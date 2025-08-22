@@ -1,30 +1,15 @@
-"use client";
+"use client"
 
-import { useAuth } from "@/components/auth-provider";
-import { LoginForm } from "@/components/login-form";
-import { AppLayout } from "@/components/app-layout";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import {
-  ShoppingCart,
-  Truck,
-  Shield,
-  Settings,
-  BarChart3,
-  Package,
-  Users,
-  FileText,
-} from "lucide-react";
-import Link from "next/link";
+import { useAuth } from "@/components/auth-provider"
+import { LoginForm } from "@/components/login-form"
+import { AppLayout } from "@/components/app-layout"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { ShoppingCart, Truck, Shield, Settings, BarChart3, Package, Users, FileText } from "lucide-react"
+import Link from "next/link"
 
 function Dashboard() {
-  const { user } = useAuth();
+  const { user } = useAuth()
 
   const getModulesForRole = (role: string) => {
     switch (role) {
@@ -51,7 +36,7 @@ function Dashboard() {
             href: "/cashier/deliveries",
             color: "bg-primary",
           },
-        ];
+        ]
       case "YARD":
         return [
           {
@@ -61,7 +46,7 @@ function Dashboard() {
             href: "/yard/deliveries",
             color: "bg-primary",
           },
-        ];
+        ]
       case "SECURITY":
         return [
           {
@@ -71,7 +56,7 @@ function Dashboard() {
             href: "/security/exits",
             color: "bg-primary",
           },
-        ];
+        ]
       case "ADMIN":
         return [
           {
@@ -102,7 +87,7 @@ function Dashboard() {
             href: "/admin/settings",
             color: "bg-primary",
           },
-        ];
+        ]
       case "REPORTS":
         return [
           {
@@ -112,34 +97,27 @@ function Dashboard() {
             href: "/reports",
             color: "bg-primary",
           },
-        ];
+        ]
       default:
-        return [];
+        return []
     }
-  };
+  }
 
-  const modules = getModulesForRole(user?.role || "");
+  const modules = getModulesForRole(user?.role || "")
 
   return (
     <AppLayout title="Panel Principal">
       <div className="space-y-6">
         <div className="text-center sm:text-left">
-          <h2 className="text-2xl sm:text-3xl font-bold text-foreground">
-            Bienvenido, {user?.name}
-          </h2>
-          <p className="text-muted-foreground text-sm sm:text-base">
-            Selecciona un módulo para comenzar
-          </p>
+          <h2 className="text-2xl sm:text-3xl font-bold text-foreground">Bienvenido, {user?.name}</h2>
+          <p className="text-muted-foreground text-sm sm:text-base">Selecciona un módulo para comenzar</p>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
           {modules.map((module) => {
-            const Icon = module.icon;
+            const Icon = module.icon
             return (
-              <Card
-                key={module.href}
-                className="hover:shadow-lg transition-all duration-300 hover:scale-105 group"
-              >
+              <Card key={module.href} className="hover:shadow-lg transition-all duration-300 hover:scale-105 group">
                 <CardHeader className="pb-3">
                   <div className="flex items-center space-x-3">
                     <div
@@ -147,50 +125,41 @@ function Dashboard() {
                     >
                       <Icon className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
                     </div>
-                    <CardTitle className="text-base sm:text-lg font-semibold">
-                      {module.title}
-                    </CardTitle>
+                    <CardTitle className="text-base sm:text-lg font-semibold">{module.title}</CardTitle>
                   </div>
                 </CardHeader>
                 <CardContent className="pt-0">
-                  <CardDescription className="mb-4 text-sm leading-relaxed">
-                    {module.description}
-                  </CardDescription>
-                  <Button
-                    asChild
-                    className="w-full h-11 text-sm sm:text-base font-medium"
-                  >
+                  <CardDescription className="mb-4 text-sm leading-relaxed">{module.description}</CardDescription>
+                  <Button asChild className="w-full h-11 text-sm sm:text-base font-medium">
                     <Link href={module.href}>Acceder</Link>
                   </Button>
                 </CardContent>
               </Card>
-            );
+            )
           })}
         </div>
       </div>
     </AppLayout>
-  );
+  )
 }
 
 export default function HomePage() {
-  const { user, isLoading } = useAuth();
+  const { user, isLoading } = useAuth()
 
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background px-4">
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 sm:h-10 sm:w-10 border-b-2 border-primary mx-auto"></div>
-          <p className="mt-2 text-muted-foreground text-sm sm:text-base">
-            Cargando...
-          </p>
+          <p className="mt-2 text-muted-foreground text-sm sm:text-base">Cargando...</p>
         </div>
       </div>
-    );
+    )
   }
 
   if (!user) {
-    return <LoginForm />;
+    return <LoginForm />
   }
 
-  return <Dashboard />;
+  return <Dashboard />
 }
