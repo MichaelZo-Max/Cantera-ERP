@@ -1,19 +1,21 @@
-"use client"
+"use client";
 
-import type { ReactNode } from "react"
-import { Button } from "@/components/ui/button"
-import { useAuth } from "@/components/auth-provider"
-import { ThemeToggle } from "@/components/theme-toggle"
-import { RedesipCredit } from "@/components/redesip-credit"
-import { LogOut, User, Building2 } from "lucide-react"
+import type { ReactNode } from "react";
+import { Button } from "@/components/ui/button";
+import { useAuth } from "@/components/auth-provider";
+import { ThemeToggle } from "@/components/theme-toggle";
+import { BackButton } from "@/components/ui/back-button";
+import { RedesipCredit } from "@/components/redesip-credit";
+import { LogOut, User, Building2 } from "lucide-react";
+import { usePathname } from "next/navigation";
 
 interface AppLayoutProps {
-  children: ReactNode
-  title: string
+  children: ReactNode;
+  title: string;
 }
 
 export function AppLayout({ children, title }: AppLayoutProps) {
-  const { user, logout } = useAuth()
+  const { user, logout } = useAuth();
 
   const getRoleDisplayName = (role: string) => {
     const roleNames = {
@@ -22,9 +24,9 @@ export function AppLayout({ children, title }: AppLayoutProps) {
       SECURITY: "Seguridad",
       ADMIN: "Administrador",
       REPORTS: "Reportes",
-    }
-    return roleNames[role as keyof typeof roleNames] || role
-  }
+    };
+    return roleNames[role as keyof typeof roleNames] || role;
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -37,8 +39,12 @@ export function AppLayout({ children, title }: AppLayoutProps) {
                   <Building2 className="h-4 w-4 sm:h-6 sm:w-6 text-primary" />
                 </div>
                 <div className="min-w-0">
-                  <h1 className="text-lg sm:text-xl font-bold text-foreground truncate">Cantera ERP</h1>
-                  <span className="text-xs text-muted-foreground font-medium hidden sm:block">{title}</span>
+                  <h1 className="text-lg sm:text-xl font-bold text-foreground truncate">
+                    Cantera ERP
+                  </h1>
+                  <span className="text-xs text-muted-foreground font-medium hidden sm:block">
+                    {title}
+                  </span>
                 </div>
               </div>
             </div>
@@ -49,8 +55,12 @@ export function AppLayout({ children, title }: AppLayoutProps) {
                   <User className="h-3.5 w-3.5 text-primary" />
                 </div>
                 <div className="text-sm">
-                  <div className="font-medium text-foreground">{user?.name}</div>
-                  <div className="text-xs text-muted-foreground">{getRoleDisplayName(user?.role || "")}</div>
+                  <div className="font-medium text-foreground">
+                    {user?.name}
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    {getRoleDisplayName(user?.role || "")}
+                  </div>
                 </div>
               </div>
 
@@ -58,7 +68,9 @@ export function AppLayout({ children, title }: AppLayoutProps) {
                 <div className="p-1 bg-primary/10 rounded-full">
                   <User className="h-3 w-3 text-primary" />
                 </div>
-                <div className="text-xs font-medium text-foreground truncate max-w-20">{user?.name?.split(" ")[0]}</div>
+                <div className="text-xs font-medium text-foreground truncate max-w-20">
+                  {user?.name?.split(" ")[0]}
+                </div>
               </div>
 
               <ThemeToggle />
@@ -78,10 +90,19 @@ export function AppLayout({ children, title }: AppLayoutProps) {
       </header>
 
       <main className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-8 py-4 sm:py-6 lg:py-8 animate-fade-in">
+        {/* Back button, hidden on home */}
+        {(() => {
+          const p = usePathname?.() || "/";
+          return p !== "/" ? (
+            <div className="mb-3 sm:mb-4">
+              <BackButton />
+            </div>
+          ) : null;
+        })()}
         <div className="space-y-4 sm:space-y-6">{children}</div>
       </main>
 
       <RedesipCredit />
     </div>
-  )
+  );
 }
