@@ -2,7 +2,8 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import { useSearchParams, useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -12,6 +13,10 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Building2, Mail, Lock, Info } from "lucide-react"
 
 export function LoginForm() {
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const next = searchParams?.get("next")
+
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [error, setError] = useState("")
@@ -23,6 +28,12 @@ export function LoginForm() {
 
     try {
       await login(email, password)
+      // redirigir a la ruta solicitada o dashboard
+      if (next) {
+        router.replace(next)
+      } else {
+        router.replace("/")
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error al iniciar sesión")
     }

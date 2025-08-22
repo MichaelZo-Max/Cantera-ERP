@@ -64,7 +64,6 @@ export function AppLayout({ children, title }: AppLayoutProps) {
               <ThemeToggle />
 
               <Button
-                aria-label="Salir"
                 variant="outline"
                 size="sm"
                 onClick={logout}

@@ -3,8 +3,13 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { Home, ShoppingCart, FileText, Truck, Shield, Users, Box, BarChart3 } from "lucide-react"
 import {
-  Breadcrumb, BreadcrumbList, BreadcrumbItem, BreadcrumbLink,
-  BreadcrumbPage, BreadcrumbSeparator, BreadcrumbEllipsis,
+  Breadcrumb,
+  BreadcrumbList,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+  BreadcrumbEllipsis,
 } from "@/components/ui/breadcrumb"
 
 type Crumb = { href: string; label: string; icon?: React.ReactNode; current?: boolean }
@@ -29,7 +34,10 @@ function buildCrumbs(pathname: string): Crumb[] {
   const parts = pathname.split("/").filter(Boolean)
   const crumbs: Crumb[] = []
   let acc = ""
+
+  // Always include home
   crumbs.push({ href: "/", label: LABELS[""].label, icon: LABELS[""].icon })
+
   for (let i = 0; i < parts.length; i++) {
     const seg = decodeURIComponent(parts[i])
     acc += `/${seg}`
@@ -42,6 +50,8 @@ function buildCrumbs(pathname: string): Crumb[] {
 export function AppBreadcrumbs() {
   const pathname = usePathname() || "/"
   const all = buildCrumbs(pathname)
+
+  // Mobile: show Home / … / Current
   const head = all[0]
   const tail = all.slice(-1)[0]
   const middle = all.slice(1, -1)
@@ -49,19 +59,23 @@ export function AppBreadcrumbs() {
   return (
     <Breadcrumb aria-label="Breadcrumb de navegación">
       <BreadcrumbList>
-        {/* Desktop: completo */}
+        {/* Desktop: todas las migas */}
         <div className="hidden sm:flex items-center flex-wrap">
           {all.map((c, idx) => (
             <div className="flex items-center" key={c.href + idx}>
               <BreadcrumbItem>
                 {c.current ? (
                   <BreadcrumbPage>
-                    <span className="inline-flex items-center gap-1.5">{c.icon}<span>{c.label}</span></span>
+                    <span className="inline-flex items-center gap-1.5">
+                      {c.icon}
+                      <span>{c.label}</span>
+                    </span>
                   </BreadcrumbPage>
                 ) : (
                   <BreadcrumbLink asChild>
                     <Link href={c.href} prefetch={false} className="inline-flex items-center gap-1.5">
-                      {c.icon}<span>{c.label}</span>
+                      {c.icon}
+                      <span>{c.label}</span>
                     </Link>
                   </BreadcrumbLink>
                 )}
@@ -71,20 +85,31 @@ export function AppBreadcrumbs() {
           ))}
         </div>
 
-        {/* Móvil: colapsado */}
+        {/* Mobile: colapsado */}
         <div className="sm:hidden flex items-center">
           <BreadcrumbItem>
             <BreadcrumbLink asChild>
               <Link href={head.href} prefetch={false} aria-label="Ir al inicio" className="inline-flex items-center gap-1.5">
-                {head.icon}<span className="sr-only">{head.label}</span>
+                {head.icon}
+                <span className="sr-only">{head.label}</span>
               </Link>
             </BreadcrumbLink>
           </BreadcrumbItem>
-          {middle.length > 0 && (<><BreadcrumbSeparator /><BreadcrumbItem><BreadcrumbEllipsis /></BreadcrumbItem></>)}
+          {middle.length > 0 && (
+            <>
+              <BreadcrumbSeparator />
+              <BreadcrumbItem>
+                <BreadcrumbEllipsis />
+              </BreadcrumbItem>
+            </>
+          )}
           <BreadcrumbSeparator />
           <BreadcrumbItem>
             <BreadcrumbPage>
-              <span className="inline-flex items-center gap-1.5">{tail.icon}<span>{tail.label}</span></span>
+              <span className="inline-flex items-center gap-1.5">
+                {tail.icon}
+                <span>{tail.label}</span>
+              </span>
             </BreadcrumbPage>
           </BreadcrumbItem>
         </div>
@@ -92,3 +117,4 @@ export function AppBreadcrumbs() {
     </Breadcrumb>
   )
 }
+

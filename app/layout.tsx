@@ -5,6 +5,7 @@ import { GeistMono } from "geist/font/mono"
 import "./globals.css"
 import { AuthProvider } from "@/components/auth-provider"
 import { ThemeProvider } from "@/components/theme-provider"
+import { Toaster } from "@/components/ui/sonner"
 
 export const metadata: Metadata = {
   title: "Cantera ERP",
@@ -53,6 +54,7 @@ html.light {
       <body>
         <ThemeProvider defaultTheme="system" storageKey="cantera-erp-theme">
           <AuthProvider>{children}</AuthProvider>
+          <Toaster richColors closeButton position="top-right" />
         </ThemeProvider>
       </body>
     </html>

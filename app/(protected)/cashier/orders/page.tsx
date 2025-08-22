@@ -13,6 +13,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { mockCustomers, mockProducts, mockTrucks } from "@/lib/mock-data"
 import type { CreateOrderForm } from "@/lib/types"
 import { Plus, Calculator } from "lucide-react"
+import { toast } from "sonner"
 
 export default function CreateOrderPage() {
   const [formData, setFormData] = useState<CreateOrderForm>({
@@ -51,6 +52,8 @@ export default function CreateOrderPage() {
       // Generate order number
       const orderNumber = `ORD-${new Date().getFullYear()}-${String(Date.now()).slice(-6)}`
 
+      toast.success("Pedido creado", { description: `Se creó el pedido ${orderNumber}` })
+
       console.log("Creating order:", {
         ...formData,
         orderNumber,
@@ -67,7 +70,7 @@ export default function CreateOrderPage() {
         notes: "",
       })
     } catch (err) {
-      setError("Error al crear el pedido")
+      setError("Error al crear el pedido"); toast.error("No se pudo crear el pedido")
     } finally {
       setIsSubmitting(false)
     }

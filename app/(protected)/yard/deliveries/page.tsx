@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge"
 import { Textarea } from "@/components/ui/textarea"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { mockDeliveries } from "@/lib/mock-data"
+import { toast } from "sonner"
 import type { Delivery, LoadDeliveryForm } from "@/lib/types"
 import { Truck, Package, User, Calendar, CheckCircle, Scale, AlertTriangle } from "lucide-react"
 
@@ -75,7 +76,7 @@ export default function YardDeliveriesPage() {
         notes: "",
       })
     } catch (err) {
-      setError("Error al confirmar la carga")
+      setError("Error al confirmar la carga"); toast.error("No se pudo confirmar la carga")
     } finally {
       setIsSubmitting(false)
     }
