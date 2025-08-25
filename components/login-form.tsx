@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -10,7 +10,8 @@ import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { useAuth } from "@/components/auth-provider"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Building2, Mail, Lock, Info } from "lucide-react"
+import { Building2, Mail, Lock, Info, ChevronUp, ChevronDown } from "lucide-react"
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 
 export function LoginForm() {
   const router = useRouter()
@@ -20,6 +21,7 @@ export function LoginForm() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [error, setError] = useState("")
+  const [isTestAccountsOpen, setIsTestAccountsOpen] = useState(false)
   const { login, isLoading } = useAuth()
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -39,8 +41,15 @@ export function LoginForm() {
     }
   }
 
+  const selectTestAccount = (testEmail: string) => {
+    setEmail(testEmail)
+    setPassword("123456")
+    setIsTestAccountsOpen(false)
+  }
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background p-4 relative">
+    <div className="min-h-screen flex flex-col items-center justify-center bg-background p-4 relative">
+      {/* Desktop test accounts - unchanged */}
       <div className="absolute top-4 right-4 max-w-xs hidden lg:block animate-fade-in">
         <Card className="card-shadow-lg border-border/50 bg-card/90 backdrop-blur-md">
           <CardHeader className="pb-3">
@@ -78,39 +87,7 @@ export function LoginForm() {
         </Card>
       </div>
 
-      <div className="absolute bottom-4 left-4 right-4 lg:hidden animate-fade-in">
-        <Card className="card-shadow-lg border-border/50 bg-card/90 backdrop-blur-md">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-center space-x-2 mb-2">
-              <Info className="h-4 w-4 text-primary" />
-              <span className="text-sm font-medium">Usuarios de prueba</span>
-            </div>
-            <div className="grid grid-cols-2 gap-2 text-xs">
-              {[
-                { email: "cajero@cantera.com", role: "Cajero" },
-                { email: "patio@cantera.com", role: "Patio" },
-                { email: "seguridad@cantera.com", role: "Seguridad" },
-                { email: "admin@cantera.com", role: "Admin" },
-              ].map((user, index) => (
-                <div
-                  key={index}
-                  className="p-2 bg-muted/30 rounded-md hover:bg-muted/50 transition-smooth cursor-pointer text-center"
-                  onClick={() => setEmail(user.email)}
-                >
-                  <div className="font-medium text-foreground truncate">{user.email}</div>
-                  <div className="text-primary font-medium">{user.role}</div>
-                </div>
-              ))}
-            </div>
-            <div className="text-center mt-2 p-2 bg-primary/5 rounded-md">
-              <span className="text-xs font-medium">Contraseña: </span>
-              <span className="text-xs font-mono font-bold text-primary">123456</span>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Main login form - centered and unchanged */}
+      {/* Main login form - centered */}
       <div className="w-full max-w-md animate-fade-in">
         <Card className="card-shadow-lg border-border/50 bg-card/80 backdrop-blur-sm">
           <CardHeader className="text-center space-y-4 pb-6">
@@ -171,6 +148,65 @@ export function LoginForm() {
             </form>
           </CardContent>
         </Card>
+      </div>
+
+      <div className="w-full max-w-md mt-4 lg:hidden animate-fade-in">
+        <Collapsible open={isTestAccountsOpen} onOpenChange={setIsTestAccountsOpen}>
+          <CollapsibleTrigger asChild>
+            <Button
+              variant="outline"
+              className="w-full h-12 bg-card/80 backdrop-blur-sm border-border/50 hover:bg-card/90 transition-smooth"
+            >
+              <div className="flex items-center justify-between w-full">
+                <div className="flex items-center space-x-2">
+                  <Info className="h-4 w-4 text-primary" />
+                  <span className="text-sm font-medium">Cuentas de prueba</span>
+                </div>
+                {isTestAccountsOpen ? (
+                  <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                ) : (
+                  <ChevronUp className="h-4 w-4 text-muted-foreground" />
+                )}
+              </div>
+            </Button>
+          </CollapsibleTrigger>
+          <CollapsibleContent className="mt-2">
+            <Card className="card-shadow-lg border-border/50 bg-card/90 backdrop-blur-md">
+              <CardContent className="p-4 space-y-3">
+                <div className="grid gap-2">
+                  {[
+                    { email: "cajero@cantera.com", role: "Cajero", color: "bg-blue-500/10 border-blue-500/20" },
+                    { email: "patio@cantera.com", role: "Patio", color: "bg-green-500/10 border-green-500/20" },
+                    {
+                      email: "seguridad@cantera.com",
+                      role: "Seguridad",
+                      color: "bg-orange-500/10 border-orange-500/20",
+                    },
+                    { email: "admin@cantera.com", role: "Admin", color: "bg-purple-500/10 border-purple-500/20" },
+                  ].map((user, index) => (
+                    <Button
+                      key={index}
+                      variant="ghost"
+                      className={`h-auto p-3 justify-start text-left hover:scale-[1.02] transition-all duration-200 ${user.color} border`}
+                      onClick={() => selectTestAccount(user.email)}
+                    >
+                      <div className="w-full">
+                        <div className="font-medium text-foreground text-sm truncate">{user.email}</div>
+                        <div className="text-primary font-medium text-xs">{user.role}</div>
+                      </div>
+                    </Button>
+                  ))}
+                </div>
+                <div className="text-center p-3 bg-primary/5 rounded-lg border border-primary/20">
+                  <p className="text-sm text-foreground">
+                    <span className="font-medium">Contraseña:</span>{" "}
+                    <span className="font-mono font-bold text-primary text-base">123456</span>
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          </CollapsibleContent>
+        </Collapsible>
       </div>
     </div>
   )
