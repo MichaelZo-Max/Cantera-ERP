@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { AppLayout } from "@/components/app-layout"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -27,189 +27,37 @@ import {
 import { toast } from "sonner"
 import type { Delivery, DispatchGuide } from "@/lib/types"
 
-// Mock data - En producción vendría de la API
-const mockLoadedDeliveries: (Delivery & {
-  order?: {
-    id: string
-    clientId: string
-    destinationId: string
-    estado: string
-    total: number
-    createdBy: string
-    createdAt: Date
-    updatedAt: Date
-    client?: { id: string; nombre: string; isActive: boolean; createdAt: Date; updatedAt: Date }
-    destination?: { id: string; clientId: string; nombre: string; isActive: boolean; createdAt: Date; updatedAt: Date }
-  }
-  truck?: { id: string; placa: string; isActive: boolean; createdAt: Date; updatedAt: Date }
-  productFormat?: {
-    product?: { nombre: string }
-    sku?: string
-    unidadBase: string
-  }
-  loadPhoto?: string // URL de la foto del patio
-})[] = [
-  {
-    id: "d1",
-    orderId: "o1",
-    truckId: "t1",
-    cantidadBase: 10,
-    estado: "CARGADA",
-    loadedAt: new Date(Date.now() - 2 * 60 * 60 * 1000), // 2 horas atrás
-    createdAt: new Date(),
-    updatedAt: new Date(),
-    order: {
-      id: "o1",
-      clientId: "c1",
-      destinationId: "dest1",
-      estado: "PAGADA",
-      total: 5000,
-      createdBy: "cashier-user-1",
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      client: {
-        id: "c1",
-        nombre: "Constructora Los Andes",
-        isActive: true,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      },
-      destination: {
-        id: "dest1",
-        clientId: "c1",
-        nombre: "Obra Av. Norte",
-        isActive: true,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      },
-    },
-    truck: {
-      id: "t1",
-      placa: "ABC-12D",
-      isActive: true,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    },
-    productFormat: {
-      product: { nombre: "Grava 3/4" },
-      sku: "A granel (m³)",
-      unidadBase: "M3",
-    },
-    loadPhoto: "/truck-loading-gravel.png",
-    notes: "Carga completa sin observaciones",
-  },
-  {
-    id: "d2",
-    orderId: "o2",
-    truckId: "t2",
-    cantidadBase: 15,
-    estado: "CARGADA",
-    loadedAt: new Date(Date.now() - 1 * 60 * 60 * 1000), // 1 hora atrás
-    createdAt: new Date(),
-    updatedAt: new Date(),
-    order: {
-      id: "o2",
-      clientId: "c2",
-      destinationId: "dest2",
-      estado: "PAGADA",
-      total: 7500,
-      createdBy: "cashier-user-1",
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      client: {
-        id: "c2",
-        nombre: "Obras Civiles CA",
-        isActive: true,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      },
-      destination: {
-        id: "dest2",
-        clientId: "c2",
-        nombre: "Puente Autopista",
-        isActive: true,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      },
-    },
-    truck: {
-      id: "t2",
-      placa: "XYZ-34E",
-      isActive: true,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    },
-    productFormat: {
-      product: { nombre: "Arena Lavada" },
-      sku: "A granel (m³)",
-      unidadBase: "M3",
-    },
-    loadPhoto: "/truck-loading-sand.png",
-  },
-]
-
-const mockExitedDeliveries: typeof mockLoadedDeliveries = [
-  {
-    id: "d3",
-    orderId: "o3",
-    truckId: "t3",
-    cantidadBase: 8,
-    estado: "SALIDA_OK",
-    loadedAt: new Date(Date.now() - 4 * 60 * 60 * 1000),
-    exitedAt: new Date(Date.now() - 30 * 60 * 1000), // 30 min atrás
-    createdAt: new Date(),
-    updatedAt: new Date(),
-    order: {
-      id: "o3",
-      clientId: "c3",
-      destinationId: "dest3",
-      estado: "PAGADA",
-      total: 4000,
-      createdBy: "cashier-user-1",
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      client: {
-        id: "c3",
-        nombre: "Constructora Los Andes",
-        isActive: true,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      },
-      destination: {
-        id: "dest3",
-        clientId: "c3",
-        nombre: "Proyecto Residencial",
-        isActive: true,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      },
-    },
-    truck: {
-      id: "t3",
-      placa: "DEF-56F",
-      isActive: true,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    },
-    productFormat: {
-      product: { nombre: "Grava 3/4" },
-      sku: "A granel (m³)",
-      unidadBase: "M3",
-    },
-  },
-]
-
 export default function SecurityExitsPage() {
-  const [loadedDeliveries, setLoadedDeliveries] = useState(mockLoadedDeliveries)
-  const [exitedDeliveries, setExitedDeliveries] = useState(mockExitedDeliveries)
+  const [allDeliveries, setAllDeliveries] = useState<Delivery[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
   const [searchQuery, setSearchQuery] = useState<string>("")
-  const [selectedDelivery, setSelectedDelivery] = useState<(typeof mockLoadedDeliveries)[0] | null>(null)
+  const [selectedDelivery, setSelectedDelivery] = useState<Delivery | null>(null)
   const [showExitModal, setShowExitModal] = useState(false)
   const [exitPhoto, setExitPhoto] = useState<File | null>(null)
   const [exitNotes, setExitNotes] = useState<string>("")
   const [isSubmitting, setIsSubmitting] = useState(false)
 
-  // Filtrar deliveries por búsqueda
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        setLoading(true)
+        const res = await fetch("/api/deliveries", { cache: "no-store" })
+        if (!res.ok) throw new Error(await res.text())
+        setAllDeliveries(await res.json())
+      } catch (e: any) {
+        setError(e?.message ?? "Error al cargar los datos de despachos")
+      } finally {
+        setLoading(false)
+      }
+    }
+    loadData()
+  }, [])
+
+  const loadedDeliveries = allDeliveries.filter((d) => d.estado === "CARGADA")
+  const exitedDeliveries = allDeliveries.filter((d) => d.estado === "SALIDA_OK")
+
   const filteredDeliveries = loadedDeliveries.filter((delivery) => {
     const query = searchQuery.toLowerCase()
     return (
@@ -219,19 +67,11 @@ export default function SecurityExitsPage() {
     )
   })
 
-  const handleSearch = (query: string) => {
-    setSearchQuery(query)
-  }
-
-  const handleSelectDelivery = (delivery: (typeof mockLoadedDeliveries)[0]) => {
-    // Validaciones según el contrato
+  const handleSelectDelivery = (delivery: Delivery) => {
     if (delivery.estado !== "CARGADA") {
-      toast.error("El viaje no está cargado", {
-        description: "Solo se pueden autorizar viajes que estén cargados",
-      })
+      toast.error("El viaje no está cargado y listo para salir.")
       return
     }
-
     setSelectedDelivery(delivery)
     setExitPhoto(null)
     setExitNotes("")
@@ -240,66 +80,67 @@ export default function SecurityExitsPage() {
 
   const handleAuthorizeExit = async () => {
     if (!selectedDelivery || !exitPhoto) {
-      toast.error("Foto de salida requerida", {
-        description: "Debes tomar una foto de la placa del camión",
-      })
+      toast.error("La foto de salida es obligatoria.")
       return
     }
 
     setIsSubmitting(true)
+    
+    const originalDeliveries = allDeliveries;
+    const updatedDeliveries = allDeliveries.map((d) =>
+      d.id === selectedDelivery.id ? { ...d, estado: "SALIDA_OK" as const, exitedAt: new Date() } : d
+    );
+    setAllDeliveries(updatedDeliveries);
+    setShowExitModal(false);
 
     try {
-      // Mock API call
-      await new Promise((resolve) => setTimeout(resolve, 2000))
-
-      // Generar guía de despacho
+      const res = await fetch(`/api/deliveries/${selectedDelivery.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+            estado: 'SALIDA_OK',
+            notes: exitNotes,
+        }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      
       const guideNumber = `GD-${new Date().getFullYear()}-${String(Date.now()).slice(-6)}`
-      const dispatchGuide: DispatchGuide = {
-        id: `guide-${Date.now()}`,
-        deliveryId: selectedDelivery.id,
-        numeroGuia: guideNumber,
-        fecha: new Date().toISOString(),
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      }
-
-      // Actualizar estado del delivery
-      const updatedDelivery = {
-        ...selectedDelivery,
-        estado: "SALIDA_OK" as const,
-        exitedBy: "security-user-1",
-        exitedAt: new Date(),
-        notes: exitNotes || selectedDelivery.notes,
-      }
-
-      // Mover de loaded a exited
-      setLoadedDeliveries((prev) => prev.filter((d) => d.id !== selectedDelivery.id))
-      setExitedDeliveries((prev) => [updatedDelivery, ...prev])
-
       toast.success("Salida autorizada", {
-        description: `Guía de despacho ${guideNumber} generada`,
+        description: `Guía de despacho ${guideNumber} generada para ${selectedDelivery.truck?.placa}`,
       })
 
-      console.log("Dispatch guide generated:", dispatchGuide)
-      console.log("Exit photo:", exitPhoto)
-
-      // Limpiar y cerrar modal
-      setShowExitModal(false)
+    } catch (error) {
+        setAllDeliveries(originalDeliveries); // Revertir en caso de error
+        toast.error("Error al autorizar la salida.", {
+            description: "Por favor, inténtalo de nuevo."
+        });
+    } finally {
+      setIsSubmitting(false)
       setSelectedDelivery(null)
       setExitPhoto(null)
       setExitNotes("")
-    } catch (error) {
-      toast.error("Error al autorizar salida")
-    } finally {
-      setIsSubmitting(false)
     }
   }
 
   const handleCloseModal = () => {
     setShowExitModal(false)
     setSelectedDelivery(null)
-    setExitPhoto(null)
-    setExitNotes("")
+  }
+
+  if (loading) {
+    return (
+      <AppLayout title="Control de Salida">
+        <div className="p-6 text-center">Cargando viajes...</div>
+      </AppLayout>
+    );
+  }
+
+  if (error) {
+    return (
+      <AppLayout title="Control de Salida">
+        <div className="p-6 text-destructive text-center">Error: {error}</div>
+      </AppLayout>
+    );
   }
 
   return (
@@ -310,7 +151,6 @@ export default function SecurityExitsPage() {
           <p className="text-muted-foreground">Autoriza la salida de camiones cargados</p>
         </div>
 
-        {/* Búsqueda rápida */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -321,14 +161,12 @@ export default function SecurityExitsPage() {
           </CardHeader>
           <CardContent>
             <div className="flex gap-4">
-              <div className="flex-1">
-                <Input
-                  placeholder="Buscar por placa (ABC-12D), ID de viaje o cliente..."
-                  value={searchQuery}
-                  onChange={(e) => handleSearch(e.target.value)}
-                  className="text-lg"
-                />
-              </div>
+              <Input
+                placeholder="Buscar por placa (ABC-12D), ID de viaje o cliente..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="text-lg"
+              />
               <Button variant="outline" onClick={() => setSearchQuery("")}>
                 Limpiar
               </Button>
@@ -336,7 +174,6 @@ export default function SecurityExitsPage() {
           </CardContent>
         </Card>
 
-        {/* Viajes cargados listos para salir */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -408,7 +245,6 @@ export default function SecurityExitsPage() {
           </CardContent>
         </Card>
 
-        {/* Salidas recientes */}
         {exitedDeliveries.length > 0 && (
           <Card>
             <CardHeader>
@@ -455,7 +291,6 @@ export default function SecurityExitsPage() {
           </Card>
         )}
 
-        {/* Modal de autorización de salida */}
         <Dialog open={showExitModal} onOpenChange={setShowExitModal}>
           <DialogContent className="sm:max-w-3xl max-h-[90vh] overflow-y-auto">
             <DialogHeader className="pb-4">
@@ -494,7 +329,6 @@ export default function SecurityExitsPage() {
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {/* Foto del patio */}
                   <div>
                     <h4 className="font-medium mb-2 flex items-center gap-2 text-sm">
                       <Eye className="h-4 w-4" />
@@ -517,7 +351,6 @@ export default function SecurityExitsPage() {
                     )}
                   </div>
 
-                  {/* Foto de salida */}
                   <div>
                     <PhotoInput
                       onSelect={setExitPhoto}
@@ -547,7 +380,6 @@ export default function SecurityExitsPage() {
                   />
                 </div>
 
-                {/* Alertas de validación */}
                 {selectedDelivery.estado !== "CARGADA" && (
                   <Alert variant="destructive" className="py-2">
                     <AlertTriangle className="h-4 w-4" />

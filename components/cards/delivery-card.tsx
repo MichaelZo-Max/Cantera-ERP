@@ -40,11 +40,6 @@ const STATUS_CONFIG = {
     color: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300",
     icon: CheckCircle,
   },
-  PEND_SALIDA: {
-    label: "Pendiente Salida",
-    color: "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300",
-    icon: Truck,
-  },
   SALIDA_OK: {
     label: "Salida OK",
     color: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-300",

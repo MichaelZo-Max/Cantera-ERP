@@ -26,12 +26,6 @@ const statusConfig = {
       "bg-green-500/10 text-green-700 border-green-200 dark:bg-green-500/20 dark:text-green-300 dark:border-green-800",
     icon: CheckCircle,
   },
-  PEND_SALIDA: {
-    label: "Pendiente Salida",
-    color:
-      "bg-purple-500/10 text-purple-700 border-purple-200 dark:bg-purple-500/20 dark:text-purple-300 dark:border-purple-800",
-    icon: Truck,
-  },
   SALIDA_OK: {
     label: "Salida OK",
     color:

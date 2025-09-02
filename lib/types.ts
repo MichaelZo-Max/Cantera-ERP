@@ -3,9 +3,9 @@ export type UnitBase = "M3" | "TON" | "BOLSA" | "UNIDAD"
 
 export type UserRole = "CASHIER" | "YARD" | "SECURITY" | "ADMIN" | "REPORTS"
 
-export type OrderStatus = "CREADA" | "PAGADA" | "EN_DESPACHO" | "PARCIAL" | "CERRADA" | "CANCELADA" | "PEND_SALIDA"
+export type OrderStatus = "CREADA" | "PAGADA" | "EN_DESPACHO" | "PARCIAL" | "CERRADA" | "CANCELADA"
 
-export type DeliveryStatus = "ASIGNADA" | "EN_CARGA" | "CARGADA" | "PEND_SALIDA" | "SALIDA_OK" | "RECHAZADA"
+export type DeliveryStatus = "ASIGNADA" | "EN_CARGA" | "CARGADA" | "SALIDA_OK" | "RECHAZADA"
 
 export type ProductArea = "AGREGADOS" | "ASFALTOS" | "VIVEROS" | "SERVICIOS"
 
@@ -56,7 +56,7 @@ export interface Product {
 export interface ProductFormat {
   id: string
   productId: string
-  product?: Product // ✨ Propiedad añadida para anidar la info del producto
+  product?: Product
   unidadBase: UnitBase
   factorUnidadBase: number
   sku?: string
@@ -124,12 +124,13 @@ export interface Delivery {
   truck?: Truck
   driverId?: string
   driver?: Driver
-  productFormat?: ProductFormat // ✨ Propiedad añadida para anidar info del formato/producto
+  productFormat?: ProductFormat
   cantidadBase: number
   loadedQuantity?: number
   estado: DeliveryStatus
   loadedBy?: string
   loadedAt?: Date
+  loadPhoto?: string // ✨ Propiedad añadida para la foto de carga
   exitedBy?: string
   exitedAt?: Date
   notes?: string
@@ -147,7 +148,7 @@ export interface DispatchGuide {
   updatedAt: Date
 }
 
-// Form types - Actualizando según nuevos tipos
+// Form types
 export interface CreateOrderForm {
   clientId: string
   destinationId?: string
