@@ -12,16 +12,23 @@ import { DeliveryCard } from "@/components/cards/delivery-card"
 import { QuantityInput } from "@/components/forms/quantity-input"
 import { PhotoInput } from "@/components/forms/photo-input"
 import { toast } from "sonner"
-import type { Delivery } from "@/lib/types"
+import type { Delivery, OrderStatus } from "@/lib/types"
 import { CheckCircle, AlertTriangle, Camera, Package } from "lucide-react"
 
 // Mock data - En producción vendría de la API
 const mockDeliveries: (Delivery & {
   order?: {
-    client?: { nombre: string }
-    destination?: { nombre: string }
+    id: string;
+    orderNumber?: string;
+    clientId: string;
+    estado: OrderStatus;
+    createdBy: string;
+    createdAt: Date;
+    updatedAt: Date;
+    client?: { id: string; nombre: string; isActive: boolean; createdAt: Date; updatedAt: Date; }
+    destination?: { id: string; clientId: string; nombre: string; direccion?: string; isActive: boolean; createdAt: Date; updatedAt: Date; }
   }
-  truck?: { placa: string }
+  truck?: { id: string; placa: string; isActive: boolean; createdAt: Date; updatedAt: Date; }
   productFormat?: {
     product?: { nombre: string }
     sku?: string
@@ -37,10 +44,16 @@ const mockDeliveries: (Delivery & {
     createdAt: new Date(),
     updatedAt: new Date(),
     order: {
-      client: { nombre: "Constructora Los Andes" },
-      destination: { nombre: "Obra Av. Norte" },
+        id: "o1",
+        clientId: "1",
+        estado: "PAGADA",
+        createdBy: "user-1",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        client: { id: "1", nombre: "Constructora Los Andes", isActive: true, createdAt: new Date(), updatedAt: new Date() },
+        destination: { id: "1", clientId: "1", nombre: "Obra Av. Norte", direccion: "Av. Norte, Caracas", isActive: true, createdAt: new Date(), updatedAt: new Date() },
     },
-    truck: { placa: "ABC-12D" },
+    truck: { id: "1", placa: "ABC-12D", isActive: true, createdAt: new Date(), updatedAt: new Date() },
     productFormat: {
       product: { nombre: "Grava 3/4" },
       sku: "A granel (m³)",
@@ -56,10 +69,16 @@ const mockDeliveries: (Delivery & {
     createdAt: new Date(),
     updatedAt: new Date(),
     order: {
-      client: { nombre: "Obras Civiles CA" },
-      destination: { nombre: "Puente Autopista" },
+      id: "o2",
+      clientId: "2",
+      estado: "PAGADA",
+      createdBy: "user-1",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      client: { id: "2", nombre: "Obras Civiles CA", isActive: true, createdAt: new Date(), updatedAt: new Date() },
+      destination: { id: "3", clientId: "2", nombre: "Puente Autopista", direccion: "Autopista Regional", isActive: true, createdAt: new Date(), updatedAt: new Date() },
     },
-    truck: { placa: "XYZ-34E" },
+    truck: { id: "2", placa: "XYZ-34E", isActive: true, createdAt: new Date(), updatedAt: new Date() },
     productFormat: {
       product: { nombre: "Arena Lavada" },
       sku: "A granel (m³)",
@@ -76,10 +95,16 @@ const mockDeliveries: (Delivery & {
     createdAt: new Date(),
     updatedAt: new Date(),
     order: {
-      client: { nombre: "Constructora Los Andes" },
-      destination: { nombre: "Proyecto Residencial" },
+      id: "o3",
+      clientId: "1",
+      estado: "PAGADA",
+      createdBy: "user-1",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      client: { id: "1", nombre: "Constructora Los Andes", isActive: true, createdAt: new Date(), updatedAt: new Date() },
+      destination: { id: "2", clientId: "1", nombre: "Proyecto Residencial", direccion: "Urb. Los Palos Grandes", isActive: true, createdAt: new Date(), updatedAt: new Date() },
     },
-    truck: { placa: "DEF-56F" },
+    truck: { id: "3", placa: "DEF-56F", isActive: true, createdAt: new Date(), updatedAt: new Date() },
     productFormat: {
       product: { nombre: "Grava 3/4" },
       sku: "A granel (m³)",
@@ -129,7 +154,7 @@ export default function YardDeliveriesPage() {
           ? {
               ...d,
               estado: "CARGADA" as const,
-              cantidadBase: loadedQuantity,
+              loadedQuantity: loadedQuantity,
               loadedBy: "yard-user-1",
               loadedAt: new Date(),
               notes: notes || undefined,
@@ -345,3 +370,4 @@ export default function YardDeliveriesPage() {
     </AppLayout>
   )
 }
+

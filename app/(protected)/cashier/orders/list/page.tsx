@@ -18,23 +18,21 @@ export default function OrdersListPage() {
 
   const filteredOrders = orders.filter(
     (order) =>
-      order.orderNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      order.customer?.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      order.product?.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      order.truck?.plates.toLowerCase().includes(searchTerm.toLowerCase()),
-  )
-
+      order.orderNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      order.client?.nombre.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+  
   const getStatusColor = (status: string) => {
     switch (status) {
-      case "PENDING":
+      case "CREADA":
         return "bg-yellow-100 text-yellow-800 border-yellow-200 dark:bg-yellow-900/20 dark:text-yellow-300 dark:border-yellow-800"
-      case "IN_PROGRESS":
+      case "PAGADA":
         return "bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/20 dark:text-blue-300 dark:border-blue-800"
-      case "LOADED":
+      case "EN_DESPACHO":
         return "bg-green-100 text-green-800 border-green-200 dark:bg-green-900/20 dark:text-green-300 dark:border-green-800"
-      case "COMPLETED":
+      case "CERRADA":
         return "bg-muted text-muted-foreground border-border"
-      case "CANCELLED":
+      case "CANCELADA":
         return "bg-red-100 text-red-800 border-red-200 dark:bg-red-900/20 dark:text-red-300 dark:border-red-800"
       default:
         return "bg-muted text-muted-foreground border-border"
@@ -43,16 +41,16 @@ export default function OrdersListPage() {
 
   const getStatusText = (status: string) => {
     switch (status) {
-      case "PENDING":
-        return "Pendiente"
-      case "IN_PROGRESS":
-        return "En Proceso"
-      case "LOADED":
-        return "Cargado"
-      case "COMPLETED":
-        return "Completado"
-      case "CANCELLED":
-        return "Cancelado"
+      case "CREADA":
+        return "Creada"
+      case "PAGADA":
+        return "Pagada"
+      case "EN_DESPACHO":
+        return "En Despacho"
+      case "CERRADA":
+        return "Cerrada"
+      case "CANCELADA":
+        return "Cancelada"
       default:
         return status
     }
@@ -116,7 +114,7 @@ export default function OrdersListPage() {
                         </span>
                       </CardDescription>
                     </div>
-                    <Badge className={getStatusColor(order.status)}>{getStatusText(order.status)}</Badge>
+                    <Badge className={getStatusColor(order.estado)}>{getStatusText(order.estado)}</Badge>
                   </div>
                 </CardHeader>
                 <CardContent>
@@ -124,34 +122,15 @@ export default function OrdersListPage() {
                     <div className="flex items-center space-x-2">
                       <User className="h-4 w-4 text-muted-foreground" />
                       <div>
-                        <p className="text-sm font-medium">{order.customer?.name}</p>
+                        <p className="text-sm font-medium">{order.client?.nombre}</p>
                         <p className="text-xs text-muted-foreground">Cliente</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Package className="h-4 w-4 text-muted-foreground" />
-                      <div>
-                        <p className="text-sm font-medium">{order.product?.name}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {order.quantity} {order.product?.unit}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Truck className="h-4 w-4 text-muted-foreground" />
-                      <div>
-                        <p className="text-sm font-medium">{order.truck?.plates}</p>
-                        <p className="text-xs text-muted-foreground">{order.truck?.driverName}</p>
                       </div>
                     </div>
                   </div>
 
                   <div className="flex justify-between items-center pt-4 border-t">
                     <div>
-                      <p className="text-lg font-bold text-foreground">${order.totalAmount.toFixed(2)}</p>
-                      <p className="text-sm text-muted-foreground">
-                        ${order.pricePerUnit} × {order.quantity} {order.product?.unit}
-                      </p>
+                      <p className="text-lg font-bold text-foreground">${order.total?.toFixed(2)}</p>
                     </div>
                     <Button variant="outline" size="sm" className="flex items-center space-x-2 bg-transparent">
                       <Eye className="h-4 w-4" />

@@ -14,7 +14,7 @@ import { AnimatedCard } from "@/components/ui/animated-card"
 import { GradientButton } from "@/components/ui/gradient-button"
 import { LoadingSkeleton } from "@/components/ui/loading-skeleton"
 import { mockProducts } from "@/lib/mock-data"
-import type { Product } from "@/lib/types"
+import type { Product, ProductArea } from "@/lib/types"
 import { Package, Plus, Search, Edit, Trash2, CheckCircle, Sparkles } from "lucide-react"
 
 export default function ProductsPage() {
@@ -23,10 +23,10 @@ export default function ProductsPage() {
   const [showForm, setShowForm] = useState(false)
   const [editingProduct, setEditingProduct] = useState<Product | null>(null)
   const [formData, setFormData] = useState({
-    name: "",
+    codigo: "",
+    nombre: "",
     description: "",
-    unit: "",
-    pricePerUnit: 0,
+    area: "AGREGADOS" as ProductArea,
   })
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [success, setSuccess] = useState("")
@@ -34,18 +34,18 @@ export default function ProductsPage() {
 
   const filteredProducts = products.filter(
     (product) =>
-      product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      product.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
       product.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      product.unit.toLowerCase().includes(searchTerm.toLowerCase()),
+      product.codigo.toLowerCase().includes(searchTerm.toLowerCase()),
   )
 
   const handleNewProduct = () => {
     setEditingProduct(null)
     setFormData({
-      name: "",
+      codigo: "",
+      nombre: "",
       description: "",
-      unit: "",
-      pricePerUnit: 0,
+      area: "AGREGADOS",
     })
     setShowForm(true)
     setSuccess("")
@@ -55,10 +55,10 @@ export default function ProductsPage() {
   const handleEditProduct = (product: Product) => {
     setEditingProduct(product)
     setFormData({
-      name: product.name,
+      codigo: product.codigo,
+      nombre: product.nombre,
       description: product.description || "",
-      unit: product.unit,
-      pricePerUnit: product.pricePerUnit,
+      area: product.area,
     })
     setShowForm(true)
     setSuccess("")
@@ -102,10 +102,10 @@ export default function ProductsPage() {
 
       setShowForm(false)
       setFormData({
-        name: "",
+        codigo: "",
+        nombre: "",
         description: "",
-        unit: "",
-        pricePerUnit: 0,
+        area: "AGREGADOS",
       })
     } catch (err) {
       setError("Error al guardar el producto")
@@ -192,27 +192,27 @@ export default function ProductsPage() {
               <form onSubmit={handleSubmit} className="space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-2">
-                    <Label htmlFor="name" className="text-sm font-semibold">
-                      Nombre del Producto *
+                    <Label htmlFor="codigo" className="text-sm font-semibold">
+                      Código del Producto *
                     </Label>
                     <Input
-                      id="name"
-                      value={formData.name}
-                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                      placeholder="Nombre del producto"
+                      id="codigo"
+                      value={formData.codigo}
+                      onChange={(e) => setFormData({ ...formData, codigo: e.target.value })}
+                      placeholder="Código del producto"
                       className="focus-ring"
                       required
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="unit" className="text-sm font-semibold">
-                      Unidad de Medida *
+                    <Label htmlFor="nombre" className="text-sm font-semibold">
+                      Nombre del Producto *
                     </Label>
                     <Input
-                      id="unit"
-                      value={formData.unit}
-                      onChange={(e) => setFormData({ ...formData, unit: e.target.value })}
-                      placeholder="m3, ton, kg, etc."
+                      id="nombre"
+                      value={formData.nombre}
+                      onChange={(e) => setFormData({ ...formData, nombre: e.target.value })}
+                      placeholder="Nombre del producto"
                       className="focus-ring"
                       required
                     />
@@ -234,17 +234,14 @@ export default function ProductsPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="pricePerUnit" className="text-sm font-semibold">
-                    Precio por Unidad *
+                  <Label htmlFor="area" className="text-sm font-semibold">
+                    Área *
                   </Label>
                   <Input
-                    id="pricePerUnit"
-                    type="number"
-                    step="0.01"
-                    min="0.01"
-                    value={formData.pricePerUnit || ""}
-                    onChange={(e) => setFormData({ ...formData, pricePerUnit: Number.parseFloat(e.target.value) || 0 })}
-                    placeholder="0.00"
+                    id="area"
+                    value={formData.area}
+                    onChange={(e) => setFormData({ ...formData, area: e.target.value as ProductArea })}
+                    placeholder="AGREGADOS"
                     className="focus-ring"
                     required
                   />
@@ -253,7 +250,7 @@ export default function ProductsPage() {
                 <div className="flex space-x-3 pt-4 border-t">
                   <GradientButton
                     type="submit"
-                    disabled={isSubmitting || !formData.name || !formData.unit || formData.pricePerUnit <= 0}
+                    disabled={isSubmitting || !formData.nombre || !formData.codigo}
                     className="flex-1"
                   >
                     {isSubmitting ? (
@@ -291,7 +288,7 @@ export default function ProductsPage() {
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-5 w-5" />
               <Input
-                placeholder="Buscar por nombre, descripción o unidad..."
+                placeholder="Buscar por nombre, descripción o código..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-12 h-12 text-lg focus-ring"
@@ -325,9 +322,9 @@ export default function ProductsPage() {
                   <div className="flex justify-between items-start">
                     <div className="flex-1">
                       <CardTitle className="text-xl font-bold bg-gradient-to-r from-foreground to-muted-foreground bg-clip-text text-transparent">
-                        {product.name}
+                        {product.nombre}
                       </CardTitle>
-                      <p className="text-sm text-muted-foreground mt-1 font-medium">Unidad: {product.unit}</p>
+                      <p className="text-sm text-muted-foreground mt-1 font-medium">Código: {product.codigo}</p>
                     </div>
                     <Badge
                       variant={product.isActive ? "default" : "secondary"}
@@ -344,9 +341,9 @@ export default function ProductsPage() {
 
                   <div className="bg-gradient-to-r from-primary/10 to-accent/10 border border-primary/20 p-4 rounded-xl">
                     <p className="text-2xl font-bold bg-gradient-primary bg-clip-text text-transparent">
-                      ${product.pricePerUnit.toFixed(2)}
+                      {product.area}
                     </p>
-                    <p className="text-sm text-primary/80 font-medium">por {product.unit}</p>
+                    <p className="text-sm text-primary/80 font-medium">Área</p>
                   </div>
 
                   <div className="flex space-x-2 pt-4 border-t">

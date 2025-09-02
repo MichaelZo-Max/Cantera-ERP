@@ -20,12 +20,10 @@ export default function TrucksPage() {
   const [showForm, setShowForm] = useState(false)
   const [editingTruck, setEditingTruck] = useState<Truck | null>(null)
   const [formData, setFormData] = useState({
-    plates: "",
+    placa: "",
     brand: "",
     model: "",
     capacity: 0,
-    driverName: "",
-    driverPhone: "",
   })
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [success, setSuccess] = useState("")
@@ -33,21 +31,18 @@ export default function TrucksPage() {
 
   const filteredTrucks = trucks.filter(
     (truck) =>
-      truck.plates.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      truck.placa.toLowerCase().includes(searchTerm.toLowerCase()) ||
       truck.brand?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      truck.model?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      truck.driverName?.toLowerCase().includes(searchTerm.toLowerCase()),
-  )
-
+      truck.model?.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+  
   const handleNewTruck = () => {
     setEditingTruck(null)
     setFormData({
-      plates: "",
+      placa: "",
       brand: "",
       model: "",
       capacity: 0,
-      driverName: "",
-      driverPhone: "",
     })
     setShowForm(true)
     setSuccess("")
@@ -57,12 +52,10 @@ export default function TrucksPage() {
   const handleEditTruck = (truck: Truck) => {
     setEditingTruck(truck)
     setFormData({
-      plates: truck.plates,
+      placa: truck.placa,
       brand: truck.brand || "",
       model: truck.model || "",
       capacity: truck.capacity || 0,
-      driverName: truck.driverName || "",
-      driverPhone: truck.driverPhone || "",
     })
     setShowForm(true)
     setSuccess("")
@@ -106,12 +99,10 @@ export default function TrucksPage() {
 
       setShowForm(false)
       setFormData({
-        plates: "",
+        placa: "",
         brand: "",
         model: "",
         capacity: 0,
-        driverName: "",
-        driverPhone: "",
       })
     } catch (err) {
       setError("Error al guardar el camión")
@@ -182,8 +173,8 @@ export default function TrucksPage() {
                     <Label htmlFor="plates">Placas *</Label>
                     <Input
                       id="plates"
-                      value={formData.plates}
-                      onChange={(e) => setFormData({ ...formData, plates: e.target.value.toUpperCase() })}
+                      value={formData.placa}
+                      onChange={(e) => setFormData({ ...formData, placa: e.target.value.toUpperCase() })}
                       placeholder="ABC-123-D"
                       required
                     />
@@ -221,29 +212,8 @@ export default function TrucksPage() {
                   />
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="driverName">Nombre del Conductor</Label>
-                    <Input
-                      id="driverName"
-                      value={formData.driverName}
-                      onChange={(e) => setFormData({ ...formData, driverName: e.target.value })}
-                      placeholder="Nombre completo del conductor"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="driverPhone">Teléfono del Conductor</Label>
-                    <Input
-                      id="driverPhone"
-                      value={formData.driverPhone}
-                      onChange={(e) => setFormData({ ...formData, driverPhone: e.target.value })}
-                      placeholder="Número de teléfono"
-                    />
-                  </div>
-                </div>
-
                 <div className="flex space-x-3">
-                  <Button type="submit" disabled={isSubmitting || !formData.plates}>
+                  <Button type="submit" disabled={isSubmitting || !formData.placa}>
                     {isSubmitting ? "Guardando..." : editingTruck ? "Actualizar" : "Crear Camión"}
                   </Button>
                   <Button
@@ -294,7 +264,7 @@ export default function TrucksPage() {
                 <CardHeader className="pb-3">
                   <div className="flex justify-between items-start">
                     <div className="flex-1">
-                      <CardTitle className="text-lg">{truck.plates}</CardTitle>
+                      <CardTitle className="text-lg">{truck.placa}</CardTitle>
                       <p className="text-sm text-muted-foreground mt-1">
                         {truck.brand} {truck.model}
                       </p>
@@ -309,21 +279,6 @@ export default function TrucksPage() {
                     <div className="bg-primary/5 border border-primary/20 p-3 rounded-lg">
                       <p className="text-lg font-bold text-primary">{truck.capacity} m³</p>
                       <p className="text-sm text-primary/80">Capacidad</p>
-                    </div>
-                  )}
-
-                  {truck.driverName && (
-                    <div className="space-y-2">
-                      <div className="flex items-center space-x-2">
-                        <User className="h-4 w-4 text-muted-foreground" />
-                        <p className="text-sm text-muted-foreground">{truck.driverName}</p>
-                      </div>
-                      {truck.driverPhone && (
-                        <div className="flex items-center space-x-2">
-                          <Phone className="h-4 w-4 text-muted-foreground" />
-                          <p className="text-sm text-muted-foreground">{truck.driverPhone}</p>
-                        </div>
-                      )}
                     </div>
                   )}
 

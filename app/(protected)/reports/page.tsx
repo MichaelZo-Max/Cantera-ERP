@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
-import { mockOrders, mockCustomers, mockProducts } from "@/lib/mock-data"
+import { mockOrders, mockClients, mockProducts } from "@/lib/mock-data"
 import {
   BarChart3,
   Calendar,
@@ -33,9 +33,8 @@ export default function ReportsPage() {
   const [itemsPerPage] = useState(10)
 
   const filteredOrders = mockOrders.filter((order) => {
-    const matchesCustomer = selectedCustomer === "all-customers" || order.customerId === selectedCustomer
-    const matchesProduct = selectedProduct === "all-products" || order.productId === selectedProduct
-    const matchesStatus = selectedStatus === "all-status" || order.status === selectedStatus
+    const matchesCustomer = selectedCustomer === "all-customers" || order.clientId === selectedCustomer
+    const matchesStatus = selectedStatus === "all-status" || order.estado === selectedStatus
 
     let matchesDateRange = true
     if (dateFrom && dateTo) {
@@ -45,37 +44,36 @@ export default function ReportsPage() {
       matchesDateRange = orderDate >= fromDate && orderDate <= toDate
     }
 
-    return matchesCustomer && matchesProduct && matchesStatus && matchesDateRange
+    return matchesCustomer && matchesStatus && matchesDateRange
   })
 
   const totalOrders = filteredOrders.length
-  const completedOrders = filteredOrders.filter((o) => o.status === "COMPLETED").length
-  const totalRevenue = filteredOrders.reduce((sum, order) => sum + order.totalAmount, 0)
-  const totalQuantity = filteredOrders.reduce((sum, order) => sum + order.quantity, 0)
+  const completedOrders = filteredOrders.filter((o) => o.estado === "CERRADA").length
+  const totalRevenue = filteredOrders.reduce((sum, order) => sum + (order.total ?? 0), 0)
 
   const totalPages = Math.ceil(filteredOrders.length / itemsPerPage)
   const startIndex = (currentPage - 1) * itemsPerPage
   const paginatedOrders = filteredOrders.slice(startIndex, startIndex + itemsPerPage)
 
   const ordersByStatus = {
-    PENDING: filteredOrders.filter((o) => o.status === "PENDING").length,
-    IN_PROGRESS: filteredOrders.filter((o) => o.status === "IN_PROGRESS").length,
-    LOADED: filteredOrders.filter((o) => o.status === "LOADED").length,
-    COMPLETED: filteredOrders.filter((o) => o.status === "COMPLETED").length,
-    CANCELLED: filteredOrders.filter((o) => o.status === "CANCELLED").length,
+    CREADA: filteredOrders.filter((o) => o.estado === "CREADA").length,
+    PAGADA: filteredOrders.filter((o) => o.estado === "PAGADA").length,
+    EN_DESPACHO: filteredOrders.filter((o) => o.estado === "EN_DESPACHO").length,
+    CERRADA: filteredOrders.filter((o) => o.estado === "CERRADA").length,
+    CANCELADA: filteredOrders.filter((o) => o.estado === "CANCELADA").length,
   }
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case "PENDING":
+      case "CREADA":
         return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-300"
-      case "IN_PROGRESS":
+      case "PAGADA":
         return "bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-300"
-      case "LOADED":
+      case "EN_DESPACHO":
         return "bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-300"
-      case "COMPLETED":
+      case "CERRADA":
         return "bg-muted text-muted-foreground"
-      case "CANCELLED":
+      case "CANCELADA":
         return "bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-300"
       default:
         return "bg-muted text-muted-foreground"
@@ -84,33 +82,31 @@ export default function ReportsPage() {
 
   const getStatusText = (status: string) => {
     switch (status) {
-      case "PENDING":
-        return "Pendiente"
-      case "IN_PROGRESS":
-        return "En Proceso"
-      case "LOADED":
-        return "Cargado"
-      case "COMPLETED":
-        return "Completado"
-      case "CANCELLED":
-        return "Cancelado"
+      case "CREADA":
+        return "Creada"
+      case "PAGADA":
+        return "Pagada"
+      case "EN_DESPACHO":
+        return "En Despacho"
+      case "CERRADA":
+        return "Cerrada"
+      case "CANCELADA":
+        return "Cancelada"
       default:
         return status
     }
   }
 
   const exportToCSV = () => {
-    const headers = ["Pedido", "Cliente", "Producto", "Cantidad", "Total", "Estado", "Fecha"]
+    const headers = ["Pedido", "Cliente", "Total", "Estado", "Fecha"]
     const csvContent = [
       headers.join(","),
       ...filteredOrders.map((order) =>
         [
           order.orderNumber,
-          `"${order.customer?.name || ""}"`,
-          `"${order.product?.name || ""}"`,
-          `${order.quantity} ${order.product?.unit || ""}`,
-          order.totalAmount.toFixed(2),
-          order.status,
+          `"${order.client?.nombre || ""}"`,
+          order.total?.toFixed(2),
+          order.estado,
           new Date(order.createdAt).toLocaleDateString("es-MX"),
         ].join(","),
       ),
@@ -150,13 +146,12 @@ export default function ReportsPage() {
           <div class="metrics">
             <div class="metric"><h3>${totalOrders}</h3><p>Total Pedidos</p></div>
             <div class="metric"><h3>$${totalRevenue.toFixed(2)}</h3><p>Ingresos</p></div>
-            <div class="metric"><h3>${totalQuantity.toFixed(1)} m³</h3><p>Cantidad</p></div>
             <div class="metric"><h3>${totalOrders > 0 ? ((completedOrders / totalOrders) * 100).toFixed(1) : "0"}%</h3><p>Completados</p></div>
           </div>
           <table>
             <thead>
               <tr>
-                <th>Pedido</th><th>Cliente</th><th>Producto</th><th>Cantidad</th><th>Total</th><th>Estado</th><th>Fecha</th>
+                <th>Pedido</th><th>Cliente</th><th>Total</th><th>Estado</th><th>Fecha</th>
               </tr>
             </thead>
             <tbody>
@@ -165,11 +160,9 @@ export default function ReportsPage() {
                   (order) => `
                 <tr>
                   <td>${order.orderNumber}</td>
-                  <td>${order.customer?.name || ""}</td>
-                  <td>${order.product?.name || ""}</td>
-                  <td>${order.quantity} ${order.product?.unit || ""}</td>
-                  <td>$${order.totalAmount.toFixed(2)}</td>
-                  <td>${order.status}</td>
+                  <td>${order.client?.nombre || ""}</td>
+                  <td>$${order.total?.toFixed(2)}</td>
+                  <td>${order.estado}</td>
                   <td>${new Date(order.createdAt).toLocaleDateString("es-MX")}</td>
                 </tr>
               `,
@@ -197,12 +190,12 @@ export default function ReportsPage() {
     }
   }
 
-  const customerStats = mockCustomers
+  const customerStats = mockClients
     .map((customer) => {
-      const customerOrders = filteredOrders.filter((o) => o.customerId === customer.id)
-      const revenue = customerOrders.reduce((sum, order) => sum + order.totalAmount, 0)
+      const customerOrders = filteredOrders.filter((o) => o.clientId === customer.id)
+      const revenue = customerOrders.reduce((sum, order) => sum + (order.total ?? 0), 0)
       return {
-        customer: customer.name,
+        customer: customer.nombre,
         orders: customerOrders.length,
         revenue,
       }
@@ -211,13 +204,11 @@ export default function ReportsPage() {
 
   const productStats = mockProducts
     .map((product) => {
-      const productOrders = filteredOrders.filter((o) => o.productId === product.id)
-      const quantity = productOrders.reduce((sum, order) => sum + order.quantity, 0)
-      const revenue = productOrders.reduce((sum, order) => sum + order.totalAmount, 0)
+      const productOrders = filteredOrders.filter((o) => o.id === product.id)
+      const revenue = productOrders.reduce((sum, order) => sum + (order.total ?? 0), 0)
       return {
-        product: product.name,
+        product: product.nombre,
         orders: productOrders.length,
-        quantity,
         revenue,
       }
     })
@@ -272,9 +263,9 @@ export default function ReportsPage() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all-customers">Todos los clientes</SelectItem>
-                    {mockCustomers.map((customer) => (
+                    {mockClients.map((customer) => (
                       <SelectItem key={customer.id} value={customer.id}>
-                        {customer.name}
+                        {customer.nombre}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -290,7 +281,7 @@ export default function ReportsPage() {
                     <SelectItem value="all-products">Todos los productos</SelectItem>
                     {mockProducts.map((product) => (
                       <SelectItem key={product.id} value={product.id}>
-                        {product.name}
+                        {product.nombre}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -304,11 +295,11 @@ export default function ReportsPage() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all-status">Todos los estados</SelectItem>
-                    <SelectItem value="PENDING">Pendiente</SelectItem>
-                    <SelectItem value="IN_PROGRESS">En Proceso</SelectItem>
-                    <SelectItem value="LOADED">Cargado</SelectItem>
-                    <SelectItem value="COMPLETED">Completado</SelectItem>
-                    <SelectItem value="CANCELLED">Cancelado</SelectItem>
+                    <SelectItem value="CREADA">Creada</SelectItem>
+                    <SelectItem value="PAGADA">Pagada</SelectItem>
+                    <SelectItem value="EN_DESPACHO">En Despacho</SelectItem>
+                    <SelectItem value="CERRADA">Cerrada</SelectItem>
+                    <SelectItem value="CANCELADA">Cancelada</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -367,7 +358,10 @@ export default function ReportsPage() {
                   <Package className="h-6 w-6 text-primary" />
                 </div>
                 <div>
-                  <p className="text-2xl font-bold text-foreground">{totalQuantity.toFixed(1)}</p>
+                  <p className="text-2xl font-bold text-foreground">
+                    {/* Reemplazar con la data correcta */}
+                    0 
+                  </p>
                   <p className="text-sm text-muted-foreground">m³ Vendidos</p>
                 </div>
               </div>
@@ -467,12 +461,11 @@ export default function ReportsPage() {
                       </div>
                       <div>
                         <p className="font-medium text-foreground">{stat.product}</p>
-                        <p className="text-sm text-muted-foreground">{stat.quantity.toFixed(1)} m³</p>
+                        <p className="text-sm text-muted-foreground">{stat.orders} pedidos</p>
                       </div>
                     </div>
                     <div className="text-right">
                       <p className="font-bold text-foreground">${stat.revenue.toFixed(2)}</p>
-                      <p className="text-sm text-muted-foreground">{stat.orders} pedidos</p>
                     </div>
                   </div>
                 ))}
@@ -496,8 +489,6 @@ export default function ReportsPage() {
                   <tr className="border-b">
                     <th className="text-left py-3 px-2">Pedido</th>
                     <th className="text-left py-3 px-2">Cliente</th>
-                    <th className="text-left py-3 px-2">Producto</th>
-                    <th className="text-left py-3 px-2">Cantidad</th>
                     <th className="text-left py-3 px-2">Total</th>
                     <th className="text-left py-3 px-2">Estado</th>
                     <th className="text-left py-3 px-2">Fecha</th>
@@ -507,15 +498,11 @@ export default function ReportsPage() {
                   {paginatedOrders.map((order) => (
                     <tr key={order.id} className="border-b hover:bg-muted/50">
                       <td className="py-3 px-2 font-medium">{order.orderNumber}</td>
-                      <td className="py-3 px-2">{order.customer?.name}</td>
-                      <td className="py-3 px-2">{order.product?.name}</td>
+                      <td className="py-3 px-2">{order.client?.nombre}</td>
+                      <td className="py-3 px-2 font-medium">${order.total?.toFixed(2)}</td>
                       <td className="py-3 px-2">
-                        {order.quantity} {order.product?.unit}
-                      </td>
-                      <td className="py-3 px-2 font-medium">${order.totalAmount.toFixed(2)}</td>
-                      <td className="py-3 px-2">
-                        <Badge className={getStatusColor(order.status)} variant="secondary">
-                          {getStatusText(order.status)}
+                        <Badge className={getStatusColor(order.estado)} variant="secondary">
+                          {getStatusText(order.estado)}
                         </Badge>
                       </td>
                       <td className="py-3 px-2">{new Date(order.createdAt).toLocaleDateString("es-MX")}</td>

@@ -3,7 +3,7 @@ export type UnitBase = "M3" | "TON" | "BOLSA" | "UNIDAD"
 
 export type UserRole = "CASHIER" | "YARD" | "SECURITY" | "ADMIN" | "REPORTS"
 
-export type OrderStatus = "CREADA" | "PAGADA" | "EN_DESPACHO" | "PARCIAL" | "CERRADA" | "CANCELADA"
+export type OrderStatus = "CREADA" | "PAGADA" | "EN_DESPACHO" | "PARCIAL" | "CERRADA" | "CANCELADA" | "PEND_SALIDA"
 
 export type DeliveryStatus = "ASIGNADA" | "EN_CARGA" | "CARGADA" | "PEND_SALIDA" | "SALIDA_OK" | "RECHAZADA"
 
@@ -124,6 +124,7 @@ export interface Delivery {
   driverId?: string
   driver?: Driver
   cantidadBase: number
+  loadedQuantity?: number
   estado: DeliveryStatus
   loadedBy?: string
   loadedAt?: Date

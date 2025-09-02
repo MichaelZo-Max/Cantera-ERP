@@ -9,22 +9,39 @@ import { mockDeliveries } from "@/lib/mock-data"
 import { AppLayout } from "@/components/app-layout"
 
 const statusConfig = {
-  PENDING: {
-    label: "Pendiente",
+  ASIGNADA: {
+    label: "Asignada",
     color: "bg-blue-500/10 text-blue-700 border-blue-200 dark:bg-blue-500/20 dark:text-blue-300 dark:border-blue-800",
     icon: Clock,
   },
-  LOADED: {
+  EN_CARGA: {
+    label: "En Carga",
+    color:
+      "bg-yellow-500/10 text-yellow-700 border-yellow-200 dark:bg-yellow-500/20 dark:text-yellow-300 dark:border-yellow-800",
+    icon: Package,
+  },
+  CARGADA: {
     label: "Cargada",
     color:
       "bg-green-500/10 text-green-700 border-green-200 dark:bg-green-500/20 dark:text-green-300 dark:border-green-800",
     icon: CheckCircle,
   },
-  EXITED: {
+  PEND_SALIDA: {
+    label: "Pendiente Salida",
+    color:
+      "bg-purple-500/10 text-purple-700 border-purple-200 dark:bg-purple-500/20 dark:text-purple-300 dark:border-purple-800",
+    icon: Truck,
+  },
+  SALIDA_OK: {
     label: "Salida OK",
     color:
       "bg-emerald-500/10 text-emerald-700 border-emerald-200 dark:bg-emerald-500/20 dark:text-emerald-300 dark:border-emerald-800",
     icon: CheckCircle,
+  },
+  RECHAZADA: {
+    label: "Rechazada",
+    color: "bg-red-500/10 text-red-700 border-red-200 dark:bg-red-500/20 dark:text-red-300 dark:border-red-800",
+    icon: Clock,
   },
 }
 
@@ -33,9 +50,8 @@ export default function CashierDeliveriesPage() {
 
   const filteredDeliveries = mockDeliveries.filter(
     (delivery) =>
-      delivery.order?.truck?.plates.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      delivery.order?.customer?.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      delivery.order?.product?.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      delivery.truck?.placa.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      delivery.order?.client?.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
       delivery.id.toLowerCase().includes(searchTerm.toLowerCase()),
   )
 
@@ -51,11 +67,11 @@ export default function CashierDeliveriesPage() {
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <div className="flex items-center gap-1">
               <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-              <span>{filteredDeliveries.filter((d) => d.status === "EXITED").length} Completados</span>
+              <span>{filteredDeliveries.filter((d) => d.estado === "SALIDA_OK").length} Completados</span>
             </div>
             <div className="flex items-center gap-1">
               <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
-              <span>{filteredDeliveries.filter((d) => d.status !== "EXITED").length} En Proceso</span>
+              <span>{filteredDeliveries.filter((d) => d.estado !== "SALIDA_OK").length} En Proceso</span>
             </div>
           </div>
         </div>
@@ -74,9 +90,9 @@ export default function CashierDeliveriesPage() {
         {/* Deliveries Grid */}
         <div className="grid gap-4 sm:gap-6 grid-cols-1 lg:grid-cols-2 xl:grid-cols-3">
           {filteredDeliveries.map((delivery) => {
-            const StatusIcon = statusConfig[delivery.status as keyof typeof statusConfig]?.icon || Clock
-            const statusStyle = statusConfig[delivery.status as keyof typeof statusConfig]?.color || ""
-            const statusLabel = statusConfig[delivery.status as keyof typeof statusConfig]?.label || delivery.status
+            const StatusIcon = statusConfig[delivery.estado as keyof typeof statusConfig]?.icon || Clock
+            const statusStyle = statusConfig[delivery.estado as keyof typeof statusConfig]?.color || ""
+            const statusLabel = statusConfig[delivery.estado as keyof typeof statusConfig]?.label || delivery.estado
 
             return (
               <Card key={delivery.id} className="hover:shadow-lg transition-all duration-200 border-border/50">
@@ -84,7 +100,7 @@ export default function CashierDeliveriesPage() {
                   <div className="flex items-start justify-between">
                     <div className="flex items-center gap-2">
                       <Truck className="h-5 w-5 text-primary" />
-                      <CardTitle className="text-lg font-semibold">{delivery.order?.truck?.plates || "N/A"}</CardTitle>
+                      <CardTitle className="text-lg font-semibold">{delivery.truck?.placa || "N/A"}</CardTitle>
                     </div>
                     <Badge className={`${statusStyle} font-medium`}>
                       <StatusIcon className="h-3 w-3 mr-1" />
@@ -98,7 +114,7 @@ export default function CashierDeliveriesPage() {
                   <div className="space-y-2">
                     <div className="flex items-center gap-2 text-sm">
                       <div className="w-2 h-2 bg-primary rounded-full"></div>
-                      <span className="font-medium text-foreground">{delivery.order?.customer?.name || "N/A"}</span>
+                      <span className="font-medium text-foreground">{delivery.order?.client?.nombre || "N/A"}</span>
                     </div>
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
                       <MapPin className="h-3 w-3" />
@@ -108,33 +124,21 @@ export default function CashierDeliveriesPage() {
 
                   {/* Product Info */}
                   <div className="bg-muted/30 rounded-lg p-3 space-y-2">
-                    <div className="flex items-center gap-2">
-                      <Package className="h-4 w-4 text-primary" />
-                      <span className="font-medium text-sm">{delivery.order?.product?.name || "N/A"}</span>
-                    </div>
-                    <div className="text-xs text-muted-foreground">
-                      Unidad: {delivery.order?.product?.unit || "N/A"}
-                    </div>
                     <div className="flex justify-between items-center text-sm">
                       <span className="text-muted-foreground">Cantidad Pedida:</span>
                       <span className="font-semibold text-foreground">
-                        {delivery.order?.quantity || 0} {delivery.order?.product?.unit?.toLowerCase() || ""}
+                        {delivery.cantidadBase}
                       </span>
                     </div>
-                    {delivery.loadedQuantity > 0 && (
+                    {delivery.loadedQuantity && delivery.loadedQuantity > 0 && (
                       <div className="flex justify-between items-center text-sm">
                         <span className="text-muted-foreground">Cantidad Cargada:</span>
                         <span className="font-semibold text-foreground">
-                          {delivery.loadedQuantity} {delivery.order?.product?.unit?.toLowerCase() || ""}
+                          {delivery.loadedQuantity}
                         </span>
                       </div>
                     )}
                   </div>
-
-                  {/* Driver Info */}
-                  {delivery.order?.truck?.driverName && (
-                    <div className="text-xs text-muted-foreground">Conductor: {delivery.order.truck.driverName}</div>
-                  )}
 
                   {/* Notes */}
                   {delivery.notes && (

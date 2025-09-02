@@ -10,18 +10,18 @@ import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { mockCustomers } from "@/lib/mock-data"
-import type { Customer } from "@/lib/types"
+import { mockClients } from "@/lib/mock-data"
+import type { Client } from "@/lib/types"
 import { Users, Plus, Search, Edit, Trash2, Phone, Mail, MapPin, CheckCircle } from "lucide-react"
 
 export default function CustomersPage() {
-  const [customers, setCustomers] = useState<Customer[]>(mockCustomers)
+  const [customers, setCustomers] = useState<Client[]>(mockClients)
   const [searchTerm, setSearchTerm] = useState("")
   const [showForm, setShowForm] = useState(false)
-  const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null)
+  const [editingCustomer, setEditingCustomer] = useState<Client | null>(null)
   const [formData, setFormData] = useState({
-    name: "",
-    rfc: "",
+    nombre: "",
+    rif: "",
     address: "",
     phone: "",
     email: "",
@@ -32,16 +32,16 @@ export default function CustomersPage() {
 
   const filteredCustomers = customers.filter(
     (customer) =>
-      customer.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      customer.rfc?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      customer.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      customer.rif?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       customer.email?.toLowerCase().includes(searchTerm.toLowerCase()),
   )
 
   const handleNewCustomer = () => {
     setEditingCustomer(null)
     setFormData({
-      name: "",
-      rfc: "",
+      nombre: "",
+      rif: "",
       address: "",
       phone: "",
       email: "",
@@ -51,11 +51,11 @@ export default function CustomersPage() {
     setError("")
   }
 
-  const handleEditCustomer = (customer: Customer) => {
+  const handleEditCustomer = (customer: Client) => {
     setEditingCustomer(customer)
     setFormData({
-      name: customer.name,
-      rfc: customer.rfc || "",
+      nombre: customer.nombre,
+      rif: customer.rif || "",
       address: customer.address || "",
       phone: customer.phone || "",
       email: customer.email || "",
@@ -89,7 +89,7 @@ export default function CustomersPage() {
         setSuccess("Cliente actualizado exitosamente")
       } else {
         // Create new customer
-        const newCustomer: Customer = {
+        const newCustomer: Client = {
           id: String(Date.now()),
           ...formData,
           isActive: true,
@@ -102,8 +102,8 @@ export default function CustomersPage() {
 
       setShowForm(false)
       setFormData({
-        name: "",
-        rfc: "",
+        nombre: "",
+        rif: "",
         address: "",
         phone: "",
         email: "",
@@ -115,7 +115,7 @@ export default function CustomersPage() {
     }
   }
 
-  const handleToggleStatus = async (customer: Customer) => {
+  const handleToggleStatus = async (customer: Client) => {
     try {
       const updatedCustomers = customers.map((c) =>
         c.id === customer.id
@@ -177,8 +177,8 @@ export default function CustomersPage() {
                     <Label htmlFor="name">Nombre / Razón Social *</Label>
                     <Input
                       id="name"
-                      value={formData.name}
-                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                      value={formData.nombre}
+                      onChange={(e) => setFormData({ ...formData, nombre: e.target.value })}
                       placeholder="Nombre del cliente o empresa"
                       required
                     />
@@ -187,8 +187,8 @@ export default function CustomersPage() {
                     <Label htmlFor="rfc">RFC</Label>
                     <Input
                       id="rfc"
-                      value={formData.rfc}
-                      onChange={(e) => setFormData({ ...formData, rfc: e.target.value })}
+                      value={formData.rif}
+                      onChange={(e) => setFormData({ ...formData, rif: e.target.value })}
                       placeholder="RFC del cliente"
                     />
                   </div>
@@ -227,7 +227,7 @@ export default function CustomersPage() {
                 </div>
 
                 <div className="flex space-x-3">
-                  <Button type="submit" disabled={isSubmitting || !formData.name}>
+                  <Button type="submit" disabled={isSubmitting || !formData.nombre}>
                     {isSubmitting ? "Guardando..." : editingCustomer ? "Actualizar" : "Crear Cliente"}
                   </Button>
                   <Button
@@ -278,8 +278,8 @@ export default function CustomersPage() {
                 <CardHeader className="pb-3">
                   <div className="flex justify-between items-start">
                     <div className="flex-1">
-                      <CardTitle className="text-lg truncate">{customer.name}</CardTitle>
-                      {customer.rfc && <p className="text-sm text-muted-foreground mt-1">{customer.rfc}</p>}
+                      <CardTitle className="text-lg truncate">{customer.nombre}</CardTitle>
+                      {customer.rif && <p className="text-sm text-muted-foreground mt-1">{customer.rif}</p>}
                     </div>
                     <Badge variant={customer.isActive ? "default" : "secondary"}>
                       {customer.isActive ? "Activo" : "Inactivo"}
