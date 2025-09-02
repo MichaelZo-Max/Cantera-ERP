@@ -1,7 +1,8 @@
+// components/login-form.tsx
 "use client"
 
 import type React from "react"
-
+import Image from "next/image"
 import { useState } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
@@ -10,13 +11,16 @@ import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { useAuth } from "@/components/auth-provider"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Building2, Mail, Lock, Info, ChevronUp, ChevronDown } from "lucide-react"
+import { Mail, Lock, Info, ChevronUp, ChevronDown } from "lucide-react"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
+import { useTheme } from "next-themes"
 
 export function LoginForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const next = searchParams?.get("next")
+  const { theme } = useTheme();
+
 
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
@@ -30,7 +34,6 @@ export function LoginForm() {
 
     try {
       await login(email, password)
-      // redirigir a la ruta solicitada o dashboard
       if (next) {
         router.replace(next)
       } else {
@@ -49,7 +52,7 @@ export function LoginForm() {
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-background p-4 relative">
-      {/* Desktop test accounts - unchanged */}
+      {/* Desktop test accounts */}
       <div className="absolute top-4 right-4 max-w-xs hidden lg:block animate-fade-in">
         <Card className="card-shadow-lg border-border/50 bg-card/90 backdrop-blur-md">
           <CardHeader className="pb-3">
@@ -87,16 +90,23 @@ export function LoginForm() {
         </Card>
       </div>
 
-      {/* Main login form - centered */}
+      {/* Main login form */}
       <div className="w-full max-w-md animate-fade-in">
         <Card className="card-shadow-lg border-border/50 bg-card/80 backdrop-blur-sm">
           <CardHeader className="text-center space-y-4 pb-6">
-            <div className="mx-auto p-3 bg-primary/10 rounded-2xl w-fit">
-              <Building2 className="h-8 w-8 text-primary" />
+            <div className="mx-auto w-fit">
+               <Image
+                    src={theme === 'dark' ? '/logo-cantera-blanco.webp' : '/logo-cantera-negro.webp'}
+                    alt="Cantera ERP Logo"
+                    width={96}
+                    height={96}
+                    className="h-24 w-24 object-contain"
+                    priority
+                  />
             </div>
             <div className="space-y-2">
               <CardTitle className="text-3xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-                Cantera ERP
+                Bienvenid@ de nuevo!
               </CardTitle>
               <CardDescription className="text-base">Sistema de gestión para canteras</CardDescription>
             </div>
@@ -150,6 +160,7 @@ export function LoginForm() {
         </Card>
       </div>
 
+      {/* Mobile test accounts */}
       <div className="w-full max-w-md mt-4 lg:hidden animate-fade-in">
         <Collapsible open={isTestAccountsOpen} onOpenChange={setIsTestAccountsOpen}>
           <CollapsibleTrigger asChild>

@@ -1,14 +1,17 @@
+// components/app-layout.tsx
 "use client"
 
 import type { ReactNode } from "react"
+import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { useAuth } from "@/components/auth-provider"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { BackButton } from "@/components/ui/back-button"
 import { AppBreadcrumbs } from "@/components/ui/app-breadcrumbs"
-import { RedesipCredit } from "@/components/redesip-credit"
-import { LogOut, User, Building2 } from "lucide-react"
+import { Footer } from "./footer"
+import { LogOut, User } from "lucide-react"
 import { usePathname } from "next/navigation"
+import { useTheme } from "next-themes"
 
 interface AppLayoutProps {
   children: ReactNode
@@ -18,6 +21,8 @@ interface AppLayoutProps {
 export function AppLayout({ children, title }: AppLayoutProps) {
   const { user, logout } = useAuth()
   const pathname = usePathname()
+  const { theme } = useTheme();
+
 
   const getRoleDisplayName = (role: string) => {
     const roleNames = {
@@ -33,17 +38,24 @@ export function AppLayout({ children, title }: AppLayoutProps) {
   const p = pathname || "/"
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background flex flex-col">
       <header className="bg-card/80 backdrop-blur-sm shadow-sm border-b border-border/50 sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-8">
-          <div className="flex justify-between items-center h-14 sm:h-16">
+          <div className="flex justify-between items-center h-16 sm:h-20">
             <div className="flex items-center space-x-2 sm:space-x-4 animate-slide-in min-w-0 flex-1">
-              <div className="flex items-center space-x-2 sm:space-x-3 min-w-0">
-                <div className="p-1.5 sm:p-2 bg-primary/10 rounded-lg flex-shrink-0">
-                  <Building2 className="h-4 w-4 sm:h-6 sm:w-6 text-primary" />
+              <div className="flex items-center space-x-3 sm:space-x-4 min-w-0">
+                <div className="flex-shrink-0">
+                  <Image
+                    src={theme === 'dark' ? '/logo-cantera-blanco.webp' : '/logo-cantera-negro.webp'}
+                    alt="Cantera ERP Logo"
+                    width={48}
+                    height={48}
+                    className="h-12 w-12 object-contain"
+                    priority
+                  />
                 </div>
                 <div className="min-w-0">
-                  <h1 className="text-lg sm:text-xl font-bold text-foreground truncate">Cantera ERP</h1>
+                  <h1 className="text-xl sm:text-2xl font-bold text-foreground truncate">Cantera ERP</h1>
                   <span className="text-xs text-muted-foreground font-medium hidden sm:block">{title}</span>
                 </div>
               </div>
@@ -83,14 +95,13 @@ export function AppLayout({ children, title }: AppLayoutProps) {
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-8 py-4 sm:py-6 lg:py-8 animate-fade-in">
+      <main className="flex-grow max-w-7xl mx-auto px-3 sm:px-4 lg:px-8 py-4 sm:py-6 lg:py-8 animate-fade-in w-full">
         {pathname !== "/" && (
           <div className="mb-4 sm:mb-6">
             <AppBreadcrumbs />
           </div>
         )}
 
-        {/* Back button, hidden on home */}
         {p !== "/" && (
           <div className="mb-3 sm:mb-4">
             <BackButton />
@@ -98,8 +109,8 @@ export function AppLayout({ children, title }: AppLayoutProps) {
         )}
         <div className="space-y-4 sm:space-y-6">{children}</div>
       </main>
-
-      <RedesipCredit />
+      
+      <Footer />
     </div>
   )
 }
