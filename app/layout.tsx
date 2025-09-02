@@ -24,10 +24,18 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en" className={`${dmSans.variable} antialiased`} suppressHydrationWarning>
+    <html lang="en" suppressHydrationWarning>
       <head></head>
-      <body className="font-sans">
-        <ThemeProvider defaultTheme="system" storageKey="cantera-erp-theme">
+      {/* Quitamos la clase de la fuente del <html> y la dejamos solo en <body> 
+        para que next-themes pueda gestionar la clase del tema (light/dark) sin conflictos.
+      */}
+      <body className={`${dmSans.variable} font-sans antialiased`}>
+        <ThemeProvider
+          attribute="class" // 👈 Añadido: le dice a next-themes que use clases (<html>)
+          defaultTheme="system"
+          enableSystem // 👈 Añadido: habilita el cambio automático con el tema del sistema
+          storageKey="cantera-erp-theme"
+        >
           <AuthProvider>{children}</AuthProvider>
           <Toaster richColors closeButton position="top-right" />
         </ThemeProvider>

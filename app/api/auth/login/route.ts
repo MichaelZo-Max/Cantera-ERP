@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { mockUsers } from '@/lib/auth';
+import { mockUsers } from "@/lib/mock-data"
 import type { User } from '@/lib/types';
 
 // Simula un pequeño retraso
@@ -11,7 +11,10 @@ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
  */
 export async function POST(request: Request) {
   try {
+    // 1. Obtener el cuerpo de la petición
     const body = await request.json();
+    
+    // 2. Desestructurar el body correctamente usando "="
     const { email, password } = body;
 
     if (!email || !password) {
@@ -22,16 +25,15 @@ export async function POST(request: Request) {
 
     const user = mockUsers.find((u) => u.email === email);
 
-    // En un proyecto real, aquí verificarías el hash de la contraseña
+    // 3. Lógica de autenticación (sin cambios)
     if (user && password === '123456' && user.isActive) {
-      // No devuelvas la contraseña en la respuesta
-      const { ...userWithoutPassword } = user;
-      return NextResponse.json(userWithoutPassword);
+      return NextResponse.json(user);
     } else {
       return new NextResponse('Credenciales inválidas o usuario inactivo', { status: 401 });
     }
   } catch (error) {
-    console.error('[API_AUTH_LOGIN_POST]', error);
+    // 4. Capturar cualquier error inesperado y registrarlo en la consola del servidor
+    console.error('[API_AUTH_LOGIN_POST] Error:', error);
     return new NextResponse('Error interno del servidor', { status: 500 });
   }
 }

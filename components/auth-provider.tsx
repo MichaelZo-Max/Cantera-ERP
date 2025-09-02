@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useState, useEffect, type ReactNode } from "react"
 import type { User } from "@/lib/types"
-import { mockUsers } from "@/lib/auth"
+// Ya no necesitamos mockUsers aquí, porque la API se encargará de eso.
 
 interface AuthContextType {
   user: User | null
@@ -26,34 +26,52 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
-    // Check for stored user session
-    const storedUser = localStorage.getItem("cantera-user")
-    if (storedUser) {
-      setUser(JSON.parse(storedUser))
+    // La lógica para verificar la sesión almacenada sigue igual
+    try {
+        const storedUser = localStorage.getItem("cantera-user")
+        if (storedUser) {
+            setUser(JSON.parse(storedUser))
+        }
+    } catch (error) {
+        console.error("Failed to parse stored user:", error)
+        localStorage.removeItem("cantera-user")
     }
     setIsLoading(false)
   }, [])
 
   const login = async (email: string, password: string) => {
     setIsLoading(true)
+    try {
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email, password }),
+      });
 
-    // Mock authentication - find user by email
-    const foundUser = mockUsers.find((u) => u.email === email)
+      if (!response.ok) {
+        // Si la respuesta no es exitosa (ej. 401, 500), leemos el mensaje de error
+        const errorText = await response.text();
+        throw new Error(errorText || 'Error al iniciar sesión');
+      }
 
-    if (foundUser && password === "123456") {
-      // Simple mock password
-      setUser(foundUser)
-      localStorage.setItem("cantera-user", JSON.stringify(foundUser))
-    } else {
-      throw new Error("Credenciales inválidas")
+      const loggedInUser: User = await response.json();
+      setUser(loggedInUser);
+      localStorage.setItem("cantera-user", JSON.stringify(loggedInUser));
+
+    } catch (error) {
+      // Re-lanzamos el error para que el formulario lo pueda capturar y mostrar
+      throw error;
+    } finally {
+      setIsLoading(false)
     }
-
-    setIsLoading(false)
   }
 
   const logout = () => {
     setUser(null)
     localStorage.removeItem("cantera-user")
+    window.location.href = '/';
   }
 
   return <AuthContext.Provider value={{ user, login, logout, isLoading }}>{children}</AuthContext.Provider>

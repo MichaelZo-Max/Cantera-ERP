@@ -1,5 +1,5 @@
 // Mock data for development and testing
-import type { Client, Product, Truck, Order, Delivery, Destination, ProductFormat } from "./types"
+import type { Client, Product, Truck, Order, Delivery, Destination, ProductFormat, User } from "./types"
 
 export const mockClients: Client[] = [
   {
@@ -122,6 +122,54 @@ export const mockTrucks: Truck[] = [
     updatedAt: new Date("2024-01-05"),
   },
 ]
+
+export const mockUsers: User[] = [
+  {
+    id: "1",
+    email: "cajero@cantera.com",
+    name: "María González",
+    role: "CASHIER",
+    isActive: true,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  },
+  {
+    id: "2",
+    email: "patio@cantera.com",
+    name: "Juan Pérez",
+    role: "YARD",
+    isActive: true,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  },
+  {
+    id: "3",
+    email: "seguridad@cantera.com",
+    name: "Carlos López",
+    role: "SECURITY",
+    isActive: true,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  },
+  {
+    id: "4",
+    email: "admin@cantera.com",
+    name: "Ana Martínez",
+    role: "ADMIN",
+    isActive: true,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  },
+  {
+    id: "5",
+    email: "reportes@cantera.com",
+    name: "Luis Rodríguez",
+    role: "REPORTS",
+    isActive: true,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  },
+];
 
 export const mockOrders: Order[] = [
   {
