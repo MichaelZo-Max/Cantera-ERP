@@ -1,7 +1,9 @@
 "use client"
 import Link from "next/link"
+import type React from "react"
+
 import { usePathname } from "next/navigation"
-import { Home, ShoppingCart, FileText, Truck, Shield, Users, Box, BarChart3 } from "lucide-react"
+import { Home, ShoppingCart, FileText, Truck, Shield, Users, Box, BarChart3, Settings } from "lucide-react"
 import {
   Breadcrumb,
   BreadcrumbList,
@@ -27,8 +29,15 @@ const LABELS: Record<string, { label: string; icon?: React.ReactNode }> = {
   customers: { label: "Clientes", icon: <Users className="h-3.5 w-3.5" aria-hidden="true" /> },
   products: { label: "Productos", icon: <Box className="h-3.5 w-3.5" aria-hidden="true" /> },
   trucks: { label: "Camiones", icon: <Truck className="h-3.5 w-3.5" aria-hidden="true" /> },
+  settings: { label: "Configuración", icon: <Settings className="h-3.5 w-3.5" aria-hidden="true" /> },
   reports: { label: "Reportes", icon: <BarChart3 className="h-3.5 w-3.5" aria-hidden="true" /> },
 }
+
+const EXISTING_INTERMEDIATE_ROUTES = new Set([
+  "/", // página principal
+  // Las rutas intermedias como /admin, /cashier, etc. no tienen páginas reales
+  // solo redirigen al dashboard principal, por lo que no las incluimos
+])
 
 function buildCrumbs(pathname: string): Crumb[] {
   const parts = pathname.split("/").filter(Boolean)
@@ -42,7 +51,16 @@ function buildCrumbs(pathname: string): Crumb[] {
     const seg = decodeURIComponent(parts[i])
     acc += `/${seg}`
     const meta = LABELS[seg] || { label: seg }
-    crumbs.push({ href: acc, label: meta.label, icon: meta.icon, current: i === parts.length - 1 })
+
+    const isCurrentPage = i === parts.length - 1
+    const routeExists = EXISTING_INTERMEDIATE_ROUTES.has(acc)
+
+    crumbs.push({
+      href: routeExists || isCurrentPage ? acc : "#",
+      label: meta.label,
+      icon: meta.icon,
+      current: isCurrentPage,
+    })
   }
   return crumbs
 }
@@ -73,10 +91,17 @@ export function AppBreadcrumbs() {
                   </BreadcrumbPage>
                 ) : (
                   <BreadcrumbLink asChild>
-                    <Link href={c.href} prefetch={false} className="inline-flex items-center gap-1.5">
-                      {c.icon}
-                      <span>{c.label}</span>
-                    </Link>
+                    {c.href !== "#" ? (
+                      <Link href={c.href} prefetch={false} className="inline-flex items-center gap-1.5">
+                        {c.icon}
+                        <span>{c.label}</span>
+                      </Link>
+                    ) : (
+                      <span className="inline-flex items-center gap-1.5 text-muted-foreground cursor-default">
+                        {c.icon}
+                        <span>{c.label}</span>
+                      </span>
+                    )}
                   </BreadcrumbLink>
                 )}
               </BreadcrumbItem>
@@ -89,7 +114,12 @@ export function AppBreadcrumbs() {
         <div className="sm:hidden flex items-center">
           <BreadcrumbItem>
             <BreadcrumbLink asChild>
-              <Link href={head.href} prefetch={false} aria-label="Ir al inicio" className="inline-flex items-center gap-1.5">
+              <Link
+                href={head.href}
+                prefetch={false}
+                aria-label="Ir al inicio"
+                className="inline-flex items-center gap-1.5"
+              >
                 {head.icon}
                 <span className="sr-only">{head.label}</span>
               </Link>
