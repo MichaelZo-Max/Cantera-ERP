@@ -21,8 +21,6 @@ export async function POST(request: Request) {
       return new NextResponse('Email y contraseña son requeridos', { status: 400 });
     }
 
-    await sleep(1000); // Simula la llamada a la base de datos
-
     const user = mockUsers.find((u) => u.email === email);
 
     // 3. Lógica de autenticación (sin cambios)

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { AppLayout } from "@/components/app-layout"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -8,7 +8,6 @@ import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
-import { mockOrders, mockClients, mockProducts } from "@/lib/mock-data"
 import {
   BarChart3,
   Calendar,
@@ -21,8 +20,15 @@ import {
   ChevronLeft,
   ChevronRight,
 } from "lucide-react"
+import type { Order, Client, Product } from "@/lib/types"
 
 export default function ReportsPage() {
+  const [orders, setOrders] = useState<Order[]>([])
+  const [clients, setClients] = useState<Client[]>([])
+  const [products, setProducts] = useState<Product[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
   const [dateFrom, setDateFrom] = useState("")
   const [dateTo, setDateTo] = useState("")
   const [reportType, setReportType] = useState("sales")
@@ -32,7 +38,33 @@ export default function ReportsPage() {
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage] = useState(10)
 
-  const filteredOrders = mockOrders.filter((order) => {
+  useEffect(() => {
+    const loadReportData = async () => {
+      try {
+        setLoading(true)
+        const [ordersRes, clientsRes, productsRes] = await Promise.all([
+          fetch("/api/orders", { cache: "no-store" }),
+          fetch("/api/customers", { cache: "no-store" }),
+          fetch("/api/products", { cache: "no-store" }),
+        ]);
+
+        if (!ordersRes.ok) throw new Error("Error al cargar pedidos");
+        if (!clientsRes.ok) throw new Error("Error al cargar clientes");
+        if (!productsRes.ok) throw new Error("Error al cargar productos");
+
+        setOrders(await ordersRes.json());
+        setClients(await clientsRes.json());
+        setProducts(await productsRes.json());
+      } catch (e: any) {
+        setError(e.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadReportData();
+  }, []);
+
+  const filteredOrders = orders.filter((order) => {
     const matchesCustomer = selectedCustomer === "all-customers" || order.clientId === selectedCustomer
     const matchesStatus = selectedStatus === "all-status" || order.estado === selectedStatus
 
@@ -190,7 +222,7 @@ export default function ReportsPage() {
     }
   }
 
-  const customerStats = mockClients
+  const customerStats = clients
     .map((customer) => {
       const customerOrders = filteredOrders.filter((o) => o.clientId === customer.id)
       const revenue = customerOrders.reduce((sum, order) => sum + (order.total ?? 0), 0)
@@ -202,9 +234,11 @@ export default function ReportsPage() {
     })
     .sort((a, b) => b.revenue - a.revenue)
 
-  const productStats = mockProducts
+  const productStats = products
     .map((product) => {
-      const productOrders = filteredOrders.filter((o) => o.id === product.id)
+      // This logic might need adjustment depending on how products are linked to orders in your final data structure.
+      // This is a simplified assumption.
+      const productOrders = filteredOrders.filter((o) => o.id === product.id) 
       const revenue = productOrders.reduce((sum, order) => sum + (order.total ?? 0), 0)
       return {
         product: product.nombre,
@@ -213,6 +247,23 @@ export default function ReportsPage() {
       }
     })
     .sort((a, b) => b.revenue - a.revenue)
+
+    if (loading) {
+        return (
+          <AppLayout title="Reportes">
+            <div className="p-6 text-center">Cargando datos para reportes...</div>
+          </AppLayout>
+        );
+    }
+    
+    if (error) {
+        return (
+          <AppLayout title="Reportes">
+            <div className="p-6 text-destructive text-center">Error: {error}</div>
+          </AppLayout>
+        );
+    }
+
 
   return (
     <AppLayout title="Reportes">
@@ -263,7 +314,7 @@ export default function ReportsPage() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all-customers">Todos los clientes</SelectItem>
-                    {mockClients.map((customer) => (
+                    {clients.map((customer) => (
                       <SelectItem key={customer.id} value={customer.id}>
                         {customer.nombre}
                       </SelectItem>
@@ -279,7 +330,7 @@ export default function ReportsPage() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all-products">Todos los productos</SelectItem>
-                    {mockProducts.map((product) => (
+                    {products.map((product) => (
                       <SelectItem key={product.id} value={product.id}>
                         {product.nombre}
                       </SelectItem>

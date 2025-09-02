@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { AppLayout } from "@/components/app-layout"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -41,113 +41,6 @@ import type {
   ProductArea,
 } from "@/lib/types"
 
-// Mock data - En producción vendría de la API
-const mockProducts: Product[] = [
-  {
-    id: "1",
-    codigo: "AGR001",
-    nombre: "Grava 3/4",
-    area: "AGREGADOS",
-    isActive: true,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  },
-  {
-    id: "2",
-    codigo: "AGR002",
-    nombre: "Arena Lavada",
-    area: "AGREGADOS",
-    isActive: true,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  },
-]
-
-const mockFormats: ProductFormat[] = [
-  {
-    id: "1",
-    productId: "1",
-    unidadBase: "M3",
-    factorUnidadBase: 1,
-    sku: "A granel (m³)",
-    pricePerUnit: 25.5,
-    activo: true,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  },
-  {
-    id: "2",
-    productId: "1",
-    unidadBase: "TON",
-    factorUnidadBase: 1.6,
-    sku: "Por tonelada",
-    pricePerUnit: 40.8,
-    activo: true,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  },
-]
-
-const mockClients: Client[] = [
-  {
-    id: "1",
-    nombre: "Constructora Los Andes",
-    rif: "J-12345678-9",
-    isActive: true,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  },
-]
-
-const mockDestinations: Destination[] = [
-  {
-    id: "1",
-    clientId: "1",
-    nombre: "Obra Av. Norte",
-    direccion: "Av. Norte, Caracas",
-    isActive: true,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  },
-]
-
-const mockTrucks: TruckType[] = [
-  {
-    id: "1",
-    placa: "ABC-12D",
-    brand: "Volvo",
-    model: "FH16",
-    capacity: 25,
-    isActive: true,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  },
-]
-
-const mockDrivers: Driver[] = [
-  {
-    id: "1",
-    nombre: "Juan Pérez",
-    docId: "V-12345678",
-    phone: "+58-414-1234567",
-    isActive: true,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  },
-]
-
-const mockUsers: User[] = [
-  {
-    id: "1",
-    email: "admin@cantera.com",
-    name: "Administrador",
-    role: "ADMIN",
-    isActive: true,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  },
-]
-
 export default function AdminPage() {
   const [activeTab, setActiveTab] = useState("productos")
   const [searchTerm, setSearchTerm] = useState("")
@@ -155,15 +48,56 @@ export default function AdminPage() {
   const [dialogType, setDialogType] = useState<string>("")
   const [editingItem, setEditingItem] = useState<any>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   // Estados para cada catálogo
-  const [products, setProducts] = useState(mockProducts)
-  const [formats, setFormats] = useState(mockFormats)
-  const [clients, setClients] = useState(mockClients)
-  const [destinations, setDestinations] = useState(mockDestinations)
-  const [trucks, setTrucks] = useState(mockTrucks)
-  const [drivers, setDrivers] = useState(mockDrivers)
-  const [users, setUsers] = useState(mockUsers)
+  const [products, setProducts] = useState<Product[]>([])
+  const [formats, setFormats] = useState<ProductFormat[]>([])
+  const [clients, setClients] = useState<Client[]>([])
+  const [destinations, setDestinations] = useState<Destination[]>([])
+  const [trucks, setTrucks] = useState<TruckType[]>([])
+  const [drivers, setDrivers] = useState<Driver[]>([])
+  const [users, setUsers] = useState<User[]>([])
+
+  useEffect(() => {
+    const loadCatalogs = async () => {
+      try {
+        setLoading(true)
+        const responses = await Promise.all([
+          fetch("/api/products", { cache: "no-store" }),
+          fetch("/api/product-formats", { cache: "no-store" }),
+          fetch("/api/customers", { cache: "no-store" }),
+          fetch("/api/destinations", { cache: "no-store" }),
+          fetch("/api/trucks", { cache: "no-store" }),
+          fetch("/api/drivers", { cache: "no-store" }),
+          fetch("/api/users", { cache: "no-store" }),
+        ])
+
+        for (const res of responses) {
+            if (!res.ok) throw new Error(`Failed to fetch: ${res.url}`)
+        }
+
+        const [productsData, formatsData, clientsData, destinationsData, trucksData, driversData, usersData] = await Promise.all(responses.map(res => res.json()));
+
+        setProducts(productsData)
+        setFormats(formatsData)
+        setClients(clientsData)
+        setDestinations(destinationsData)
+        setTrucks(trucksData)
+        setDrivers(driversData)
+        setUsers(usersData)
+
+      } catch (e: any) {
+        setError(e.message)
+        toast.error("Error al cargar catálogos", { description: e.message })
+      } finally {
+        setLoading(false)
+      }
+    }
+    loadCatalogs()
+  }, [])
+
 
   // Formularios
   const [productForm, setProductForm] = useState({
@@ -291,8 +225,6 @@ export default function AdminPage() {
     setIsSubmitting(true)
 
     try {
-      // Mock API call
-      await new Promise((resolve) => setTimeout(resolve, 1000))
 
       const now = new Date()
 
@@ -450,6 +382,22 @@ export default function AdminPage() {
     }
 
     toast.success("Estado actualizado")
+  }
+  
+  if (loading) {
+    return (
+        <AppLayout title="Administración">
+            <div className="text-center p-8">Cargando catálogos...</div>
+        </AppLayout>
+    )
+  }
+
+  if (error) {
+      return (
+        <AppLayout title="Administración">
+            <div className="text-center p-8 text-destructive">{error}</div>
+        </AppLayout>
+      )
   }
 
   const renderDialog = () => {

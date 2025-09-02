@@ -1,5 +1,5 @@
 // Mock data for development and testing
-import type { Client, Product, Truck, Order, Delivery, Destination, ProductFormat, User } from "./types"
+import type { Client, Product, Truck, Order, Delivery, Destination, ProductFormat, User, Driver } from "./types"
 
 export const mockClients: Client[] = [
   {
@@ -275,6 +275,27 @@ export const mockOrders: Order[] = [
     updatedAt: new Date("2024-01-30T11:00:00"),
   },
 ]
+
+export const mockDrivers: Driver[] = [
+  {
+    id: "1",
+    nombre: "Juan Pérez",
+    docId: "V-12345678",
+    phone: "+58-414-1234567",
+    isActive: true,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  },
+  {
+    id: "2",
+    nombre: "Carlos Rodriguez",
+    docId: "V-87654321",
+    phone: "+58-412-7654321",
+    isActive: true,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  },
+];
 
 export const mockDeliveries: Delivery[] = [
   {

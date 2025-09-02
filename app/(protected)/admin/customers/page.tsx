@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { AppLayout } from "@/components/app-layout"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -10,12 +10,14 @@ import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { mockClients } from "@/lib/mock-data"
 import type { Client } from "@/lib/types"
 import { Users, Plus, Search, Edit, Trash2, Phone, Mail, MapPin, CheckCircle } from "lucide-react"
 
 export default function CustomersPage() {
-  const [customers, setCustomers] = useState<Client[]>(mockClients)
+  const [customers, setCustomers] = useState<Client[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  
   const [searchTerm, setSearchTerm] = useState("")
   const [showForm, setShowForm] = useState(false)
   const [editingCustomer, setEditingCustomer] = useState<Client | null>(null)
@@ -28,7 +30,22 @@ export default function CustomersPage() {
   })
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [success, setSuccess] = useState("")
-  const [error, setError] = useState("")
+
+  useEffect(() => {
+    const loadCustomers = async () => {
+      try {
+        setLoading(true)
+        const res = await fetch("/api/customers", { cache: "no-store" })
+        if (!res.ok) throw new Error(await res.text())
+        setCustomers(await res.json())
+      } catch (e: any) {
+        setError(e?.message ?? "Error al cargar clientes")
+      } finally {
+        setLoading(false)
+      }
+    }
+    loadCustomers()
+  }, [])
 
   const filteredCustomers = customers.filter(
     (customer) =>
@@ -69,68 +86,72 @@ export default function CustomersPage() {
     e.preventDefault()
     setIsSubmitting(true)
     setError("")
+    setSuccess("")
+
+    const method = editingCustomer ? 'PATCH' : 'POST';
+    const url = editingCustomer ? `/api/customers/${editingCustomer.id}` : '/api/customers';
 
     try {
-      // Mock API call
-      await new Promise((resolve) => setTimeout(resolve, 1000))
+      const res = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData),
+      });
 
+      if (!res.ok) throw new Error(await res.text());
+
+      const savedCustomer = await res.json();
+      
       if (editingCustomer) {
-        // Update existing customer
-        const updatedCustomers = customers.map((c) =>
-          c.id === editingCustomer.id
-            ? {
-                ...c,
-                ...formData,
-                updatedAt: new Date(),
-              }
-            : c,
-        )
-        setCustomers(updatedCustomers)
-        setSuccess("Cliente actualizado exitosamente")
+        setCustomers(customers.map(c => c.id === savedCustomer.id ? savedCustomer : c));
+        setSuccess("Cliente actualizado exitosamente.");
       } else {
-        // Create new customer
-        const newCustomer: Client = {
-          id: String(Date.now()),
-          ...formData,
-          isActive: true,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        }
-        setCustomers([...customers, newCustomer])
-        setSuccess("Cliente creado exitosamente")
+        setCustomers([...customers, savedCustomer]);
+        setSuccess("Cliente creado exitosamente.");
       }
 
       setShowForm(false)
-      setFormData({
-        nombre: "",
-        rif: "",
-        address: "",
-        phone: "",
-        email: "",
-      })
-    } catch (err) {
-      setError("Error al guardar el cliente")
+    } catch (err: any) {
+      setError(err.message || "Error al guardar el cliente");
     } finally {
       setIsSubmitting(false)
     }
   }
 
   const handleToggleStatus = async (customer: Client) => {
+    // Optimistic UI update
+    const originalCustomers = customers;
+    const updatedCustomers = customers.map((c) =>
+      c.id === customer.id ? { ...c, isActive: !c.isActive } : c,
+    );
+    setCustomers(updatedCustomers);
+    
     try {
-      const updatedCustomers = customers.map((c) =>
-        c.id === customer.id
-          ? {
-              ...c,
-              isActive: !c.isActive,
-              updatedAt: new Date(),
-            }
-          : c,
-      )
-      setCustomers(updatedCustomers)
-      setSuccess(`Cliente ${customer.isActive ? "desactivado" : "activado"} exitosamente`)
-    } catch (err) {
-      setError("Error al cambiar el estado del cliente")
+        const res = await fetch(`/api/customers/${customer.id}`, { method: 'DELETE' });
+        if(!res.ok) throw new Error(await res.text());
+
+        setSuccess(`Cliente ${customer.isActive ? "desactivado" : "activado"} exitosamente.`);
+    } catch (err: any) {
+        // Revert on error
+        setCustomers(originalCustomers);
+        setError(err.message || "Error al cambiar el estado del cliente");
     }
+  }
+  
+  if (loading) {
+    return (
+      <AppLayout title="Gestión de Clientes">
+        <div className="p-6 text-center">Cargando clientes...</div>
+      </AppLayout>
+    );
+  }
+
+  if (error && !showForm) { // Do not show main page error if form has its own error
+    return (
+      <AppLayout title="Gestión de Clientes">
+        <div className="p-6 text-destructive text-center">Error: {error}</div>
+      </AppLayout>
+    );
   }
 
   return (
@@ -147,7 +168,6 @@ export default function CustomersPage() {
           </Button>
         </div>
 
-        {/* Success/Error Messages */}
         {success && (
           <Alert className="border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-900/20">
             <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400" />
@@ -155,13 +175,12 @@ export default function CustomersPage() {
           </Alert>
         )}
 
-        {error && (
+        {error && showForm && (
           <Alert variant="destructive">
             <AlertDescription>{error}</AlertDescription>
           </Alert>
         )}
 
-        {/* Customer Form */}
         {showForm && (
           <Card>
             <CardHeader>
@@ -246,7 +265,6 @@ export default function CustomersPage() {
           </Card>
         )}
 
-        {/* Search */}
         <Card>
           <CardContent className="pt-6">
             <div className="relative">
@@ -261,7 +279,6 @@ export default function CustomersPage() {
           </CardContent>
         </Card>
 
-        {/* Customers List */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {filteredCustomers.length === 0 ? (
             <div className="col-span-full">

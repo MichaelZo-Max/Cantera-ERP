@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { AppLayout } from "@/components/app-layout"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -13,12 +13,14 @@ import { Textarea } from "@/components/ui/textarea"
 import { AnimatedCard } from "@/components/ui/animated-card"
 import { GradientButton } from "@/components/ui/gradient-button"
 import { LoadingSkeleton } from "@/components/ui/loading-skeleton"
-import { mockProducts } from "@/lib/mock-data"
 import type { Product, ProductArea } from "@/lib/types"
 import { Package, Plus, Search, Edit, Trash2, CheckCircle, Sparkles } from "lucide-react"
 
 export default function ProductsPage() {
-  const [products, setProducts] = useState<Product[]>(mockProducts)
+  const [products, setProducts] = useState<Product[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
   const [searchTerm, setSearchTerm] = useState("")
   const [showForm, setShowForm] = useState(false)
   const [editingProduct, setEditingProduct] = useState<Product | null>(null)
@@ -30,7 +32,23 @@ export default function ProductsPage() {
   })
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [success, setSuccess] = useState("")
-  const [error, setError] = useState("")
+  
+  useEffect(() => {
+    const loadProducts = async () => {
+      try {
+        setLoading(true);
+        const res = await fetch("/api/products", { cache: "no-store" });
+        if (!res.ok) throw new Error(await res.text());
+        setProducts(await res.json());
+      } catch (e: any) {
+        setError(e?.message ?? "Error al cargar los productos");
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadProducts();
+  }, []);
+
 
   const filteredProducts = products.filter(
     (product) =>
@@ -69,68 +87,71 @@ export default function ProductsPage() {
     e.preventDefault()
     setIsSubmitting(true)
     setError("")
+    setSuccess("")
+
+    const method = editingProduct ? 'PATCH' : 'POST';
+    const url = editingProduct ? `/api/products/${editingProduct.id}` : '/api/products';
 
     try {
-      // Mock API call
-      await new Promise((resolve) => setTimeout(resolve, 1000))
+      const res = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData),
+      });
 
+      if (!res.ok) throw new Error(await res.text());
+
+      const savedProduct = await res.json();
+      
       if (editingProduct) {
-        // Update existing product
-        const updatedProducts = products.map((p) =>
-          p.id === editingProduct.id
-            ? {
-                ...p,
-                ...formData,
-                updatedAt: new Date(),
-              }
-            : p,
-        )
-        setProducts(updatedProducts)
-        setSuccess("Producto actualizado exitosamente")
+        setProducts(products.map(p => p.id === savedProduct.id ? savedProduct : p));
+        setSuccess("Producto actualizado exitosamente.");
       } else {
-        // Create new product
-        const newProduct: Product = {
-          id: String(Date.now()),
-          ...formData,
-          isActive: true,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        }
-        setProducts([...products, newProduct])
-        setSuccess("Producto creado exitosamente")
+        setProducts([...products, savedProduct]);
+        setSuccess("Producto creado exitosamente.");
       }
 
-      setShowForm(false)
-      setFormData({
-        codigo: "",
-        nombre: "",
-        description: "",
-        area: "AGREGADOS",
-      })
-    } catch (err) {
-      setError("Error al guardar el producto")
+      setShowForm(false);
+    } catch (err: any) {
+      setError(err.message || "Error al guardar el producto");
     } finally {
-      setIsSubmitting(false)
+      setIsSubmitting(false);
     }
   }
 
   const handleToggleStatus = async (product: Product) => {
+    const originalProducts = products;
+    const updatedProducts = products.map((p) =>
+        p.id === product.id ? { ...p, isActive: !p.isActive } : p
+    );
+    setProducts(updatedProducts);
+
     try {
-      const updatedProducts = products.map((p) =>
-        p.id === product.id
-          ? {
-              ...p,
-              isActive: !p.isActive,
-              updatedAt: new Date(),
-            }
-          : p,
-      )
-      setProducts(updatedProducts)
-      setSuccess(`Producto ${product.isActive ? "desactivado" : "activado"} exitosamente`)
-    } catch (err) {
-      setError("Error al cambiar el estado del producto")
+        const res = await fetch(`/api/products/${product.id}`, { method: 'DELETE' });
+        if(!res.ok) throw new Error(await res.text());
+        setSuccess(`Producto ${product.isActive ? "desactivado" : "activado"} exitosamente.`);
+    } catch (err: any) {
+        setProducts(originalProducts);
+        setError(err.message || "Error al cambiar el estado del producto");
     }
   }
+  
+  if (loading) {
+    return (
+      <AppLayout title="Gestión de Productos">
+        <div className="p-6 text-center">Cargando productos...</div>
+      </AppLayout>
+    );
+  }
+
+  if (error && !showForm) {
+    return (
+      <AppLayout title="Gestión de Productos">
+        <div className="p-6 text-destructive text-center">Error: {error}</div>
+      </AppLayout>
+    );
+  }
+
 
   return (
     <AppLayout title="Gestión de Productos">
@@ -156,7 +177,6 @@ export default function ProductsPage() {
           </GradientButton>
         </div>
 
-        {/* Success/Error Messages with enhanced styling */}
         {success && (
           <AnimatedCard className="border-green-200 bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20">
             <CardContent className="pt-4">
@@ -168,7 +188,7 @@ export default function ProductsPage() {
           </AnimatedCard>
         )}
 
-        {error && (
+        {error && showForm && (
           <AnimatedCard className="border-red-200 bg-gradient-to-r from-red-50 to-orange-50 dark:from-red-900/20 dark:to-orange-900/20">
             <CardContent className="pt-4">
               <p className="text-red-800 dark:text-red-300 font-medium">{error}</p>
@@ -176,7 +196,6 @@ export default function ProductsPage() {
           </AnimatedCard>
         )}
 
-        {/* Enhanced Product Form */}
         {showForm && (
           <AnimatedCard hoverEffect="glow" className="glass">
             <CardHeader className="bg-gradient-primary text-white rounded-t-lg">
@@ -282,7 +301,6 @@ export default function ProductsPage() {
           </AnimatedCard>
         )}
 
-        {/* Enhanced Search */}
         <AnimatedCard hoverEffect="lift" className="glass">
           <CardContent className="pt-6">
             <div className="relative">
@@ -297,7 +315,6 @@ export default function ProductsPage() {
           </CardContent>
         </AnimatedCard>
 
-        {/* Enhanced Products Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredProducts.length === 0 ? (
             <div className="col-span-full">

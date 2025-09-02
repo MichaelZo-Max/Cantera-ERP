@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { AppLayout } from "@/components/app-layout"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -10,12 +10,14 @@ import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { mockTrucks } from "@/lib/mock-data"
 import type { Truck } from "@/lib/types"
-import { TruckIcon, Plus, Search, Edit, Trash2, CheckCircle, Phone, User } from "lucide-react"
+import { TruckIcon, Plus, Search, Edit, Trash2, CheckCircle } from "lucide-react"
 
 export default function TrucksPage() {
-  const [trucks, setTrucks] = useState<Truck[]>(mockTrucks)
+  const [trucks, setTrucks] = useState<Truck[]>([])
+  const [loading, setLoading] = useState(true)
+  const [apiError, setApiError] = useState<string | null>(null)
+
   const [searchTerm, setSearchTerm] = useState("")
   const [showForm, setShowForm] = useState(false)
   const [editingTruck, setEditingTruck] = useState<Truck | null>(null)
@@ -27,7 +29,22 @@ export default function TrucksPage() {
   })
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [success, setSuccess] = useState("")
-  const [error, setError] = useState("")
+  
+  useEffect(() => {
+    const loadTrucks = async () => {
+      try {
+        setLoading(true);
+        const res = await fetch("/api/trucks", { cache: "no-store" });
+        if (!res.ok) throw new Error(await res.text());
+        setTrucks(await res.json());
+      } catch (e: any) {
+        setApiError(e?.message ?? "Error al cargar los camiones");
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadTrucks();
+  }, []);
 
   const filteredTrucks = trucks.filter(
     (truck) =>
@@ -46,7 +63,7 @@ export default function TrucksPage() {
     })
     setShowForm(true)
     setSuccess("")
-    setError("")
+    setApiError("")
   }
 
   const handleEditTruck = (truck: Truck) => {
@@ -59,74 +76,76 @@ export default function TrucksPage() {
     })
     setShowForm(true)
     setSuccess("")
-    setError("")
+    setApiError("")
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsSubmitting(true)
-    setError("")
+    setApiError("")
+    setSuccess("")
+
+    const method = editingTruck ? 'PATCH' : 'POST';
+    const url = editingTruck ? `/api/trucks/${editingTruck.id}` : '/api/trucks';
 
     try {
-      // Mock API call
-      await new Promise((resolve) => setTimeout(resolve, 1000))
+      const res = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData),
+      });
 
+      if (!res.ok) throw new Error(await res.text());
+      
+      const savedTruck = await res.json();
+      
       if (editingTruck) {
-        // Update existing truck
-        const updatedTrucks = trucks.map((t) =>
-          t.id === editingTruck.id
-            ? {
-                ...t,
-                ...formData,
-                updatedAt: new Date(),
-              }
-            : t,
-        )
-        setTrucks(updatedTrucks)
-        setSuccess("Camión actualizado exitosamente")
+        setTrucks(trucks.map(t => t.id === savedTruck.id ? savedTruck : t));
+        setSuccess("Camión actualizado exitosamente.");
       } else {
-        // Create new truck
-        const newTruck: Truck = {
-          id: String(Date.now()),
-          ...formData,
-          isActive: true,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        }
-        setTrucks([...trucks, newTruck])
-        setSuccess("Camión creado exitosamente")
+        setTrucks([...trucks, savedTruck]);
+        setSuccess("Camión creado exitosamente.");
       }
 
-      setShowForm(false)
-      setFormData({
-        placa: "",
-        brand: "",
-        model: "",
-        capacity: 0,
-      })
-    } catch (err) {
-      setError("Error al guardar el camión")
+      setShowForm(false);
+    } catch (err: any) {
+      setApiError(err.message || "Error al guardar el camión");
     } finally {
-      setIsSubmitting(false)
+      setIsSubmitting(false);
     }
   }
 
   const handleToggleStatus = async (truck: Truck) => {
+    const originalTrucks = trucks;
+    const updatedTrucks = trucks.map((t) =>
+      t.id === truck.id ? { ...t, isActive: !t.isActive } : t,
+    );
+    setTrucks(updatedTrucks);
+
     try {
-      const updatedTrucks = trucks.map((t) =>
-        t.id === truck.id
-          ? {
-              ...t,
-              isActive: !t.isActive,
-              updatedAt: new Date(),
-            }
-          : t,
-      )
-      setTrucks(updatedTrucks)
-      setSuccess(`Camión ${truck.isActive ? "desactivado" : "activado"} exitosamente`)
-    } catch (err) {
-      setError("Error al cambiar el estado del camión")
+        const res = await fetch(`/api/trucks/${truck.id}`, { method: 'DELETE' });
+        if(!res.ok) throw new Error(await res.text());
+        setSuccess(`Camión ${truck.isActive ? "desactivado" : "activado"} exitosamente.`);
+    } catch (err: any) {
+        setTrucks(originalTrucks);
+        setApiError(err.message || "Error al cambiar el estado del camión.");
     }
+  }
+  
+  if (loading) {
+    return (
+      <AppLayout title="Gestión de Camiones">
+        <div className="p-6 text-center">Cargando camiones...</div>
+      </AppLayout>
+    );
+  }
+
+  if (apiError && !showForm) {
+    return (
+      <AppLayout title="Gestión de Camiones">
+        <div className="p-6 text-destructive text-center">Error: {apiError}</div>
+      </AppLayout>
+    );
   }
 
   return (
@@ -143,7 +162,6 @@ export default function TrucksPage() {
           </Button>
         </div>
 
-        {/* Success/Error Messages */}
         {success && (
           <Alert className="border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-900/20">
             <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400" />
@@ -151,13 +169,12 @@ export default function TrucksPage() {
           </Alert>
         )}
 
-        {error && (
+        {apiError && showForm && (
           <Alert variant="destructive">
-            <AlertDescription>{error}</AlertDescription>
+            <AlertDescription>{apiError}</AlertDescription>
           </Alert>
         )}
 
-        {/* Truck Form */}
         {showForm && (
           <Card>
             <CardHeader>
@@ -232,7 +249,6 @@ export default function TrucksPage() {
           </Card>
         )}
 
-        {/* Search */}
         <Card>
           <CardContent className="pt-6">
             <div className="relative">
@@ -247,7 +263,6 @@ export default function TrucksPage() {
           </CardContent>
         </Card>
 
-        {/* Trucks List */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {filteredTrucks.length === 0 ? (
             <div className="col-span-full">
