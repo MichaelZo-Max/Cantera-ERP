@@ -1,12 +1,12 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Search, Truck, MapPin, Package, Clock, CheckCircle } from "lucide-react"
-import { mockDeliveries } from "@/lib/mock-data"
 import { AppLayout } from "@/components/app-layout"
+import type { Delivery } from "@/lib/types"
 
 const statusConfig = {
   ASIGNADA: {
@@ -43,17 +43,53 @@ const statusConfig = {
     color: "bg-red-500/10 text-red-700 border-red-200 dark:bg-red-500/20 dark:text-red-300 dark:border-red-800",
     icon: Clock,
   },
-}
+} as const
 
 export default function CashierDeliveriesPage() {
   const [searchTerm, setSearchTerm] = useState("")
+  const [deliveries, setDeliveries] = useState<Delivery[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
-  const filteredDeliveries = mockDeliveries.filter(
-    (delivery) =>
-      delivery.truck?.placa.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      delivery.order?.client?.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      delivery.id.toLowerCase().includes(searchTerm.toLowerCase()),
-  )
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const res = await fetch("/api/deliveries", { cache: "no-store" })
+        if (!res.ok) throw new Error(await res.text())
+        const data: Delivery[] = await res.json()
+        setDeliveries(data)
+      } catch (e: any) {
+        setError(e?.message ?? "Error al cargar despachos")
+      } finally {
+        setLoading(false)
+      }
+    }
+    load()
+  }, [])
+
+  const filteredDeliveries = deliveries.filter((delivery) => {
+    const q = searchTerm.toLowerCase()
+    const placa = delivery.truck?.placa?.toLowerCase() ?? ""
+    const cliente = delivery.order?.client?.nombre?.toLowerCase() ?? ""
+    const id = delivery.id?.toLowerCase() ?? ""
+    return placa.includes(q) || cliente.includes(q) || id.includes(q)
+  })
+
+  if (loading) {
+    return (
+      <AppLayout title="Seguimiento de Despachos">
+        <div className="p-6">Cargando…</div>
+      </AppLayout>
+    )
+  }
+
+  if (error) {
+    return (
+      <AppLayout title="Seguimiento de Despachos">
+        <div className="p-6 text-destructive">Error: {error}</div>
+      </AppLayout>
+    )
+  }
 
   return (
     <AppLayout title="Seguimiento de Despachos">
@@ -80,7 +116,7 @@ export default function CashierDeliveriesPage() {
         <div className="relative max-w-md">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
           <Input
-            placeholder="Buscar por placa, cliente o producto..."
+            placeholder="Buscar por placa, cliente o ID…"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="pl-10"
@@ -90,9 +126,14 @@ export default function CashierDeliveriesPage() {
         {/* Deliveries Grid */}
         <div className="grid gap-4 sm:gap-6 grid-cols-1 lg:grid-cols-2 xl:grid-cols-3">
           {filteredDeliveries.map((delivery) => {
-            const StatusIcon = statusConfig[delivery.estado as keyof typeof statusConfig]?.icon || Clock
-            const statusStyle = statusConfig[delivery.estado as keyof typeof statusConfig]?.color || ""
-            const statusLabel = statusConfig[delivery.estado as keyof typeof statusConfig]?.label || delivery.estado
+            const conf = statusConfig[delivery.estado as keyof typeof statusConfig]
+            const StatusIcon = conf?.icon ?? Clock
+            const statusStyle = conf?.color ?? ""
+            const statusLabel = conf?.label ?? delivery.estado
+
+            const createdAt = delivery.createdAt ? new Date(delivery.createdAt as unknown as string) : null
+            const loadedAt = delivery.loadedAt ? new Date(delivery.loadedAt as unknown as string) : null
+            const exitedAt = delivery.exitedAt ? new Date(delivery.exitedAt as unknown as string) : null
 
             return (
               <Card key={delivery.id} className="hover:shadow-lg transition-all duration-200 border-border/50">
@@ -130,7 +171,7 @@ export default function CashierDeliveriesPage() {
                         {delivery.cantidadBase}
                       </span>
                     </div>
-                    {delivery.loadedQuantity && delivery.loadedQuantity > 0 && (
+                    {!!delivery.loadedQuantity && delivery.loadedQuantity > 0 && (
                       <div className="flex justify-between items-center text-sm">
                         <span className="text-muted-foreground">Cantidad Cargada:</span>
                         <span className="font-semibold text-foreground">
@@ -141,7 +182,7 @@ export default function CashierDeliveriesPage() {
                   </div>
 
                   {/* Notes */}
-                  {delivery.notes && (
+                  {!!delivery.notes && (
                     <div className="text-xs text-muted-foreground bg-muted/20 p-2 rounded">
                       <strong>Notas:</strong> {delivery.notes}
                     </div>
@@ -149,19 +190,10 @@ export default function CashierDeliveriesPage() {
 
                   {/* Timestamps */}
                   <div className="text-xs text-muted-foreground border-t border-border/50 pt-3">
-                    Creado:{" "}
-                    {new Date(delivery.createdAt).toLocaleDateString("es-ES", {
-                      day: "2-digit",
-                      month: "2-digit",
-                      year: "numeric",
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
-                    {delivery.loadedAt && (
+                    {createdAt && (
                       <>
-                        <br />
-                        Cargado:{" "}
-                        {new Date(delivery.loadedAt).toLocaleDateString("es-ES", {
+                        Creado:{" "}
+                        {createdAt.toLocaleDateString("es-ES", {
                           day: "2-digit",
                           month: "2-digit",
                           year: "numeric",
@@ -170,11 +202,24 @@ export default function CashierDeliveriesPage() {
                         })}
                       </>
                     )}
-                    {delivery.exitedAt && (
+                    {loadedAt && (
+                      <>
+                        <br />
+                        Cargado:{" "}
+                        {loadedAt.toLocaleDateString("es-ES", {
+                          day: "2-digit",
+                          month: "2-digit",
+                          year: "numeric",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </>
+                    )}
+                    {exitedAt && (
                       <>
                         <br />
                         Salida:{" "}
-                        {new Date(delivery.exitedAt).toLocaleDateString("es-ES", {
+                        {exitedAt.toLocaleDateString("es-ES", {
                           day: "2-digit",
                           month: "2-digit",
                           year: "numeric",

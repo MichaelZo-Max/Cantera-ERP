@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { AppLayout } from "@/components/app-layout"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
@@ -16,133 +16,6 @@ import { Plus, Trash2, Calculator, CreditCard, Truck } from "lucide-react"
 import { toast } from "sonner"
 import type { Client, Destination, Product, ProductFormat, ProductSelection, CreateOrderForm } from "@/lib/types"
 
-// Mock data - En producción vendría de la API
-const mockClients: Client[] = [
-  {
-    id: "1",
-    nombre: "Constructora Los Andes",
-    rif: "J-12345678-9",
-    isActive: true,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  },
-  {
-    id: "2",
-    nombre: "Obras Civiles CA",
-    rif: "J-87654321-0",
-    isActive: true,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  },
-]
-
-const mockDestinations: Destination[] = [
-  {
-    id: "1",
-    clientId: "1",
-    nombre: "Obra Av. Norte",
-    direccion: "Av. Norte, Caracas",
-    isActive: true,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  },
-  {
-    id: "2",
-    clientId: "1",
-    nombre: "Proyecto Residencial",
-    direccion: "Urb. Los Palos Grandes",
-    isActive: true,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  },
-  {
-    id: "3",
-    clientId: "2",
-    nombre: "Puente Autopista",
-    direccion: "Autopista Regional",
-    isActive: true,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  },
-]
-
-const mockProducts: Product[] = [
-  {
-    id: "1",
-    codigo: "AGR001",
-    nombre: "Grava 3/4",
-    area: "AGREGADOS",
-    isActive: true,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  },
-  {
-    id: "2",
-    codigo: "AGR002",
-    nombre: "Arena Lavada",
-    area: "AGREGADOS",
-    isActive: true,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  },
-  {
-    id: "3",
-    codigo: "ASF001",
-    nombre: "Asfalto RC-250",
-    area: "ASFALTOS",
-    isActive: true,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  },
-]
-
-const mockFormats: ProductFormat[] = [
-  {
-    id: "1",
-    productId: "1",
-    unidadBase: "M3",
-    factorUnidadBase: 1,
-    sku: "A granel (m³)",
-    pricePerUnit: 25.5,
-    activo: true,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  },
-  {
-    id: "2",
-    productId: "1",
-    unidadBase: "TON",
-    factorUnidadBase: 1.6,
-    sku: "Por tonelada",
-    pricePerUnit: 40.8,
-    activo: true,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  },
-  {
-    id: "3",
-    productId: "2",
-    unidadBase: "M3",
-    factorUnidadBase: 1,
-    sku: "A granel (m³)",
-    pricePerUnit: 22.0,
-    activo: true,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  },
-  {
-    id: "4",
-    productId: "3",
-    unidadBase: "TON",
-    factorUnidadBase: 1,
-    sku: "Tanque",
-    pricePerUnit: 850.0,
-    activo: true,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  },
-]
-
 interface OrderItem {
   id: string
   productSelection: ProductSelection
@@ -154,15 +27,25 @@ interface OrderItem {
 }
 
 export default function CashierOrderPage() {
+  // selección
   const [selectedClient, setSelectedClient] = useState<string>("")
   const [selectedDestination, setSelectedDestination] = useState<string>("")
-  const [orderItems, setOrderItems] = useState<OrderItem[]>([])
 
-  // Constructor de items
+  // catálogo desde API
+  const [clients, setClients] = useState<Client[]>([])
+  const [products, setProducts] = useState<Product[]>([])
+  const [formats, setFormats] = useState<ProductFormat[]>([])
+  const [destinations, setDestinations] = useState<Destination[]>([])
+
+  const [loadingData, setLoadingData] = useState(true)
+  const [errorData, setErrorData] = useState<string | null>(null)
+
+  // items
+  const [orderItems, setOrderItems] = useState<OrderItem[]>([])
   const [currentProduct, setCurrentProduct] = useState<ProductSelection | null>(null)
   const [currentQuantity, setCurrentQuantity] = useState<number>(0)
 
-  // Pago y camión
+  // pago y camión
   const [paymentMethod, setPaymentMethod] = useState<string>("")
   const [paymentReference, setPaymentReference] = useState<string>("")
   const [truckPlate, setTruckPlate] = useState<string>("")
@@ -170,69 +53,105 @@ export default function CashierOrderPage() {
 
   const [isSubmitting, setIsSubmitting] = useState(false)
 
-  // Obtener destinos disponibles para el cliente seleccionado
-  const availableDestinations = mockDestinations.filter((d) => d.clientId === selectedClient)
+  // Cargar clientes, productos, formatos
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const [cRes, pRes, fRes] = await Promise.all([
+          fetch("/api/customers", { cache: "no-store" }),
+          fetch("/api/products", { cache: "no-store" }),
+          fetch("/api/product-formats", { cache: "no-store" }),
+        ])
+        if (!cRes.ok) throw new Error(await cRes.text())
+        if (!pRes.ok) throw new Error(await pRes.text())
+        if (!fRes.ok) throw new Error(await fRes.text())
 
-  // Obtener formato seleccionado actual
-  const currentFormat = currentProduct ? mockFormats.find((f) => f.id === currentProduct.formatId) : null
+        setClients(await cRes.json())
+        setProducts(await pRes.json())
+        setFormats(await fRes.json())
+      } catch (e: any) {
+        setErrorData(e?.message ?? "Error cargando catálogos")
+      } finally {
+        setLoadingData(false)
+      }
+    }
+    load()
+  }, [])
 
-  // Calcular totales
+  // Destinos por cliente
+  useEffect(() => {
+    if (!selectedClient) {
+      setDestinations([])
+      setSelectedDestination("")
+      return
+    }
+    const loadDestinations = async () => {
+      try {
+        const res = await fetch(`/api/destinations?clientId=${selectedClient}`, { cache: "no-store" })
+        if (!res.ok) throw new Error(await res.text())
+        setDestinations(await res.json())
+      } catch {
+        setDestinations([])
+      }
+    }
+    loadDestinations()
+  }, [selectedClient])
+
+  // Helpers
+  const currentFormat = useMemo(
+    () => (currentProduct ? formats.find((f) => f.id === currentProduct.formatId) ?? null : null),
+    [currentProduct, formats]
+  )
+  const findProduct = (id: string) => products.find((p) => p.id === id)
+  const findFormat = (id: string) => formats.find((f) => f.id === id)
+
+  // Totales
   const subtotal = orderItems.reduce((sum, item) => sum + item.subtotal, 0)
-  const tax = subtotal * 0.16 // IVA 16%
+  const tax = subtotal * 0.16
   const total = subtotal + tax
 
+  // Acciones items
   const handleAddItem = () => {
     if (!currentProduct || currentQuantity <= 0) {
       toast.error("Selecciona un producto y cantidad válida")
       return
     }
-
-    const product = mockProducts.find((p) => p.id === currentProduct.productId)
-    const format = mockFormats.find((f) => f.id === currentProduct.formatId)
-
+    const product = findProduct(currentProduct.productId)
+    const format = findFormat(currentProduct.formatId)
     if (!product || !format) {
       toast.error("Producto o formato no encontrado")
       return
     }
 
+    const price = Number(format.pricePerUnit ?? 0)
     const newItem: OrderItem = {
-      id: Date.now().toString(),
+      id: crypto.randomUUID(),
       productSelection: currentProduct,
       product,
       format,
       quantity: currentQuantity,
-      pricePerUnit: format.pricePerUnit || 0,
-      subtotal: currentQuantity * (format.pricePerUnit || 0),
+      pricePerUnit: price,
+      subtotal: currentQuantity * price,
     }
-
-    setOrderItems([...orderItems, newItem])
-
-    // Limpiar constructor
+    setOrderItems((prev) => [...prev, newItem])
     setCurrentProduct(null)
     setCurrentQuantity(0)
-
     toast.success("Item agregado a la comanda")
   }
 
   const handleRemoveItem = (itemId: string) => {
-    setOrderItems(orderItems.filter((item) => item.id !== itemId))
+    setOrderItems((prev) => prev.filter((item) => item.id !== itemId))
     toast.success("Item eliminado")
   }
 
+  // Autorizar (POST /api/orders)
   const handleAuthorizeDispatch = async () => {
-    if (!selectedClient || orderItems.length === 0 || !truckPlate) {
-      toast.error("Completa todos los campos requeridos")
+    if (!selectedClient || orderItems.length === 0 || !truckPlate || !paymentMethod) {
+      toast.error("Completa los campos requeridos")
       return
     }
-
     setIsSubmitting(true)
-
     try {
-      // Mock API call
-      await new Promise((resolve) => setTimeout(resolve, 1500))
-
-      const orderNumber = `ORD-${new Date().getFullYear()}-${String(Date.now()).slice(-6)}`
-
       const orderData: CreateOrderForm = {
         clientId: selectedClient,
         destinationId: selectedDestination || undefined,
@@ -245,19 +164,25 @@ export default function CashierOrderPage() {
           monto: total,
           ref: paymentReference,
         },
-        truck: {
-          placa: truckPlate,
-        },
-        photoFile: truckPhoto || undefined,
+        truck: { placa: truckPlate },
+        // Nota: si necesitas enviar foto real, cambia a FormData (multipart)
+        // y ajusta tu route handler para leer archivos.
+        // photoFile: truckPhoto || undefined,
       }
 
-      console.log("Creating order:", { orderNumber, ...orderData })
+      const res = await fetch("/api/orders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(orderData),
+      })
+      if (!res.ok) throw new Error(await res.text())
+      const { order, delivery } = await res.json()
 
-      toast.success("Despacho autorizado", {
-        description: `Orden ${orderNumber} creada exitosamente`,
+      toast.success(`Orden ${order?.orderNumber ?? ""} creada`, {
+        description: delivery ? `Despacho ${delivery.id} asignado` : undefined,
       })
 
-      // Limpiar formulario
+      // Reset
       setSelectedClient("")
       setSelectedDestination("")
       setOrderItems([])
@@ -265,14 +190,29 @@ export default function CashierOrderPage() {
       setPaymentReference("")
       setTruckPlate("")
       setTruckPhoto(null)
-    } catch (error) {
-      toast.error("Error al autorizar despacho")
+    } catch (err: any) {
+      toast.error("Error al autorizar despacho", { description: err?.message })
     } finally {
       setIsSubmitting(false)
     }
   }
 
-  const canAuthorize = selectedClient && orderItems.length > 0 && truckPlate && paymentMethod
+  const canAuthorize = !!selectedClient && orderItems.length > 0 && !!truckPlate && !!paymentMethod
+
+  if (loadingData) {
+    return (
+      <AppLayout title="Comanda y Pago">
+        <div className="p-6">Cargando catálogos…</div>
+      </AppLayout>
+    )
+  }
+  if (errorData) {
+    return (
+      <AppLayout title="Comanda y Pago">
+        <div className="p-6 text-destructive">Error: {errorData}</div>
+      </AppLayout>
+    )
+  }
 
   return (
     <AppLayout title="Comanda y Pago">
@@ -285,12 +225,12 @@ export default function CashierOrderPage() {
           <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Cliente *</Label>
-              <Select value={selectedClient} onValueChange={setSelectedClient}>
+              <Select value={selectedClient} onValueChange={(v) => { setSelectedClient(v); setSelectedDestination("") }}>
                 <SelectTrigger>
                   <SelectValue placeholder="Selecciona cliente..." />
                 </SelectTrigger>
                 <SelectContent>
-                  {mockClients.map((client) => (
+                  {clients.map((client) => (
                     <SelectItem key={client.id} value={client.id}>
                       <div>
                         <div className="font-medium">{client.nombre}</div>
@@ -304,12 +244,16 @@ export default function CashierOrderPage() {
 
             <div className="space-y-2">
               <Label>Destino</Label>
-              <Select value={selectedDestination} onValueChange={setSelectedDestination} disabled={!selectedClient}>
+              <Select
+                value={selectedDestination}
+                onValueChange={setSelectedDestination}
+                disabled={!selectedClient || destinations.length === 0}
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="Selecciona destino..." />
                 </SelectTrigger>
                 <SelectContent>
-                  {availableDestinations.map((destination) => (
+                  {destinations.map((destination) => (
                     <SelectItem key={destination.id} value={destination.id}>
                       <div>
                         <div className="font-medium">{destination.nombre}</div>
@@ -339,8 +283,8 @@ export default function CashierOrderPage() {
               <ProductPicker
                 value={currentProduct}
                 onChange={setCurrentProduct}
-                products={mockProducts}
-                formats={mockFormats}
+                products={products}
+                formats={formats}
               />
 
               {currentFormat && (
@@ -356,7 +300,7 @@ export default function CashierOrderPage() {
                   <div className="flex justify-between items-center">
                     <span className="text-sm text-muted-foreground">Subtotal:</span>
                     <span className="font-semibold">
-                      ${(currentQuantity * (currentFormat.pricePerUnit || 0)).toFixed(2)}
+                      {(currentQuantity * Number(currentFormat.pricePerUnit ?? 0)).toFixed(2)}
                     </span>
                   </div>
                 </div>

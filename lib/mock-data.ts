@@ -123,6 +123,84 @@ export const mockTrucks: Truck[] = [
   },
 ]
 
+export const mockProductFormats: ProductFormat[] = [
+  {
+    id: "1",
+    productId: "1",
+    unidadBase: "M3",
+    factorUnidadBase: 1,
+    sku: "A granel (m³)",
+    pricePerUnit: 25.5,
+    activo: true,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  },
+  {
+    id: "2",
+    productId: "1",
+    unidadBase: "TON",
+    factorUnidadBase: 1.6,
+    sku: "Por tonelada",
+    pricePerUnit: 40.8,
+    activo: true,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  },
+  {
+    id: "3",
+    productId: "2",
+    unidadBase: "M3",
+    factorUnidadBase: 1,
+    sku: "A granel (m³)",
+    pricePerUnit: 22.0,
+    activo: true,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  },
+  {
+    id: "4",
+    productId: "3",
+    unidadBase: "TON",
+    factorUnidadBase: 1,
+    sku: "Tanque",
+    pricePerUnit: 850.0,
+    activo: true,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  },
+]
+
+export const mockDestinations: Destination[] = [
+  {
+    id: "1",
+    clientId: "1",
+    nombre: "Obra Av. Norte",
+    direccion: "Av. Norte, Caracas",
+    isActive: true,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  },
+  {
+    id: "2",
+    clientId: "1",
+    nombre: "Proyecto Residencial",
+    direccion: "Urb. Los Palos Grandes",
+    isActive: true,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  },
+  {
+    id: "3",
+    clientId: "2",
+    nombre: "Puente Autopista",
+    direccion: "Autopista Regional",
+    isActive: true,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  },
+]
+
+
 export const mockUsers: User[] = [
   {
     id: "1",
