@@ -1,18 +1,29 @@
-// Core entity types for Cantera ERP system
+// Core enums and types for Cantera ERP system
+export type UnitBase = "M3" | "TON" | "BOLSA" | "UNIDAD"
+
+export type UserRole = "CASHIER" | "YARD" | "SECURITY" | "ADMIN" | "REPORTS"
+
+export type OrderStatus = "CREADA" | "PAGADA" | "EN_DESPACHO" | "PARCIAL" | "CERRADA" | "CANCELADA"
+
+export type DeliveryStatus = "ASIGNADA" | "EN_CARGA" | "CARGADA" | "PEND_SALIDA" | "SALIDA_OK" | "RECHAZADA"
+
+export type ProductArea = "AGREGADOS" | "ASFALTOS" | "VIVEROS" | "SERVICIOS"
+
+// Core entity types
 export interface User {
   id: string
   email: string
   name: string
-  role: "CASHIER" | "YARD" | "SECURITY" | "ADMIN" | "REPORTS"
+  role: UserRole
   isActive: boolean
   createdAt: Date
   updatedAt: Date
 }
 
-export interface Customer {
+export interface Client {
   id: string
-  name: string
-  rfc?: string
+  nombre: string
+  rif?: string
   address?: string
   phone?: string
   email?: string
@@ -21,12 +32,44 @@ export interface Customer {
   updatedAt: Date
 }
 
+export interface Destination {
+  id: string
+  clientId: string
+  nombre: string
+  direccion?: string
+  isActive: boolean
+  createdAt: Date
+  updatedAt: Date
+}
+
 export interface Product {
   id: string
-  name: string
+  codigo: string
+  nombre: string
   description?: string
-  unit: string // m3, ton, etc.
-  pricePerUnit: number
+  area: ProductArea
+  isActive: boolean
+  createdAt: Date
+  updatedAt: Date
+}
+
+export interface ProductFormat {
+  id: string
+  productId: string
+  unidadBase: UnitBase
+  factorUnidadBase: number
+  sku?: string
+  pricePerUnit?: number
+  activo: boolean
+  createdAt: Date
+  updatedAt: Date
+}
+
+export interface Driver {
+  id: string
+  nombre: string
+  docId?: string
+  phone?: string
   isActive: boolean
   createdAt: Date
   updatedAt: Date
@@ -34,12 +77,11 @@ export interface Product {
 
 export interface Truck {
   id: string
-  plates: string
+  placa: string
+  transporterId?: string
   brand?: string
   model?: string
   capacity?: number
-  driverName?: string
-  driverPhone?: string
   isActive: boolean
   createdAt: Date
   updatedAt: Date
@@ -47,19 +89,28 @@ export interface Truck {
 
 export interface Order {
   id: string
-  orderNumber: string
-  customerId: string
-  customer?: Customer
-  productId: string
-  product?: Product
-  truckId: string
-  truck?: Truck
-  quantity: number
-  pricePerUnit: number
-  totalAmount: number
-  status: "PENDING" | "IN_PROGRESS" | "LOADED" | "COMPLETED" | "CANCELLED"
+  orderNumber?: string
+  clientId: string
+  client?: Client
+  destinationId?: string
+  destination?: Destination
+  estado: OrderStatus
+  total?: number
+  totalPagado?: number
   notes?: string
   createdBy: string
+  createdAt: Date
+  updatedAt: Date
+}
+
+export interface OrderItem {
+  id: string
+  orderId: string
+  productFormatId: string
+  productFormat?: ProductFormat
+  cantidadSolicitadaBase: number
+  cantidadPendienteBase: number
+  precioUnitario?: number
   createdAt: Date
   updatedAt: Date
 }
@@ -68,36 +119,72 @@ export interface Delivery {
   id: string
   orderId: string
   order?: Order
-  loadedQuantity: number
+  truckId: string
+  truck?: Truck
+  driverId?: string
+  driver?: Driver
+  cantidadBase: number
+  estado: DeliveryStatus
   loadedBy?: string
   loadedAt?: Date
   exitedBy?: string
   exitedAt?: Date
   notes?: string
-  status: "PENDING" | "LOADED" | "EXITED"
   createdAt: Date
   updatedAt: Date
 }
 
-// Form types
+export interface DispatchGuide {
+  id: string
+  deliveryId: string
+  numeroGuia: string
+  urlPdf?: string
+  fecha: string
+  createdAt: Date
+  updatedAt: Date
+}
+
+// Form types - Actualizando según nuevos tipos
 export interface CreateOrderForm {
-  customerId: string
-  productId: string
-  truckId: string
-  quantity: number
-  pricePerUnit: number
-  notes?: string
+  clientId: string
+  destinationId?: string
+  items: {
+    productFormatId: string
+    cantidadBase: number
+  }[]
+  pago: {
+    metodo: string
+    monto: number
+    ref?: string
+  }
+  truck: {
+    placa: string
+  }
+  photoFile?: File
 }
 
 export interface LoadDeliveryForm {
   deliveryId: string
-  loadedQuantity: number
+  cantidadBase: number
+  photoFile: File
   notes?: string
 }
 
 export interface ExitDeliveryForm {
   deliveryId: string
+  photoFile: File
   notes?: string
+}
+
+export interface ProductSelection {
+  productId: string
+  formatId: string
+}
+
+export interface QuantityInputProps {
+  unitBase: UnitBase
+  value: number
+  onChange: (value: number) => void
 }
 
 // API Response types

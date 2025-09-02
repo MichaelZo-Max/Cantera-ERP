@@ -9,7 +9,18 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
 import { mockOrders, mockCustomers, mockProducts } from "@/lib/mock-data"
-import { BarChart3, Calendar, Download, TrendingUp, Package, Users, DollarSign } from "lucide-react"
+import {
+  BarChart3,
+  Calendar,
+  Download,
+  TrendingUp,
+  Package,
+  Users,
+  DollarSign,
+  FileText,
+  ChevronLeft,
+  ChevronRight,
+} from "lucide-react"
 
 export default function ReportsPage() {
   const [dateFrom, setDateFrom] = useState("")
@@ -17,46 +28,42 @@ export default function ReportsPage() {
   const [reportType, setReportType] = useState("sales")
   const [selectedCustomer, setSelectedCustomer] = useState("all-customers")
   const [selectedProduct, setSelectedProduct] = useState("all-products")
+  const [selectedStatus, setSelectedStatus] = useState("all-status")
+  const [currentPage, setCurrentPage] = useState(1)
+  const [itemsPerPage] = useState(10)
 
-  // Mock data calculations
-  const totalOrders = mockOrders.length
-  const completedOrders = mockOrders.filter((o) => o.status === "COMPLETED").length
-  const totalRevenue = mockOrders.reduce((sum, order) => sum + order.totalAmount, 0)
-  const totalQuantity = mockOrders.reduce((sum, order) => sum + order.quantity, 0)
+  const filteredOrders = mockOrders.filter((order) => {
+    const matchesCustomer = selectedCustomer === "all-customers" || order.customerId === selectedCustomer
+    const matchesProduct = selectedProduct === "all-products" || order.productId === selectedProduct
+    const matchesStatus = selectedStatus === "all-status" || order.status === selectedStatus
+
+    let matchesDateRange = true
+    if (dateFrom && dateTo) {
+      const orderDate = new Date(order.createdAt)
+      const fromDate = new Date(dateFrom)
+      const toDate = new Date(dateTo)
+      matchesDateRange = orderDate >= fromDate && orderDate <= toDate
+    }
+
+    return matchesCustomer && matchesProduct && matchesStatus && matchesDateRange
+  })
+
+  const totalOrders = filteredOrders.length
+  const completedOrders = filteredOrders.filter((o) => o.status === "COMPLETED").length
+  const totalRevenue = filteredOrders.reduce((sum, order) => sum + order.totalAmount, 0)
+  const totalQuantity = filteredOrders.reduce((sum, order) => sum + order.quantity, 0)
+
+  const totalPages = Math.ceil(filteredOrders.length / itemsPerPage)
+  const startIndex = (currentPage - 1) * itemsPerPage
+  const paginatedOrders = filteredOrders.slice(startIndex, startIndex + itemsPerPage)
 
   const ordersByStatus = {
-    PENDING: mockOrders.filter((o) => o.status === "PENDING").length,
-    IN_PROGRESS: mockOrders.filter((o) => o.status === "IN_PROGRESS").length,
-    LOADED: mockOrders.filter((o) => o.status === "LOADED").length,
-    COMPLETED: mockOrders.filter((o) => o.status === "COMPLETED").length,
-    CANCELLED: mockOrders.filter((o) => o.status === "CANCELLED").length,
+    PENDING: filteredOrders.filter((o) => o.status === "PENDING").length,
+    IN_PROGRESS: filteredOrders.filter((o) => o.status === "IN_PROGRESS").length,
+    LOADED: filteredOrders.filter((o) => o.status === "LOADED").length,
+    COMPLETED: filteredOrders.filter((o) => o.status === "COMPLETED").length,
+    CANCELLED: filteredOrders.filter((o) => o.status === "CANCELLED").length,
   }
-
-  const customerStats = mockCustomers
-    .map((customer) => {
-      const customerOrders = mockOrders.filter((o) => o.customerId === customer.id)
-      const revenue = customerOrders.reduce((sum, order) => sum + order.totalAmount, 0)
-      return {
-        customer: customer.name,
-        orders: customerOrders.length,
-        revenue,
-      }
-    })
-    .sort((a, b) => b.revenue - a.revenue)
-
-  const productStats = mockProducts
-    .map((product) => {
-      const productOrders = mockOrders.filter((o) => o.productId === product.id)
-      const quantity = productOrders.reduce((sum, order) => sum + order.quantity, 0)
-      const revenue = productOrders.reduce((sum, order) => sum + order.totalAmount, 0)
-      return {
-        product: product.name,
-        orders: productOrders.length,
-        quantity,
-        revenue,
-      }
-    })
-    .sort((a, b) => b.revenue - a.revenue)
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -92,17 +99,129 @@ export default function ReportsPage() {
     }
   }
 
-  const handleExportReport = () => {
-    // Mock export functionality
-    console.log("Exporting report with filters:", {
-      dateFrom,
-      dateTo,
-      reportType,
-      selectedCustomer,
-      selectedProduct,
-    })
-    alert("Reporte exportado exitosamente")
+  const exportToCSV = () => {
+    const headers = ["Pedido", "Cliente", "Producto", "Cantidad", "Total", "Estado", "Fecha"]
+    const csvContent = [
+      headers.join(","),
+      ...filteredOrders.map((order) =>
+        [
+          order.orderNumber,
+          `"${order.customer?.name || ""}"`,
+          `"${order.product?.name || ""}"`,
+          `${order.quantity} ${order.product?.unit || ""}`,
+          order.totalAmount.toFixed(2),
+          order.status,
+          new Date(order.createdAt).toLocaleDateString("es-MX"),
+        ].join(","),
+      ),
+    ].join("\n")
+
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" })
+    const link = document.createElement("a")
+    const url = URL.createObjectURL(blob)
+    link.setAttribute("href", url)
+    link.setAttribute("download", `reporte_${reportType}_${new Date().toISOString().split("T")[0]}.csv`)
+    link.style.visibility = "hidden"
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
   }
+
+  const exportToPDF = () => {
+    const printContent = `
+      <html>
+        <head>
+          <title>Reporte ${reportType.toUpperCase()}</title>
+          <style>
+            body { font-family: Arial, sans-serif; margin: 20px; }
+            table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+            th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+            th { background-color: #f2f2f2; }
+            .header { text-align: center; margin-bottom: 20px; }
+            .metrics { display: flex; justify-content: space-around; margin: 20px 0; }
+            .metric { text-align: center; }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <h1>Reporte de ${reportType.charAt(0).toUpperCase() + reportType.slice(1)}</h1>
+            <p>Generado el ${new Date().toLocaleDateString("es-MX")}</p>
+          </div>
+          <div class="metrics">
+            <div class="metric"><h3>${totalOrders}</h3><p>Total Pedidos</p></div>
+            <div class="metric"><h3>$${totalRevenue.toFixed(2)}</h3><p>Ingresos</p></div>
+            <div class="metric"><h3>${totalQuantity.toFixed(1)} m³</h3><p>Cantidad</p></div>
+            <div class="metric"><h3>${totalOrders > 0 ? ((completedOrders / totalOrders) * 100).toFixed(1) : "0"}%</h3><p>Completados</p></div>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>Pedido</th><th>Cliente</th><th>Producto</th><th>Cantidad</th><th>Total</th><th>Estado</th><th>Fecha</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${filteredOrders
+                .map(
+                  (order) => `
+                <tr>
+                  <td>${order.orderNumber}</td>
+                  <td>${order.customer?.name || ""}</td>
+                  <td>${order.product?.name || ""}</td>
+                  <td>${order.quantity} ${order.product?.unit || ""}</td>
+                  <td>$${order.totalAmount.toFixed(2)}</td>
+                  <td>${order.status}</td>
+                  <td>${new Date(order.createdAt).toLocaleDateString("es-MX")}</td>
+                </tr>
+              `,
+                )
+                .join("")}
+            </tbody>
+          </table>
+        </body>
+      </html>
+    `
+
+    const printWindow = window.open("", "_blank")
+    if (printWindow) {
+      printWindow.document.write(printContent)
+      printWindow.document.close()
+      printWindow.print()
+    }
+  }
+
+  const handleExportReport = (format: "csv" | "pdf") => {
+    if (format === "csv") {
+      exportToCSV()
+    } else {
+      exportToPDF()
+    }
+  }
+
+  const customerStats = mockCustomers
+    .map((customer) => {
+      const customerOrders = filteredOrders.filter((o) => o.customerId === customer.id)
+      const revenue = customerOrders.reduce((sum, order) => sum + order.totalAmount, 0)
+      return {
+        customer: customer.name,
+        orders: customerOrders.length,
+        revenue,
+      }
+    })
+    .sort((a, b) => b.revenue - a.revenue)
+
+  const productStats = mockProducts
+    .map((product) => {
+      const productOrders = filteredOrders.filter((o) => o.productId === product.id)
+      const quantity = productOrders.reduce((sum, order) => sum + order.quantity, 0)
+      const revenue = productOrders.reduce((sum, order) => sum + order.totalAmount, 0)
+      return {
+        product: product.name,
+        orders: productOrders.length,
+        quantity,
+        revenue,
+      }
+    })
+    .sort((a, b) => b.revenue - a.revenue)
 
   return (
     <AppLayout title="Reportes">
@@ -122,7 +241,7 @@ export default function ReportsPage() {
             <CardDescription>Configura los parámetros para generar reportes personalizados</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="dateFrom">Fecha Desde</Label>
                 <Input id="dateFrom" type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
@@ -177,11 +296,35 @@ export default function ReportsPage() {
                   </SelectContent>
                 </Select>
               </div>
+              <div className="space-y-2">
+                <Label htmlFor="status">Estado</Label>
+                <Select value={selectedStatus} onValueChange={setSelectedStatus}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Todos los estados" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all-status">Todos los estados</SelectItem>
+                    <SelectItem value="PENDING">Pendiente</SelectItem>
+                    <SelectItem value="IN_PROGRESS">En Proceso</SelectItem>
+                    <SelectItem value="LOADED">Cargado</SelectItem>
+                    <SelectItem value="COMPLETED">Completado</SelectItem>
+                    <SelectItem value="CANCELLED">Cancelado</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
-            <div className="flex justify-end mt-4">
-              <Button onClick={handleExportReport} className="flex items-center space-x-2">
+            <div className="flex justify-end mt-4 space-x-2">
+              <Button
+                onClick={() => handleExportReport("csv")}
+                variant="outline"
+                className="flex items-center space-x-2"
+              >
                 <Download className="h-4 w-4" />
-                <span>Exportar Reporte</span>
+                <span>Exportar CSV</span>
+              </Button>
+              <Button onClick={() => handleExportReport("pdf")} className="flex items-center space-x-2">
+                <FileText className="h-4 w-4" />
+                <span>Exportar PDF</span>
               </Button>
             </div>
           </CardContent>
@@ -239,7 +382,7 @@ export default function ReportsPage() {
                 </div>
                 <div>
                   <p className="text-2xl font-bold text-foreground">
-                    {((completedOrders / totalOrders) * 100).toFixed(1)}%
+                    {totalOrders > 0 ? ((completedOrders / totalOrders) * 100).toFixed(1) : "0"}%
                   </p>
                   <p className="text-sm text-muted-foreground">Tasa Completado</p>
                 </div>
@@ -264,7 +407,9 @@ export default function ReportsPage() {
                     </Badge>
                   </div>
                   <p className="text-2xl font-bold text-foreground">{count}</p>
-                  <p className="text-sm text-muted-foreground">{((count / totalOrders) * 100).toFixed(1)}%</p>
+                  <p className="text-sm text-muted-foreground">
+                    {totalOrders > 0 ? ((count / totalOrders) * 100).toFixed(1) : "0"}%
+                  </p>
                 </div>
               ))}
             </div>
@@ -336,11 +481,13 @@ export default function ReportsPage() {
           </Card>
         </div>
 
-        {/* Recent Orders Table */}
+        {/* Recent Orders Table with Pagination */}
         <Card>
           <CardHeader>
-            <CardTitle>Pedidos Recientes</CardTitle>
-            <CardDescription>Últimos pedidos registrados en el sistema</CardDescription>
+            <CardTitle>Pedidos Filtrados</CardTitle>
+            <CardDescription>
+              Mostrando {startIndex + 1}-{Math.min(startIndex + itemsPerPage, totalOrders)} de {totalOrders} pedidos
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="overflow-x-auto">
@@ -357,7 +504,7 @@ export default function ReportsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {mockOrders.slice(0, 10).map((order) => (
+                  {paginatedOrders.map((order) => (
                     <tr key={order.id} className="border-b hover:bg-muted/50">
                       <td className="py-3 px-2 font-medium">{order.orderNumber}</td>
                       <td className="py-3 px-2">{order.customer?.name}</td>
@@ -377,6 +524,33 @@ export default function ReportsPage() {
                 </tbody>
               </table>
             </div>
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between mt-4">
+                <div className="text-sm text-muted-foreground">
+                  Página {currentPage} de {totalPages}
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+                    disabled={currentPage === 1}
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                    Anterior
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+                    disabled={currentPage === totalPages}
+                  >
+                    Siguiente
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>

@@ -1,116 +1,216 @@
 "use client"
 
-import type React from "react"
-
 import { useState } from "react"
 import { AppLayout } from "@/components/app-layout"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Textarea } from "@/components/ui/textarea"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { mockDeliveries } from "@/lib/mock-data"
-import type { Delivery, ExitDeliveryForm } from "@/lib/types"
-import { Shield, Truck, Package, User, CheckCircle, Clock, AlertTriangle, LogOut } from "lucide-react"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { PhotoInput } from "@/components/forms/photo-input"
+import {
+  Search,
+  Shield,
+  Truck,
+  Package,
+  User,
+  CheckCircle,
+  AlertTriangle,
+  LogOut,
+  Camera,
+  FileText,
+  Eye,
+} from "lucide-react"
+import { toast } from "sonner"
+import type { Delivery, DispatchGuide } from "@/lib/types"
+
+// Mock data - En producción vendría de la API
+const mockLoadedDeliveries: (Delivery & {
+  order?: {
+    client?: { nombre: string }
+    destination?: { nombre: string }
+  }
+  truck?: { placa: string }
+  productFormat?: {
+    product?: { nombre: string }
+    sku?: string
+    unidadBase: string
+  }
+  loadPhoto?: string // URL de la foto del patio
+})[] = [
+  {
+    id: "d1",
+    orderId: "o1",
+    truckId: "t1",
+    cantidadBase: 10,
+    estado: "CARGADA",
+    loadedAt: new Date(Date.now() - 2 * 60 * 60 * 1000), // 2 horas atrás
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    order: {
+      client: { nombre: "Constructora Los Andes" },
+      destination: { nombre: "Obra Av. Norte" },
+    },
+    truck: { placa: "ABC-12D" },
+    productFormat: {
+      product: { nombre: "Grava 3/4" },
+      sku: "A granel (m³)",
+      unidadBase: "M3",
+    },
+    loadPhoto: "/truck-loading-gravel.png",
+    notes: "Carga completa sin observaciones",
+  },
+  {
+    id: "d2",
+    orderId: "o2",
+    truckId: "t2",
+    cantidadBase: 15,
+    estado: "CARGADA",
+    loadedAt: new Date(Date.now() - 1 * 60 * 60 * 1000), // 1 hora atrás
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    order: {
+      client: { nombre: "Obras Civiles CA" },
+      destination: { nombre: "Puente Autopista" },
+    },
+    truck: { placa: "XYZ-34E" },
+    productFormat: {
+      product: { nombre: "Arena Lavada" },
+      sku: "A granel (m³)",
+      unidadBase: "M3",
+    },
+    loadPhoto: "/truck-loading-sand.png",
+  },
+]
+
+const mockExitedDeliveries: typeof mockLoadedDeliveries = [
+  {
+    id: "d3",
+    orderId: "o3",
+    truckId: "t3",
+    cantidadBase: 8,
+    estado: "SALIDA_OK",
+    loadedAt: new Date(Date.now() - 4 * 60 * 60 * 1000),
+    exitedAt: new Date(Date.now() - 30 * 60 * 1000), // 30 min atrás
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    order: {
+      client: { nombre: "Constructora Los Andes" },
+      destination: { nombre: "Proyecto Residencial" },
+    },
+    truck: { placa: "DEF-56F" },
+    productFormat: {
+      product: { nombre: "Grava 3/4" },
+      sku: "A granel (m³)",
+      unidadBase: "M3",
+    },
+  },
+]
 
 export default function SecurityExitsPage() {
-  const [deliveries, setDeliveries] = useState<Delivery[]>(mockDeliveries)
-  const [selectedDelivery, setSelectedDelivery] = useState<Delivery | null>(null)
-  const [exitForm, setExitForm] = useState<ExitDeliveryForm>({
-    deliveryId: "",
-    notes: "",
-  })
+  const [loadedDeliveries, setLoadedDeliveries] = useState(mockLoadedDeliveries)
+  const [exitedDeliveries, setExitedDeliveries] = useState(mockExitedDeliveries)
+  const [searchQuery, setSearchQuery] = useState<string>("")
+  const [selectedDelivery, setSelectedDelivery] = useState<(typeof mockLoadedDeliveries)[0] | null>(null)
+  const [showExitModal, setShowExitModal] = useState(false)
+  const [exitPhoto, setExitPhoto] = useState<File | null>(null)
+  const [exitNotes, setExitNotes] = useState<string>("")
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [success, setSuccess] = useState("")
-  const [error, setError] = useState("")
 
-  const loadedDeliveries = deliveries.filter((d) => d.status === "LOADED")
-  const exitedDeliveries = deliveries.filter((d) => d.status === "EXITED")
+  // Filtrar deliveries por búsqueda
+  const filteredDeliveries = loadedDeliveries.filter((delivery) => {
+    const query = searchQuery.toLowerCase()
+    return (
+      delivery.truck?.placa.toLowerCase().includes(query) ||
+      delivery.id.toLowerCase().includes(query) ||
+      delivery.order?.client?.nombre.toLowerCase().includes(query)
+    )
+  })
 
-  const handleSelectDelivery = (delivery: Delivery) => {
-    setSelectedDelivery(delivery)
-    setExitForm({
-      deliveryId: delivery.id,
-      notes: "",
-    })
-    setSuccess("")
-    setError("")
+  const handleSearch = (query: string) => {
+    setSearchQuery(query)
   }
 
-  const handleAuthorizeExit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!selectedDelivery) return
+  const handleSelectDelivery = (delivery: (typeof mockLoadedDeliveries)[0]) => {
+    // Validaciones según el contrato
+    if (delivery.estado !== "CARGADA") {
+      toast.error("El viaje no está cargado", {
+        description: "Solo se pueden autorizar viajes que estén cargados",
+      })
+      return
+    }
+
+    setSelectedDelivery(delivery)
+    setExitPhoto(null)
+    setExitNotes("")
+    setShowExitModal(true)
+  }
+
+  const handleAuthorizeExit = async () => {
+    if (!selectedDelivery || !exitPhoto) {
+      toast.error("Foto de salida requerida", {
+        description: "Debes tomar una foto de la placa del camión",
+      })
+      return
+    }
 
     setIsSubmitting(true)
-    setError("")
 
     try {
       // Mock API call
-      await new Promise((resolve) => setTimeout(resolve, 1000))
+      await new Promise((resolve) => setTimeout(resolve, 2000))
 
-      // Update delivery status
-      const updatedDeliveries = deliveries.map((d) =>
-        d.id === selectedDelivery.id
-          ? {
-              ...d,
-              status: "EXITED" as const,
-              exitedBy: "3", // Mock security user ID
-              exitedAt: new Date(),
-              notes: exitForm.notes || d.notes,
-            }
-          : d,
-      )
+      // Generar guía de despacho
+      const guideNumber = `GD-${new Date().getFullYear()}-${String(Date.now()).slice(-6)}`
+      const dispatchGuide: DispatchGuide = {
+        id: `guide-${Date.now()}`,
+        deliveryId: selectedDelivery.id,
+        numeroGuia: guideNumber,
+        fecha: new Date().toISOString(),
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      }
 
-      setDeliveries(updatedDeliveries)
-      setSuccess(
-        `Salida autorizada para ${selectedDelivery.order?.orderNumber} - ${selectedDelivery.order?.truck?.plates}`,
-      )
-      setSelectedDelivery(null)
-      setExitForm({
-        deliveryId: "",
-        notes: "",
+      // Actualizar estado del delivery
+      const updatedDelivery = {
+        ...selectedDelivery,
+        estado: "SALIDA_OK" as const,
+        exitedBy: "security-user-1",
+        exitedAt: new Date(),
+        notes: exitNotes || selectedDelivery.notes,
+      }
+
+      // Mover de loaded a exited
+      setLoadedDeliveries((prev) => prev.filter((d) => d.id !== selectedDelivery.id))
+      setExitedDeliveries((prev) => [updatedDelivery, ...prev])
+
+      toast.success("Salida autorizada", {
+        description: `Guía de despacho ${guideNumber} generada`,
       })
-    } catch (err) {
-      setError("Error al autorizar la salida")
+
+      console.log("Dispatch guide generated:", dispatchGuide)
+      console.log("Exit photo:", exitPhoto)
+
+      // Limpiar y cerrar modal
+      setShowExitModal(false)
+      setSelectedDelivery(null)
+      setExitPhoto(null)
+      setExitNotes("")
+    } catch (error) {
+      toast.error("Error al autorizar salida")
     } finally {
       setIsSubmitting(false)
     }
   }
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "LOADED":
-        return "bg-green-100 text-green-800 border-green-200 dark:bg-green-900/20 dark:text-green-300 dark:border-green-800"
-      case "EXITED":
-        return "bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/20 dark:text-blue-300 dark:border-blue-800"
-      default:
-        return "bg-muted text-muted-foreground border-border"
-    }
-  }
-
-  const getStatusText = (status: string) => {
-    switch (status) {
-      case "LOADED":
-        return "Listo para Salir"
-      case "EXITED":
-        return "Salió"
-      default:
-        return status
-    }
-  }
-
-  const calculateWaitTime = (loadedAt: Date) => {
-    const now = new Date()
-    const diffMs = now.getTime() - loadedAt.getTime()
-    const diffMins = Math.floor(diffMs / (1000 * 60))
-
-    if (diffMins < 60) {
-      return `${diffMins} min`
-    } else {
-      const hours = Math.floor(diffMins / 60)
-      const mins = diffMins % 60
-      return `${hours}h ${mins}m`
-    }
+  const handleCloseModal = () => {
+    setShowExitModal(false)
+    setSelectedDelivery(null)
+    setExitPhoto(null)
+    setExitNotes("")
   }
 
   return (
@@ -121,260 +221,113 @@ export default function SecurityExitsPage() {
           <p className="text-muted-foreground">Autoriza la salida de camiones cargados</p>
         </div>
 
-        {/* Success/Error Messages */}
-        {success && (
-          <Alert className="border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-900/20">
-            <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400" />
-            <AlertDescription className="text-green-800 dark:text-green-300">{success}</AlertDescription>
-          </Alert>
-        )}
+        {/* Búsqueda rápida */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Search className="h-5 w-5" />
+              Búsqueda Rápida
+            </CardTitle>
+            <CardDescription>Busca por placa, ID de viaje o cliente</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex gap-4">
+              <div className="flex-1">
+                <Input
+                  placeholder="Buscar por placa (ABC-12D), ID de viaje o cliente..."
+                  value={searchQuery}
+                  onChange={(e) => handleSearch(e.target.value)}
+                  className="text-lg"
+                />
+              </div>
+              <Button variant="outline" onClick={() => setSearchQuery("")}>
+                Limpiar
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
 
-        {error && (
-          <Alert variant="destructive">
-            <AlertTriangle className="h-4 w-4" />
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
-        )}
-
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Ready to Exit */}
-          <div className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <Shield className="h-5 w-5 text-green-600 dark:text-green-400" />
-                  <span>Listos para Salir</span>
-                  <Badge variant="secondary">{loadedDeliveries.length}</Badge>
-                </CardTitle>
-                <CardDescription>Camiones cargados esperando autorización</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {loadedDeliveries.length === 0 ? (
-                  <div className="text-center py-8">
-                    <Truck className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                    <p className="text-muted-foreground">No hay camiones esperando salida</p>
-                  </div>
-                ) : (
-                  loadedDeliveries.map((delivery) => (
-                    <Card
-                      key={delivery.id}
-                      className={`cursor-pointer transition-all hover:shadow-md ${
-                        selectedDelivery?.id === delivery.id ? "ring-2 ring-primary bg-primary/5" : ""
-                      }`}
-                      onClick={() => handleSelectDelivery(delivery)}
-                    >
-                      <CardContent className="pt-4">
-                        <div className="flex justify-between items-start mb-3">
-                          <div>
-                            <p className="font-semibold text-lg">{delivery.order?.truck?.plates}</p>
-                            <p className="text-sm text-muted-foreground">{delivery.order?.orderNumber}</p>
-                          </div>
-                          <div className="text-right">
-                            <Badge className={getStatusColor(delivery.status)}>{getStatusText(delivery.status)}</Badge>
-                            {delivery.loadedAt && (
-                              <p className="text-xs text-muted-foreground mt-1 flex items-center space-x-1">
-                                <Clock className="h-3 w-3" />
-                                <span>Esperando: {calculateWaitTime(delivery.loadedAt)}</span>
-                              </p>
-                            )}
-                          </div>
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-3 text-sm mb-3">
-                          <div className="flex items-center space-x-2">
-                            <User className="h-4 w-4 text-muted-foreground" />
-                            <span className="truncate">{delivery.order?.customer?.name}</span>
-                          </div>
-                          <div className="flex items-center space-x-2">
-                            <Package className="h-4 w-4 text-muted-foreground" />
-                            <span>{delivery.order?.product?.name}</span>
-                          </div>
-                        </div>
-
-                        <div className="bg-muted p-3 rounded-lg">
-                          <div className="flex justify-between items-center text-sm">
-                            <span className="text-muted-foreground">Cantidad cargada:</span>
-                            <span className="font-medium">
-                              {delivery.loadedQuantity} {delivery.order?.product?.unit}
-                            </span>
-                          </div>
-                          {delivery.loadedQuantity !== delivery.order?.quantity && (
-                            <div className="flex justify-between items-center text-sm mt-1">
-                              <span className="text-muted-foreground">Solicitado:</span>
-                              <span className="text-amber-600 dark:text-amber-400">
-                                {delivery.order?.quantity} {delivery.order?.product?.unit}
-                              </span>
-                            </div>
-                          )}
-                        </div>
-
-                        {delivery.order?.truck?.driverName && (
-                          <p className="text-xs text-muted-foreground mt-2">
-                            Conductor: {delivery.order.truck.driverName}
-                            {delivery.order.truck.driverPhone && ` - ${delivery.order.truck.driverPhone}`}
-                          </p>
-                        )}
-
-                        {delivery.notes && (
-                          <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 dark:bg-yellow-900/20 dark:border-yellow-800 rounded text-xs">
-                            <span className="font-medium text-yellow-800 dark:text-yellow-300">Notas del patio:</span>
-                            <p className="text-yellow-700 dark:text-yellow-400">{delivery.notes}</p>
-                          </div>
-                        )}
-                      </CardContent>
-                    </Card>
-                  ))
-                )}
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Exit Authorization Form */}
-          <div className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <LogOut className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-                  <span>Autorizar Salida</span>
-                </CardTitle>
-                <CardDescription>
-                  {selectedDelivery ? "Confirma la salida del camión" : "Selecciona un camión para autorizar salida"}
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {selectedDelivery ? (
-                  <form onSubmit={handleAuthorizeExit} className="space-y-4">
-                    {/* Delivery Summary */}
-                    <div className="bg-blue-50 border border-blue-200 dark:bg-blue-900/20 dark:border-blue-800 p-4 rounded-lg space-y-3">
-                      <h4 className="font-medium text-blue-900 dark:text-blue-100">Resumen de Salida</h4>
-
-                      <div className="grid grid-cols-2 gap-3 text-sm">
+        {/* Viajes cargados listos para salir */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Shield className="h-5 w-5 text-green-600" />
+              Viajes Listos para Salir
+              <Badge variant="secondary">{filteredDeliveries.length}</Badge>
+            </CardTitle>
+            <CardDescription>Camiones cargados esperando autorización de salida</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {filteredDeliveries.length === 0 ? (
+              <div className="text-center py-8">
+                <Truck className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                <p className="text-muted-foreground">
+                  {searchQuery ? "No se encontraron viajes con esa búsqueda" : "No hay viajes listos para salir"}
+                </p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {filteredDeliveries.map((delivery) => (
+                  <Card
+                    key={delivery.id}
+                    className="cursor-pointer hover:shadow-md transition-shadow border-green-200 bg-green-50/50 dark:border-green-800 dark:bg-green-900/10"
+                    onClick={() => handleSelectDelivery(delivery)}
+                  >
+                    <CardContent className="pt-4">
+                      <div className="flex justify-between items-start mb-3">
                         <div>
-                          <span className="text-blue-700 dark:text-blue-300">Camión:</span>
-                          <p className="font-bold text-lg text-blue-900 dark:text-blue-100">
-                            {selectedDelivery.order?.truck?.plates}
-                          </p>
+                          <p className="font-bold text-lg">{delivery.truck?.placa}</p>
+                          <p className="text-sm text-muted-foreground">ID: {delivery.id}</p>
                         </div>
-                        <div>
-                          <span className="text-blue-700 dark:text-blue-300">Pedido:</span>
-                          <p className="font-medium text-blue-900 dark:text-blue-100">
-                            {selectedDelivery.order?.orderNumber}
-                          </p>
-                        </div>
-                        <div>
-                          <span className="text-blue-700 dark:text-blue-300">Cliente:</span>
-                          <p className="font-medium text-blue-900 dark:text-blue-100">
-                            {selectedDelivery.order?.customer?.name}
-                          </p>
-                        </div>
-                        <div>
-                          <span className="text-blue-700 dark:text-blue-300">Producto:</span>
-                          <p className="font-medium text-blue-900 dark:text-blue-100">
-                            {selectedDelivery.order?.product?.name}
-                          </p>
-                        </div>
+                        <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300">
+                          Listo
+                        </Badge>
                       </div>
 
-                      <div className="border-t border-blue-200 dark:border-blue-700 pt-3">
-                        <div className="flex justify-between items-center">
-                          <span className="text-blue-700 dark:text-blue-300">Cantidad autorizada:</span>
-                          <span className="font-bold text-blue-900 dark:text-blue-100">
-                            {selectedDelivery.loadedQuantity} {selectedDelivery.order?.product?.unit}
+                      <div className="space-y-2 text-sm">
+                        <div className="flex items-center gap-2">
+                          <User className="h-4 w-4 text-muted-foreground" />
+                          <span className="truncate">{delivery.order?.client?.nombre}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Package className="h-4 w-4 text-muted-foreground" />
+                          <span>{delivery.productFormat?.product?.nombre}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Cantidad:</span>
+                          <span className="font-medium">
+                            {delivery.cantidadBase} {delivery.productFormat?.unidadBase}
                           </span>
                         </div>
-                        {selectedDelivery.loadedAt && (
-                          <div className="flex justify-between items-center mt-1">
-                            <span className="text-blue-700 dark:text-blue-300">Cargado:</span>
-                            <span className="text-blue-800 dark:text-blue-200">
-                              {new Date(selectedDelivery.loadedAt).toLocaleString("es-MX")}
-                            </span>
+                        {delivery.loadedAt && (
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Cargado:</span>
+                            <span>{new Date(delivery.loadedAt).toLocaleTimeString()}</span>
                           </div>
                         )}
                       </div>
-                    </div>
 
-                    {/* Driver Information */}
-                    {selectedDelivery.order?.truck?.driverName && (
-                      <div className="bg-muted p-3 rounded-lg">
-                        <h5 className="font-medium text-foreground mb-2">Información del Conductor</h5>
-                        <div className="text-sm space-y-1">
-                          <p>
-                            <span className="text-muted-foreground">Nombre:</span>{" "}
-                            {selectedDelivery.order.truck.driverName}
-                          </p>
-                          {selectedDelivery.order.truck.driverPhone && (
-                            <p>
-                              <span className="text-muted-foreground">Teléfono:</span>{" "}
-                              {selectedDelivery.order.truck.driverPhone}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Security Notes */}
-                    <div className="space-y-2">
-                      <label htmlFor="securityNotes" className="text-sm font-medium text-foreground">
-                        Observaciones de Seguridad
-                      </label>
-                      <Textarea
-                        id="securityNotes"
-                        value={exitForm.notes}
-                        onChange={(e) => setExitForm({ ...exitForm, notes: e.target.value })}
-                        placeholder="Documentos verificados, condición del vehículo, observaciones..."
-                        rows={3}
-                      />
-                    </div>
-
-                    {/* Previous Notes */}
-                    {selectedDelivery.notes && (
-                      <div className="bg-yellow-50 border border-yellow-200 dark:bg-yellow-900/20 dark:border-yellow-800 p-3 rounded-lg">
-                        <h5 className="font-medium text-yellow-800 dark:text-yellow-300 mb-1">Notas del Patio</h5>
-                        <p className="text-sm text-yellow-700 dark:text-yellow-400">{selectedDelivery.notes}</p>
-                      </div>
-                    )}
-
-                    {/* Action Buttons */}
-                    <div className="flex space-x-3">
-                      <Button type="submit" disabled={isSubmitting} className="flex-1 bg-green-600 hover:bg-green-700">
-                        {isSubmitting ? "Autorizando..." : "Autorizar Salida"}
+                      <Button className="w-full mt-3" size="sm">
+                        <LogOut className="h-4 w-4 mr-2" />
+                        Autorizar Salida
                       </Button>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() => {
-                          setSelectedDelivery(null)
-                          setExitForm({
-                            deliveryId: "",
-                            notes: "",
-                          })
-                        }}
-                      >
-                        Cancelar
-                      </Button>
-                    </div>
-                  </form>
-                ) : (
-                  <div className="text-center py-8">
-                    <Shield className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                    <p className="text-muted-foreground">Selecciona un camión para autorizar su salida</p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-        </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
-        {/* Recent Exits */}
+        {/* Salidas recientes */}
         {exitedDeliveries.length > 0 && (
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <CheckCircle className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-                <span>Salidas Recientes</span>
+              <CardTitle className="flex items-center gap-2">
+                <CheckCircle className="h-5 w-5 text-blue-600" />
+                Salidas Recientes
                 <Badge variant="secondary">{exitedDeliveries.length}</Badge>
               </CardTitle>
-              <CardDescription>Camiones que han salido hoy</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -386,27 +339,22 @@ export default function SecurityExitsPage() {
                     <CardContent className="pt-4">
                       <div className="flex justify-between items-start mb-3">
                         <div>
-                          <p className="font-semibold">{delivery.order?.truck?.plates}</p>
-                          <p className="text-sm text-muted-foreground">{delivery.order?.orderNumber}</p>
+                          <p className="font-semibold">{delivery.truck?.placa}</p>
+                          <p className="text-sm text-muted-foreground">{delivery.order?.client?.nombre}</p>
                         </div>
-                        <Badge className={getStatusColor(delivery.status)}>{getStatusText(delivery.status)}</Badge>
+                        <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300">Salió</Badge>
                       </div>
-
-                      <div className="space-y-2 text-sm">
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Cliente:</span>
-                          <span className="truncate ml-2">{delivery.order?.customer?.name}</span>
-                        </div>
+                      <div className="text-sm space-y-1">
                         <div className="flex justify-between">
                           <span className="text-muted-foreground">Cantidad:</span>
                           <span>
-                            {delivery.loadedQuantity} {delivery.order?.product?.unit}
+                            {delivery.cantidadBase} {delivery.productFormat?.unidadBase}
                           </span>
                         </div>
                         {delivery.exitedAt && (
                           <div className="flex justify-between">
                             <span className="text-muted-foreground">Salida:</span>
-                            <span>{new Date(delivery.exitedAt).toLocaleTimeString("es-MX")}</span>
+                            <span>{new Date(delivery.exitedAt).toLocaleTimeString()}</span>
                           </div>
                         )}
                       </div>
@@ -417,6 +365,139 @@ export default function SecurityExitsPage() {
             </CardContent>
           </Card>
         )}
+
+        {/* Modal de autorización de salida */}
+        <Dialog open={showExitModal} onOpenChange={setShowExitModal}>
+          <DialogContent className="max-w-3xl">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <LogOut className="h-5 w-5 text-green-600" />
+                Autorizar Salida
+              </DialogTitle>
+              <DialogDescription>
+                Verifica la información y toma foto de la placa para autorizar la salida
+              </DialogDescription>
+            </DialogHeader>
+
+            {selectedDelivery && (
+              <div className="space-y-6">
+                {/* Información del viaje */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-4">
+                    <div className="p-4 bg-muted/50 rounded-lg">
+                      <h4 className="font-medium mb-3">Información del Viaje</h4>
+                      <div className="space-y-2 text-sm">
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Placa:</span>
+                          <span className="font-bold text-lg">{selectedDelivery.truck?.placa}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Cliente:</span>
+                          <span className="font-medium">{selectedDelivery.order?.client?.nombre}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Destino:</span>
+                          <span>{selectedDelivery.order?.destination?.nombre || "No especificado"}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Material:</span>
+                          <span className="font-medium">{selectedDelivery.productFormat?.product?.nombre}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Cantidad:</span>
+                          <span className="font-medium">
+                            {selectedDelivery.cantidadBase} {selectedDelivery.productFormat?.unidadBase}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {selectedDelivery.notes && (
+                      <div className="p-3 bg-yellow-50 border border-yellow-200 dark:bg-yellow-900/20 dark:border-yellow-800 rounded-lg">
+                        <h5 className="font-medium text-yellow-800 dark:text-yellow-300 mb-1">Notas del Patio</h5>
+                        <p className="text-sm text-yellow-700 dark:text-yellow-400">{selectedDelivery.notes}</p>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Foto del patio */}
+                  <div className="space-y-4">
+                    <div>
+                      <h4 className="font-medium mb-2 flex items-center gap-2">
+                        <Eye className="h-4 w-4" />
+                        Foto del Patio
+                      </h4>
+                      {selectedDelivery.loadPhoto ? (
+                        <div className="border rounded-lg overflow-hidden">
+                          <img
+                            src={selectedDelivery.loadPhoto || "/placeholder.svg"}
+                            alt="Foto de carga del patio"
+                            className="w-full h-48 object-cover"
+                          />
+                          <div className="p-2 bg-muted text-xs text-muted-foreground">Foto tomada durante la carga</div>
+                        </div>
+                      ) : (
+                        <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-8 text-center">
+                          <Camera className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
+                          <p className="text-sm text-muted-foreground">No hay foto del patio disponible</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Foto de salida obligatoria */}
+                <div className="border-t pt-6">
+                  <PhotoInput
+                    onSelect={setExitPhoto}
+                    required={true}
+                    label="Foto de salida (obligatoria)"
+                    capture={true}
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Asegúrate de que la placa del camión sea visible en la foto
+                  </p>
+                </div>
+
+                {/* Observaciones de seguridad */}
+                <div className="space-y-2">
+                  <Label>Observaciones de Seguridad</Label>
+                  <Textarea
+                    value={exitNotes}
+                    onChange={(e) => setExitNotes(e.target.value)}
+                    placeholder="Documentos verificados, condición del vehículo, observaciones..."
+                    rows={3}
+                  />
+                </div>
+
+                {/* Alertas de validación */}
+                {selectedDelivery.estado !== "CARGADA" && (
+                  <Alert variant="destructive">
+                    <AlertTriangle className="h-4 w-4" />
+                    <AlertDescription>
+                      Este viaje no está marcado como cargado. Solo se pueden autorizar viajes cargados.
+                    </AlertDescription>
+                  </Alert>
+                )}
+
+                {/* Botones */}
+                <div className="flex gap-3">
+                  <Button
+                    onClick={handleAuthorizeExit}
+                    disabled={isSubmitting || !exitPhoto || selectedDelivery.estado !== "CARGADA"}
+                    className="flex-1"
+                  >
+                    <FileText className="h-4 w-4 mr-2" />
+                    {isSubmitting ? "Procesando..." : "Salida OK - Generar Guía"}
+                  </Button>
+                  <Button variant="outline" onClick={handleCloseModal} disabled={isSubmitting}>
+                    Cancelar
+                  </Button>
+                </div>
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
       </div>
     </AppLayout>
   )
