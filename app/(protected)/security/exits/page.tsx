@@ -30,10 +30,18 @@ import type { Delivery, DispatchGuide } from "@/lib/types"
 // Mock data - En producción vendría de la API
 const mockLoadedDeliveries: (Delivery & {
   order?: {
-    client?: { nombre: string }
-    destination?: { nombre: string }
+    id: string
+    clientId: string
+    destinationId: string
+    estado: string
+    total: number
+    createdBy: string
+    createdAt: Date
+    updatedAt: Date
+    client?: { id: string; nombre: string; isActive: boolean; createdAt: Date; updatedAt: Date }
+    destination?: { id: string; clientId: string; nombre: string; isActive: boolean; createdAt: Date; updatedAt: Date }
   }
-  truck?: { placa: string }
+  truck?: { id: string; placa: string; isActive: boolean; createdAt: Date; updatedAt: Date }
   productFormat?: {
     product?: { nombre: string }
     sku?: string
@@ -51,10 +59,37 @@ const mockLoadedDeliveries: (Delivery & {
     createdAt: new Date(),
     updatedAt: new Date(),
     order: {
-      client: { nombre: "Constructora Los Andes" },
-      destination: { nombre: "Obra Av. Norte" },
+      id: "o1",
+      clientId: "c1",
+      destinationId: "dest1",
+      estado: "PAGADA",
+      total: 5000,
+      createdBy: "cashier-user-1",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      client: {
+        id: "c1",
+        nombre: "Constructora Los Andes",
+        isActive: true,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+      destination: {
+        id: "dest1",
+        clientId: "c1",
+        nombre: "Obra Av. Norte",
+        isActive: true,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
     },
-    truck: { placa: "ABC-12D" },
+    truck: {
+      id: "t1",
+      placa: "ABC-12D",
+      isActive: true,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    },
     productFormat: {
       product: { nombre: "Grava 3/4" },
       sku: "A granel (m³)",
@@ -73,10 +108,37 @@ const mockLoadedDeliveries: (Delivery & {
     createdAt: new Date(),
     updatedAt: new Date(),
     order: {
-      client: { nombre: "Obras Civiles CA" },
-      destination: { nombre: "Puente Autopista" },
+      id: "o2",
+      clientId: "c2",
+      destinationId: "dest2",
+      estado: "PAGADA",
+      total: 7500,
+      createdBy: "cashier-user-1",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      client: {
+        id: "c2",
+        nombre: "Obras Civiles CA",
+        isActive: true,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+      destination: {
+        id: "dest2",
+        clientId: "c2",
+        nombre: "Puente Autopista",
+        isActive: true,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
     },
-    truck: { placa: "XYZ-34E" },
+    truck: {
+      id: "t2",
+      placa: "XYZ-34E",
+      isActive: true,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    },
     productFormat: {
       product: { nombre: "Arena Lavada" },
       sku: "A granel (m³)",
@@ -98,10 +160,37 @@ const mockExitedDeliveries: typeof mockLoadedDeliveries = [
     createdAt: new Date(),
     updatedAt: new Date(),
     order: {
-      client: { nombre: "Constructora Los Andes" },
-      destination: { nombre: "Proyecto Residencial" },
+      id: "o3",
+      clientId: "c3",
+      destinationId: "dest3",
+      estado: "PAGADA",
+      total: 4000,
+      createdBy: "cashier-user-1",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      client: {
+        id: "c3",
+        nombre: "Constructora Los Andes",
+        isActive: true,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+      destination: {
+        id: "dest3",
+        clientId: "c3",
+        nombre: "Proyecto Residencial",
+        isActive: true,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
     },
-    truck: { placa: "DEF-56F" },
+    truck: {
+      id: "t3",
+      placa: "DEF-56F",
+      isActive: true,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    },
     productFormat: {
       product: { nombre: "Grava 3/4" },
       sku: "A granel (m³)",
@@ -368,11 +457,11 @@ export default function SecurityExitsPage() {
 
         {/* Modal de autorización de salida */}
         <Dialog open={showExitModal} onOpenChange={setShowExitModal}>
-          <DialogContent className="max-w-3xl">
-            <DialogHeader>
+          <DialogContent className="sm:max-w-3xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader className="pb-4">
               <DialogTitle className="flex items-center gap-2">
                 <LogOut className="h-5 w-5 text-green-600" />
-                Autorizar Salida
+                Autorizar Salida - {selectedDelivery?.truck?.placa}
               </DialogTitle>
               <DialogDescription>
                 Verifica la información y toma foto de la placa para autorizar la salida
@@ -380,117 +469,105 @@ export default function SecurityExitsPage() {
             </DialogHeader>
 
             {selectedDelivery && (
-              <div className="space-y-6">
-                {/* Información del viaje */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-4">
-                    <div className="p-4 bg-muted/50 rounded-lg">
-                      <h4 className="font-medium mb-3">Información del Viaje</h4>
-                      <div className="space-y-2 text-sm">
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Placa:</span>
-                          <span className="font-bold text-lg">{selectedDelivery.truck?.placa}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Cliente:</span>
-                          <span className="font-medium">{selectedDelivery.order?.client?.nombre}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Destino:</span>
-                          <span>{selectedDelivery.order?.destination?.nombre || "No especificado"}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Material:</span>
-                          <span className="font-medium">{selectedDelivery.productFormat?.product?.nombre}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Cantidad:</span>
-                          <span className="font-medium">
-                            {selectedDelivery.cantidadBase} {selectedDelivery.productFormat?.unidadBase}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 bg-muted/30 rounded-lg">
+                  <div>
+                    <p className="text-xs text-muted-foreground">Cliente</p>
+                    <p className="font-medium text-sm">{selectedDelivery.order?.client?.nombre}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Material</p>
+                    <p className="font-medium text-sm">{selectedDelivery.productFormat?.product?.nombre}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Cantidad</p>
+                    <p className="font-medium text-sm">
+                      {selectedDelivery.cantidadBase} {selectedDelivery.productFormat?.unidadBase}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Destino</p>
+                    <p className="font-medium text-sm">
+                      {selectedDelivery.order?.destination?.nombre || "No especificado"}
+                    </p>
+                  </div>
+                </div>
 
-                    {selectedDelivery.notes && (
-                      <div className="p-3 bg-yellow-50 border border-yellow-200 dark:bg-yellow-900/20 dark:border-yellow-800 rounded-lg">
-                        <h5 className="font-medium text-yellow-800 dark:text-yellow-300 mb-1">Notas del Patio</h5>
-                        <p className="text-sm text-yellow-700 dark:text-yellow-400">{selectedDelivery.notes}</p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Foto del patio */}
+                  <div>
+                    <h4 className="font-medium mb-2 flex items-center gap-2 text-sm">
+                      <Eye className="h-4 w-4" />
+                      Foto del Patio
+                    </h4>
+                    {selectedDelivery.loadPhoto ? (
+                      <div className="border rounded-lg overflow-hidden">
+                        <img
+                          src={selectedDelivery.loadPhoto || "/placeholder.svg"}
+                          alt="Foto de carga del patio"
+                          className="w-full h-48 object-cover"
+                        />
+                        <div className="p-2 bg-muted text-sm text-muted-foreground text-center">Carga verificada</div>
+                      </div>
+                    ) : (
+                      <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-6 text-center h-48 flex flex-col items-center justify-center">
+                        <Camera className="h-8 w-8 text-muted-foreground mb-2" />
+                        <p className="text-sm text-muted-foreground">Sin foto</p>
                       </div>
                     )}
                   </div>
 
-                  {/* Foto del patio */}
-                  <div className="space-y-4">
-                    <div>
-                      <h4 className="font-medium mb-2 flex items-center gap-2">
-                        <Eye className="h-4 w-4" />
-                        Foto del Patio
-                      </h4>
-                      {selectedDelivery.loadPhoto ? (
-                        <div className="border rounded-lg overflow-hidden">
-                          <img
-                            src={selectedDelivery.loadPhoto || "/placeholder.svg"}
-                            alt="Foto de carga del patio"
-                            className="w-full h-48 object-cover"
-                          />
-                          <div className="p-2 bg-muted text-xs text-muted-foreground">Foto tomada durante la carga</div>
-                        </div>
-                      ) : (
-                        <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-8 text-center">
-                          <Camera className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
-                          <p className="text-sm text-muted-foreground">No hay foto del patio disponible</p>
-                        </div>
-                      )}
-                    </div>
+                  {/* Foto de salida */}
+                  <div>
+                    <PhotoInput
+                      onSelect={setExitPhoto}
+                      required={true}
+                      label="Foto de salida (obligatoria)"
+                      capture={true}
+                    />
+                    <p className="text-sm text-muted-foreground mt-2">Placa visible en la foto</p>
                   </div>
                 </div>
 
-                {/* Foto de salida obligatoria */}
-                <div className="border-t pt-6">
-                  <PhotoInput
-                    onSelect={setExitPhoto}
-                    required={true}
-                    label="Foto de salida (obligatoria)"
-                    capture={true}
-                  />
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Asegúrate de que la placa del camión sea visible en la foto
-                  </p>
-                </div>
+                {selectedDelivery.notes && (
+                  <div className="p-2 bg-yellow-50 border border-yellow-200 dark:bg-yellow-900/20 dark:border-yellow-800 rounded-lg">
+                    <p className="text-xs font-medium text-yellow-800 dark:text-yellow-300">Notas del Patio:</p>
+                    <p className="text-xs text-yellow-700 dark:text-yellow-400">{selectedDelivery.notes}</p>
+                  </div>
+                )}
 
-                {/* Observaciones de seguridad */}
                 <div className="space-y-2">
-                  <Label>Observaciones de Seguridad</Label>
+                  <Label className="text-sm">Observaciones de Seguridad</Label>
                   <Textarea
                     value={exitNotes}
                     onChange={(e) => setExitNotes(e.target.value)}
-                    placeholder="Documentos verificados, condición del vehículo, observaciones..."
-                    rows={3}
+                    placeholder="Documentos OK, condición del vehículo..."
+                    rows={2}
+                    className="text-sm"
                   />
                 </div>
 
                 {/* Alertas de validación */}
                 {selectedDelivery.estado !== "CARGADA" && (
-                  <Alert variant="destructive">
+                  <Alert variant="destructive" className="py-2">
                     <AlertTriangle className="h-4 w-4" />
-                    <AlertDescription>
-                      Este viaje no está marcado como cargado. Solo se pueden autorizar viajes cargados.
+                    <AlertDescription className="text-sm">
+                      Este viaje no está cargado. Solo se pueden autorizar viajes cargados.
                     </AlertDescription>
                   </Alert>
                 )}
 
-                {/* Botones */}
-                <div className="flex gap-3">
+                <div className="flex gap-3 pt-2">
                   <Button
                     onClick={handleAuthorizeExit}
                     disabled={isSubmitting || !exitPhoto || selectedDelivery.estado !== "CARGADA"}
                     className="flex-1"
+                    size="sm"
                   >
                     <FileText className="h-4 w-4 mr-2" />
                     {isSubmitting ? "Procesando..." : "Salida OK - Generar Guía"}
                   </Button>
-                  <Button variant="outline" onClick={handleCloseModal} disabled={isSubmitting}>
+                  <Button variant="outline" onClick={handleCloseModal} disabled={isSubmitting} size="sm">
                     Cancelar
                   </Button>
                 </div>
