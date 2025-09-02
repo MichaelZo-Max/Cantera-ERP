@@ -236,42 +236,46 @@ export default function YardDeliveriesPage() {
 
         {/* Modal Confirmar Carga */}
         <Dialog open={showConfirmModal} onOpenChange={setShowConfirmModal}>
-          <DialogContent className="max-w-2xl">
-            <DialogHeader>
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto z-50">
+            <DialogHeader className="pb-3">
               <DialogTitle className="flex items-center gap-2">
                 <CheckCircle className="h-5 w-5 text-green-600" />
-                Confirmar Carga
+                Confirmar Carga - {selectedDelivery?.truck?.placa}
               </DialogTitle>
-              <DialogDescription>Registra la cantidad real cargada y toma una foto del proceso</DialogDescription>
+              <DialogDescription className="text-sm">
+                Registra la cantidad real cargada y toma una foto del proceso
+              </DialogDescription>
             </DialogHeader>
 
             {selectedDelivery && (
-              <div className="space-y-6">
+              <div className="space-y-4">
                 {/* Información del viaje */}
-                <div className="p-4 bg-muted/50 rounded-lg">
-                  <h4 className="font-medium mb-3">Información del Viaje</h4>
-                  <div className="grid grid-cols-2 gap-4 text-sm">
+                <div className="p-3 bg-muted/50 rounded-lg">
+                  <h4 className="font-medium mb-2 text-sm">Información del Viaje</h4>
+                  <div className="grid grid-cols-4 gap-3 text-xs">
                     <div>
-                      <span className="text-muted-foreground">Placa:</span>
-                      <p className="font-medium">{selectedDelivery.truck?.placa}</p>
+                      <span className="text-muted-foreground">Cliente</span>
+                      <p className="font-medium text-sm">{selectedDelivery.order?.client?.nombre}</p>
                     </div>
                     <div>
-                      <span className="text-muted-foreground">Cliente:</span>
-                      <p className="font-medium">{selectedDelivery.order?.client?.nombre}</p>
+                      <span className="text-muted-foreground">Material</span>
+                      <p className="font-medium text-sm">{selectedDelivery.productFormat?.product?.nombre}</p>
                     </div>
                     <div>
-                      <span className="text-muted-foreground">Material:</span>
-                      <p className="font-medium">{selectedDelivery.productFormat?.product?.nombre}</p>
+                      <span className="text-muted-foreground">Formato</span>
+                      <p className="font-medium text-sm">{selectedDelivery.productFormat?.sku}</p>
                     </div>
                     <div>
-                      <span className="text-muted-foreground">Formato:</span>
-                      <p className="font-medium">{selectedDelivery.productFormat?.sku}</p>
+                      <span className="text-muted-foreground">Solicitado</span>
+                      <p className="font-medium text-sm">
+                        {selectedDelivery.cantidadBase} {selectedDelivery.productFormat?.unidadBase}
+                      </p>
                     </div>
                   </div>
                 </div>
 
                 {/* Cantidad cargada */}
-                <div className="space-y-4">
+                <div className="space-y-3">
                   <QuantityInput
                     unitBase={selectedDelivery.productFormat?.unidadBase as any}
                     value={loadedQuantity}
@@ -280,58 +284,56 @@ export default function YardDeliveriesPage() {
                   />
 
                   {/* Tolerancia */}
-                  <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-                    <div className="flex items-center gap-2 mb-2">
-                      <AlertTriangle className="h-4 w-4 text-blue-600" />
-                      <span className="text-sm font-medium text-blue-800 dark:text-blue-200">
-                        Tolerancia de referencia
+                  <div className="p-2 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                    <div className="flex items-center gap-2 mb-1">
+                      <AlertTriangle className="h-3 w-3 text-blue-600" />
+                      <span className="text-xs font-medium text-blue-800 dark:text-blue-200">
+                        Tolerancia ±5%: {minQuantity.toFixed(1)} - {maxQuantity.toFixed(1)}{" "}
+                        {selectedDelivery.productFormat?.unidadBase}
                       </span>
                     </div>
-                    <div className="text-sm text-blue-700 dark:text-blue-300">
-                      <p>
-                        Cantidad solicitada: {selectedDelivery.cantidadBase}{" "}
-                        {selectedDelivery.productFormat?.unidadBase}
+                    {loadedQuantity > 0 && (
+                      <p className={`text-xs font-medium ${isWithinTolerance ? "text-green-600" : "text-amber-600"}`}>
+                        Diferencia: {differencePercent > 0 ? "+" : ""}
+                        {differencePercent.toFixed(1)}% {isWithinTolerance ? "(✓ Dentro)" : "(⚠ Fuera)"} de tolerancia
                       </p>
-                      <p>
-                        Rango aceptable: {minQuantity.toFixed(1)} - {maxQuantity.toFixed(1)}{" "}
-                        {selectedDelivery.productFormat?.unidadBase} (±5%)
-                      </p>
-                      {loadedQuantity > 0 && (
-                        <p className={`font-medium ${isWithinTolerance ? "text-green-600" : "text-amber-600"}`}>
-                          Diferencia: {differencePercent > 0 ? "+" : ""}
-                          {differencePercent.toFixed(1)}%{" "}
-                          {isWithinTolerance ? "(Dentro de tolerancia)" : "(Fuera de tolerancia)"}
-                        </p>
-                      )}
-                    </div>
+                    )}
                   </div>
                 </div>
 
                 {/* Foto obligatoria */}
-                <PhotoInput onSelect={setLoadPhoto} required={true} label="Foto de la carga (obligatoria)" />
+                <div className="space-y-2">
+                  <PhotoInput onSelect={setLoadPhoto} required={true} label="Foto de la carga (obligatoria)" />
+                </div>
 
                 {/* Observaciones */}
-                <div className="space-y-2">
-                  <Label>Observaciones</Label>
+                <div className="space-y-1">
+                  <Label className="text-sm">Observaciones</Label>
                   <Textarea
                     value={notes}
                     onChange={(e) => setNotes(e.target.value)}
-                    placeholder="Comentarios sobre la carga, diferencias encontradas, etc..."
-                    rows={3}
+                    placeholder="Comentarios sobre la carga..."
+                    rows={2}
+                    className="text-sm"
                   />
                 </div>
 
                 {/* Botones */}
-                <div className="flex gap-3">
+                <div className="flex gap-2 pt-2">
                   <Button
                     onClick={handleSubmitLoad}
                     disabled={isSubmitting || !loadPhoto || loadedQuantity <= 0}
-                    className="flex-1"
+                    className="flex-1 h-9"
                   >
                     <Camera className="h-4 w-4 mr-2" />
                     {isSubmitting ? "Confirmando..." : "Confirmar Carga"}
                   </Button>
-                  <Button variant="outline" onClick={handleCloseModal} disabled={isSubmitting}>
+                  <Button
+                    variant="outline"
+                    onClick={handleCloseModal}
+                    disabled={isSubmitting}
+                    className="h-9 bg-transparent"
+                  >
                     Cancelar
                   </Button>
                 </div>

@@ -64,8 +64,23 @@ export function DeliveryCard({ delivery, onConfirmLoad, onViewDetails, showActio
   const canConfirmLoad = delivery.estado === "ASIGNADA" && onConfirmLoad
   const canViewDetails = onViewDetails
 
+  const handleCardClick = () => {
+    if (canConfirmLoad) {
+      onConfirmLoad(delivery.id)
+    } else if (canViewDetails) {
+      onViewDetails(delivery.id)
+    }
+  }
+
+  const isClickable = canConfirmLoad || canViewDetails
+
   return (
-    <Card className="hover:shadow-md transition-shadow cursor-pointer">
+    <Card
+      className={`transition-all duration-200 ${
+        isClickable ? "hover:shadow-lg hover:scale-[1.02] cursor-pointer hover:border-primary/50" : "hover:shadow-md"
+      }`}
+      onClick={isClickable ? handleCardClick : undefined}
+    >
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between">
           <div className="flex items-center gap-2">
@@ -130,14 +145,28 @@ export function DeliveryCard({ delivery, onConfirmLoad, onViewDetails, showActio
       {showActions && (canConfirmLoad || canViewDetails) && (
         <CardFooter className="pt-3 gap-2">
           {canConfirmLoad && (
-            <Button onClick={() => onConfirmLoad(delivery.id)} className="flex-1" size="sm">
+            <Button
+              onClick={(e) => {
+                e.stopPropagation()
+                onConfirmLoad(delivery.id)
+              }}
+              className="flex-1"
+              size="sm"
+            >
               <CheckCircle className="h-4 w-4 mr-2" />
               Confirmar carga
             </Button>
           )}
 
           {canViewDetails && (
-            <Button variant="outline" onClick={() => onViewDetails(delivery.id)} size="sm">
+            <Button
+              variant="outline"
+              onClick={(e) => {
+                e.stopPropagation()
+                onViewDetails(delivery.id)
+              }}
+              size="sm"
+            >
               Ver detalles
             </Button>
           )}
