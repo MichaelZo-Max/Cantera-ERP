@@ -56,6 +56,7 @@ export interface Product {
 export interface ProductFormat {
   id: string
   productId: string
+  product?: Product // ✨ Propiedad añadida para anidar la info del producto
   unidadBase: UnitBase
   factorUnidadBase: number
   sku?: string
@@ -123,6 +124,7 @@ export interface Delivery {
   truck?: Truck
   driverId?: string
   driver?: Driver
+  productFormat?: ProductFormat // ✨ Propiedad añadida para anidar info del formato/producto
   cantidadBase: number
   loadedQuantity?: number
   estado: DeliveryStatus

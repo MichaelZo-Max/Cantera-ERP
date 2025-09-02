@@ -1,8 +1,8 @@
 "use client"
 
 import { createContext, useContext, useState, useEffect, type ReactNode } from "react"
+import { useRouter } from "next/navigation"
 import type { User } from "@/lib/types"
-// Ya no necesitamos mockUsers aquí, porque la API se encargará de eso.
 
 interface AuthContextType {
   user: User | null
@@ -24,9 +24,9 @@ export function useAuth() {
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const router = useRouter()
 
   useEffect(() => {
-    // La lógica para verificar la sesión almacenada sigue igual
     try {
         const storedUser = localStorage.getItem("cantera-user")
         if (storedUser) {
@@ -51,7 +51,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
 
       if (!response.ok) {
-        // Si la respuesta no es exitosa (ej. 401, 500), leemos el mensaje de error
         const errorText = await response.text();
         throw new Error(errorText || 'Error al iniciar sesión');
       }
@@ -61,7 +60,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       localStorage.setItem("cantera-user", JSON.stringify(loggedInUser));
 
     } catch (error) {
-      // Re-lanzamos el error para que el formulario lo pueda capturar y mostrar
       throw error;
     } finally {
       setIsLoading(false)
@@ -71,7 +69,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = () => {
     setUser(null)
     localStorage.removeItem("cantera-user")
-    window.location.href = '/';
+    router.replace('/'); // ✨ Cambio clave: Navegación suave sin recarga
   }
 
   return <AuthContext.Provider value={{ user, login, logout, isLoading }}>{children}</AuthContext.Provider>

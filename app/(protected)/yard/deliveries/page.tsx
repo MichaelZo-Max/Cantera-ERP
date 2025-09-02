@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { AppLayout } from "@/components/app-layout"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
@@ -12,115 +12,37 @@ import { DeliveryCard } from "@/components/cards/delivery-card"
 import { QuantityInput } from "@/components/forms/quantity-input"
 import { PhotoInput } from "@/components/forms/photo-input"
 import { toast } from "sonner"
-import type { Delivery, OrderStatus } from "@/lib/types"
+import type { Delivery } from "@/lib/types"
 import { CheckCircle, AlertTriangle, Camera, Package } from "lucide-react"
 
-// Mock data - En producción vendría de la API
-const mockDeliveries: (Delivery & {
-  order?: {
-    id: string;
-    orderNumber?: string;
-    clientId: string;
-    estado: OrderStatus;
-    createdBy: string;
-    createdAt: Date;
-    updatedAt: Date;
-    client?: { id: string; nombre: string; isActive: boolean; createdAt: Date; updatedAt: Date; }
-    destination?: { id: string; clientId: string; nombre: string; direccion?: string; isActive: boolean; createdAt: Date; updatedAt: Date; }
-  }
-  truck?: { id: string; placa: string; isActive: boolean; createdAt: Date; updatedAt: Date; }
-  productFormat?: {
-    product?: { nombre: string }
-    sku?: string
-    unidadBase: string
-  }
-})[] = [
-  {
-    id: "d1",
-    orderId: "o1",
-    truckId: "t1",
-    cantidadBase: 10,
-    estado: "ASIGNADA",
-    createdAt: new Date(),
-    updatedAt: new Date(),
-    order: {
-        id: "o1",
-        clientId: "1",
-        estado: "PAGADA",
-        createdBy: "user-1",
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        client: { id: "1", nombre: "Constructora Los Andes", isActive: true, createdAt: new Date(), updatedAt: new Date() },
-        destination: { id: "1", clientId: "1", nombre: "Obra Av. Norte", direccion: "Av. Norte, Caracas", isActive: true, createdAt: new Date(), updatedAt: new Date() },
-    },
-    truck: { id: "1", placa: "ABC-12D", isActive: true, createdAt: new Date(), updatedAt: new Date() },
-    productFormat: {
-      product: { nombre: "Grava 3/4" },
-      sku: "A granel (m³)",
-      unidadBase: "M3",
-    },
-  },
-  {
-    id: "d2",
-    orderId: "o2",
-    truckId: "t2",
-    cantidadBase: 15,
-    estado: "ASIGNADA",
-    createdAt: new Date(),
-    updatedAt: new Date(),
-    order: {
-      id: "o2",
-      clientId: "2",
-      estado: "PAGADA",
-      createdBy: "user-1",
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      client: { id: "2", nombre: "Obras Civiles CA", isActive: true, createdAt: new Date(), updatedAt: new Date() },
-      destination: { id: "3", clientId: "2", nombre: "Puente Autopista", direccion: "Autopista Regional", isActive: true, createdAt: new Date(), updatedAt: new Date() },
-    },
-    truck: { id: "2", placa: "XYZ-34E", isActive: true, createdAt: new Date(), updatedAt: new Date() },
-    productFormat: {
-      product: { nombre: "Arena Lavada" },
-      sku: "A granel (m³)",
-      unidadBase: "M3",
-    },
-  },
-  {
-    id: "d3",
-    orderId: "o3",
-    truckId: "t3",
-    cantidadBase: 8,
-    estado: "CARGADA",
-    loadedAt: new Date(),
-    createdAt: new Date(),
-    updatedAt: new Date(),
-    order: {
-      id: "o3",
-      clientId: "1",
-      estado: "PAGADA",
-      createdBy: "user-1",
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      client: { id: "1", nombre: "Constructora Los Andes", isActive: true, createdAt: new Date(), updatedAt: new Date() },
-      destination: { id: "2", clientId: "1", nombre: "Proyecto Residencial", direccion: "Urb. Los Palos Grandes", isActive: true, createdAt: new Date(), updatedAt: new Date() },
-    },
-    truck: { id: "3", placa: "DEF-56F", isActive: true, createdAt: new Date(), updatedAt: new Date() },
-    productFormat: {
-      product: { nombre: "Grava 3/4" },
-      sku: "A granel (m³)",
-      unidadBase: "M3",
-    },
-  },
-]
-
 export default function YardDeliveriesPage() {
-  const [deliveries, setDeliveries] = useState(mockDeliveries)
-  const [selectedDelivery, setSelectedDelivery] = useState<(typeof mockDeliveries)[0] | null>(null)
+  const [deliveries, setDeliveries] = useState<Delivery[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  
+  const [selectedDelivery, setSelectedDelivery] = useState<Delivery | null>(null)
   const [showConfirmModal, setShowConfirmModal] = useState(false)
   const [loadedQuantity, setLoadedQuantity] = useState<number>(0)
   const [loadPhoto, setLoadPhoto] = useState<File | null>(null)
   const [notes, setNotes] = useState<string>("")
   const [isSubmitting, setIsSubmitting] = useState(false)
+
+  useEffect(() => {
+    const loadDeliveries = async () => {
+      try {
+        setLoading(true)
+        const res = await fetch("/api/deliveries", { cache: "no-store" })
+        if (!res.ok) throw new Error(await res.text())
+        const data: Delivery[] = await res.json()
+        setDeliveries(data)
+      } catch (e: any) {
+        setError(e?.message ?? "Error al cargar despachos")
+      } finally {
+        setLoading(false)
+      }
+    }
+    loadDeliveries()
+  }, [])
 
   const pendingDeliveries = deliveries.filter((d) => d.estado === "ASIGNADA")
   const loadedDeliveries = deliveries.filter((d) => d.estado === "CARGADA")
@@ -129,7 +51,7 @@ export default function YardDeliveriesPage() {
     const delivery = deliveries.find((d) => d.id === deliveryId)
     if (delivery) {
       setSelectedDelivery(delivery)
-      setLoadedQuantity(delivery.cantidadBase) // Pre-llenar con cantidad solicitada
+      setLoadedQuantity(delivery.cantidadBase)
       setLoadPhoto(null)
       setNotes("")
       setShowConfirmModal(true)
@@ -138,66 +60,87 @@ export default function YardDeliveriesPage() {
 
   const handleSubmitLoad = async () => {
     if (!selectedDelivery || !loadPhoto || loadedQuantity <= 0) {
-      toast.error("Completa todos los campos requeridos")
+      toast.error("Completa los campos requeridos: cantidad y foto.")
       return
     }
 
     setIsSubmitting(true)
+    
+    // Actualización optimista
+    const originalDeliveries = deliveries;
+    const updatedDeliveries = deliveries.map((d) =>
+      d.id === selectedDelivery.id
+        ? {
+            ...d,
+            estado: "CARGADA" as const,
+            loadedQuantity: loadedQuantity,
+            loadedAt: new Date(),
+            notes: notes || undefined,
+          }
+        : d,
+    )
+    setDeliveries(updatedDeliveries)
+    setShowConfirmModal(false)
 
     try {
-      // Mock API call
-      await new Promise((resolve) => setTimeout(resolve, 1500))
+      const res = await fetch(`/api/deliveries/${selectedDelivery.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+            estado: 'CARGADA',
+            loadedQuantity,
+            notes,
+        }),
+      });
 
-      // Actualizar estado del delivery
-      const updatedDeliveries = deliveries.map((d) =>
-        d.id === selectedDelivery.id
-          ? {
-              ...d,
-              estado: "CARGADA" as const,
-              loadedQuantity: loadedQuantity,
-              loadedBy: "yard-user-1",
-              loadedAt: new Date(),
-              notes: notes || undefined,
-            }
-          : d,
-      )
+      if (!res.ok) throw new Error(await res.text());
 
-      setDeliveries(updatedDeliveries)
-
-      toast.success("Carga confirmada", {
-        description: `Viaje ${selectedDelivery.truck?.placa} marcado como cargado`,
+      toast.success("Carga confirmada exitosamente", {
+        description: `Viaje para ${selectedDelivery.truck?.placa} actualizado.`,
       })
-
-      // Limpiar y cerrar modal
-      setShowConfirmModal(false)
-      setSelectedDelivery(null)
-      setLoadedQuantity(0)
-      setLoadPhoto(null)
-      setNotes("")
     } catch (error) {
-      toast.error("Error al confirmar carga")
+      // Revertir en caso de error
+      setDeliveries(originalDeliveries)
+      toast.error("Error al confirmar la carga", {
+        description: "Por favor, inténtalo de nuevo.",
+      })
     } finally {
       setIsSubmitting(false)
+      // Limpiar formulario
+      setSelectedDelivery(null)
+      setLoadPhoto(null)
+      setNotes("")
     }
   }
 
   const handleCloseModal = () => {
     setShowConfirmModal(false)
     setSelectedDelivery(null)
-    setLoadedQuantity(0)
-    setLoadPhoto(null)
-    setNotes("")
   }
 
-  // Calcular tolerancia (ejemplo: ±5%)
   const tolerance = selectedDelivery ? selectedDelivery.cantidadBase * 0.05 : 0
   const minQuantity = selectedDelivery ? selectedDelivery.cantidadBase - tolerance : 0
   const maxQuantity = selectedDelivery ? selectedDelivery.cantidadBase + tolerance : 0
-
   const isWithinTolerance = loadedQuantity >= minQuantity && loadedQuantity <= maxQuantity
   const differencePercent = selectedDelivery
     ? ((loadedQuantity - selectedDelivery.cantidadBase) / selectedDelivery.cantidadBase) * 100
     : 0
+    
+  if (loading) {
+    return (
+      <AppLayout title="Confirmación de Carga">
+        <div className="p-6 text-center">Cargando despachos...</div>
+      </AppLayout>
+    );
+  }
+
+  if (error) {
+    return (
+      <AppLayout title="Confirmación de Carga">
+        <div className="p-6 text-destructive text-center">Error: {error}</div>
+      </AppLayout>
+    );
+  }
 
   return (
     <AppLayout title="Confirmación de Carga">
@@ -207,7 +150,6 @@ export default function YardDeliveriesPage() {
           <p className="text-muted-foreground">Confirma la carga de los viajes pendientes</p>
         </div>
 
-        {/* Viajes Pendientes */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -238,7 +180,6 @@ export default function YardDeliveriesPage() {
           </CardContent>
         </Card>
 
-        {/* Viajes Cargados */}
         {loadedDeliveries.length > 0 && (
           <Card>
             <CardHeader>
@@ -259,7 +200,6 @@ export default function YardDeliveriesPage() {
           </Card>
         )}
 
-        {/* Modal Confirmar Carga */}
         <Dialog open={showConfirmModal} onOpenChange={setShowConfirmModal}>
           <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto z-50">
             <DialogHeader className="pb-3">
@@ -274,7 +214,6 @@ export default function YardDeliveriesPage() {
 
             {selectedDelivery && (
               <div className="space-y-4">
-                {/* Información del viaje */}
                 <div className="p-3 bg-muted/50 rounded-lg">
                   <h4 className="font-medium mb-2 text-sm">Información del Viaje</h4>
                   <div className="grid grid-cols-4 gap-3 text-xs">
@@ -299,7 +238,6 @@ export default function YardDeliveriesPage() {
                   </div>
                 </div>
 
-                {/* Cantidad cargada */}
                 <div className="space-y-3">
                   <QuantityInput
                     unitBase={selectedDelivery.productFormat?.unidadBase as any}
@@ -307,8 +245,6 @@ export default function YardDeliveriesPage() {
                     onChange={setLoadedQuantity}
                     label="Cantidad real cargada"
                   />
-
-                  {/* Tolerancia */}
                   <div className="p-2 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
                     <div className="flex items-center gap-2 mb-1">
                       <AlertTriangle className="h-3 w-3 text-blue-600" />
@@ -326,12 +262,10 @@ export default function YardDeliveriesPage() {
                   </div>
                 </div>
 
-                {/* Foto obligatoria */}
                 <div className="space-y-2">
                   <PhotoInput onSelect={setLoadPhoto} required={true} label="Foto de la carga (obligatoria)" />
                 </div>
 
-                {/* Observaciones */}
                 <div className="space-y-1">
                   <Label className="text-sm">Observaciones</Label>
                   <Textarea
@@ -343,7 +277,6 @@ export default function YardDeliveriesPage() {
                   />
                 </div>
 
-                {/* Botones */}
                 <div className="flex gap-2 pt-2">
                   <Button
                     onClick={handleSubmitLoad}
@@ -370,4 +303,3 @@ export default function YardDeliveriesPage() {
     </AppLayout>
   )
 }
-
