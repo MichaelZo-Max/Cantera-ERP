@@ -1,3 +1,5 @@
+// lib/types.ts
+
 // Core enums and types for Cantera ERP system
 export type UnitBase = "M3" | "TON" | "BOLSA" | "UNIDAD"
 
@@ -27,9 +29,9 @@ export interface Client {
   address?: string
   phone?: string
   email?: string
-  isActive: boolean
-  createdAt: Date
-  updatedAt: Date
+  isActive?: boolean
+  createdAt?: Date
+  updatedAt?: Date
 }
 
 export interface Destination {
@@ -99,9 +101,9 @@ export interface Order {
   total?: number
   totalPagado?: number
   notes?: string
-  createdBy: string
+  createdBy?: string // <--- Cambiado a opcional
   createdAt: Date
-  updatedAt: Date
+  updatedAt?: Date // <--- Cambiado a opcional
 }
 
 export interface OrderItem {
@@ -130,7 +132,7 @@ export interface Delivery {
   estado: DeliveryStatus
   loadedBy?: string
   loadedAt?: Date
-  loadPhoto?: string // ✨ Propiedad añadida para la foto de carga
+  loadPhoto?: string
   exitedBy?: string
   exitedAt?: Date
   notes?: string
@@ -155,15 +157,15 @@ export interface CreateOrderForm {
   items: {
     productFormatId: string
     cantidadBase: number
+    pricePerUnit: number
+    quantity: number
   }[]
   pago: {
     metodo: string
     monto: number
     ref?: string
   }
-  truck: {
-    placa: string
-  }
+  truckId: string // <--- CAMBIO: de 'truck' a 'truckId'
   photoFile?: File
 }
 

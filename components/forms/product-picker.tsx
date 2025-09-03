@@ -1,3 +1,5 @@
+// components/forms/product-picker.tsx
+
 "use client"
 
 import { useState, useEffect } from "react"
@@ -9,12 +11,13 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command"
 import { Badge } from "@/components/ui/badge"
 import type { Product, ProductFormat, ProductSelection } from "@/lib/types"
+import { toast } from "sonner"
 
 interface ProductPickerProps {
   value: ProductSelection | null
   onChange: (value: ProductSelection | null) => void
+  onFormatChange: (format: ProductFormat | null) => void; // Para devolver el objeto formato completo
   products?: Product[]
-  formats?: ProductFormat[]
   placeholder?: string
   disabled?: boolean
 }
@@ -22,45 +25,68 @@ interface ProductPickerProps {
 export function ProductPicker({
   value,
   onChange,
+  onFormatChange,
   products = [],
-  formats = [],
   placeholder = "Seleccionar producto...",
   disabled = false,
 }: ProductPickerProps) {
   const [open, setOpen] = useState(false)
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null)
   const [availableFormats, setAvailableFormats] = useState<ProductFormat[]>([])
+  const [isLoadingFormats, setIsLoadingFormats] = useState(false)
 
-  // Filtrar formatos disponibles cuando se selecciona un producto
+  // Sincronizar con el valor externo cuando se resetea
+  useEffect(() => {
+    if (!value) {
+      setSelectedProduct(null)
+      setAvailableFormats([])
+      onFormatChange(null)
+    }
+  }, [value, onFormatChange]);
+  
+  // EFECTO CLAVE: Cargar formatos cuando cambia el producto seleccionado
   useEffect(() => {
     if (selectedProduct) {
-      const productFormats = formats.filter((f) => f.productId === selectedProduct.id && f.activo)
-      setAvailableFormats(productFormats)
+      const fetchFormats = async () => {
+        setIsLoadingFormats(true);
+        try {
+          const res = await fetch(`/api/product-formats?productId=${selectedProduct.id}`);
+          if (!res.ok) throw new Error("No se pudieron cargar los formatos");
+          const data: ProductFormat[] = await res.json();
+          setAvailableFormats(data);
+          // Si solo hay un formato, lo seleccionamos automáticamente
+          if (data.length === 1) {
+            handleFormatSelect(data[0].id);
+          }
+        } catch (error) {
+          toast.error("Error al cargar formatos.");
+          setAvailableFormats([]);
+        } finally {
+          setIsLoadingFormats(false);
+        }
+      };
+      fetchFormats();
     } else {
-      setAvailableFormats([])
+      setAvailableFormats([]);
     }
-  }, [selectedProduct, formats])
+  }, [selectedProduct])
 
-  // Sincronizar con el valor externo
-  useEffect(() => {
-    if (value?.productId) {
-      const product = products.find((p) => p.id === value.productId)
-      setSelectedProduct(product || null)
-    } else {
-      setSelectedProduct(null)
+  const handleProductSelect = (productCode: string) => {
+    const product = products.find((p) => `${p.codigo} ${p.nombre}` === productCode)
+    if (product) {
+        setSelectedProduct(product)
+        setOpen(false)
+        // Reset format selection
+        onChange({ productId: product.id, formatId: "" })
+        onFormatChange(null)
     }
-  }, [value, products])
-
-  const handleProductSelect = (product: Product) => {
-    setSelectedProduct(product)
-    setOpen(false)
-    // Reset format selection when product changes
-    onChange({ productId: product.id, formatId: "" })
   }
 
   const handleFormatSelect = (formatId: string) => {
     if (selectedProduct) {
       onChange({ productId: selectedProduct.id, formatId })
+      const format = availableFormats.find(f => f.id === formatId);
+      onFormatChange(format || null);
     }
   }
 
@@ -68,7 +94,6 @@ export function ProductPicker({
 
   return (
     <div className="space-y-4">
-      {/* Product Selection */}
       <div className="space-y-2">
         <Label>Producto</Label>
         <Popover open={open} onOpenChange={setOpen}>
@@ -104,7 +129,7 @@ export function ProductPicker({
                     <CommandItem
                       key={product.id}
                       value={`${product.codigo} ${product.nombre}`}
-                      onSelect={() => handleProductSelect(product)}
+                      onSelect={handleProductSelect}
                     >
                       <div className="flex items-center justify-between w-full">
                         <div className="flex items-center gap-2">
@@ -125,13 +150,16 @@ export function ProductPicker({
         </Popover>
       </div>
 
-      {/* Format Selection */}
-      {selectedProduct && availableFormats.length > 0 && (
+      {selectedProduct && (
         <div className="space-y-2">
           <Label>Formato</Label>
-          <Select value={value?.formatId || ""} onValueChange={handleFormatSelect} disabled={disabled}>
+          <Select
+            value={value?.formatId || ""}
+            onValueChange={handleFormatSelect}
+            disabled={disabled || isLoadingFormats || availableFormats.length === 0}
+          >
             <SelectTrigger>
-              <SelectValue placeholder="Seleccionar formato..." />
+              <SelectValue placeholder={isLoadingFormats ? "Cargando..." : "Seleccionar formato..."} />
             </SelectTrigger>
             <SelectContent>
               {availableFormats.map((format) => (
@@ -139,19 +167,13 @@ export function ProductPicker({
                   <div className="flex items-center justify-between w-full">
                     <span>{format.sku || `Formato ${format.unidadBase}`}</span>
                     <Badge variant="secondary" className="ml-2">
-                      {format.unidadBase}
+                      {format.pricePerUnit ? `$${format.pricePerUnit.toFixed(2)}` : format.unidadBase}
                     </Badge>
                   </div>
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
-
-          {selectedFormat && (
-            <div className="text-sm text-muted-foreground">
-              Factor: {selectedFormat.factorUnidadBase} {selectedFormat.unidadBase}
-            </div>
-          )}
         </div>
       )}
     </div>
