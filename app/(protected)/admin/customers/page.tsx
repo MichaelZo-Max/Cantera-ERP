@@ -12,6 +12,8 @@ import { Badge } from "@/components/ui/badge"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import type { Client } from "@/lib/types"
 import { Users, Plus, Search, Edit, Trash2, Phone, Mail, MapPin, CheckCircle } from "lucide-react"
+import { toast } from "sonner"
+
 
 export default function CustomersPage() {
   const [customers, setCustomers] = useState<Client[]>([])
@@ -40,6 +42,7 @@ export default function CustomersPage() {
         setCustomers(await res.json())
       } catch (e: any) {
         setError(e?.message ?? "Error al cargar clientes")
+        toast.error("Error al cargar clientes", { description: e.message })
       } finally {
         setLoading(false)
       }
@@ -98,43 +101,57 @@ export default function CustomersPage() {
         body: JSON.stringify(formData),
       });
 
-      if (!res.ok) throw new Error(await res.text());
+      if (!res.ok){
+        const errorText = await res.text();
+        throw new Error(errorText || "Error al guardar el cliente");
+      }
 
       const savedCustomer = await res.json();
       
       if (editingCustomer) {
         setCustomers(customers.map(c => c.id === savedCustomer.id ? savedCustomer : c));
-        setSuccess("Cliente actualizado exitosamente.");
+        toast.success("Cliente actualizado exitosamente.");
       } else {
         setCustomers([...customers, savedCustomer]);
-        setSuccess("Cliente creado exitosamente.");
+        toast.success("Cliente creado exitosamente.");
       }
 
       setShowForm(false)
     } catch (err: any) {
-      setError(err.message || "Error al guardar el cliente");
+      setError(err.message);
+      toast.error("Error al guardar", { description: err.message });
     } finally {
       setIsSubmitting(false)
     }
   }
 
   const handleToggleStatus = async (customer: Client) => {
-    // Optimistic UI update
-    const originalCustomers = customers;
-    const updatedCustomers = customers.map((c) =>
-      c.id === customer.id ? { ...c, isActive: !c.isActive } : c,
-    );
-    setCustomers(updatedCustomers);
+    const isActive = customer.isActive;
+    if (!confirm(`¿Estás seguro de que quieres ${isActive ? 'desactivar' : 'activar'} este cliente?`)) {
+      return;
+    }
+
+    const originalCustomers = [...customers];
     
     try {
-        const res = await fetch(`/api/customers/${customer.id}`, { method: 'DELETE' });
-        if(!res.ok) throw new Error(await res.text());
+      const res = await fetch(`/api/customers/${customer.id}`, { 
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ...customer, is_active: !isActive }),
+      });
 
-        setSuccess(`Cliente ${customer.isActive ? "desactivado" : "activado"} exitosamente.`);
+      if(!res.ok) {
+        const errorText = await res.text();
+        throw new Error(errorText);
+      }
+
+      const updatedCustomer = await res.json();
+      setCustomers(customers.map(c => c.id === updatedCustomer.id ? updatedCustomer : c));
+      toast.success(`Cliente ${updatedCustomer.isActive ? "activado" : "desactivado"} exitosamente.`);
     } catch (err: any) {
-        // Revert on error
         setCustomers(originalCustomers);
         setError(err.message || "Error al cambiar el estado del cliente");
+        toast.error("Error al cambiar el estado", { description: err.message });
     }
   }
   
@@ -146,7 +163,7 @@ export default function CustomersPage() {
     );
   }
 
-  if (error && !showForm) { // Do not show main page error if form has its own error
+  if (error && !showForm) {
     return (
       <AppLayout title="Gestión de Clientes">
         <div className="p-6 text-destructive text-center">Error: {error}</div>

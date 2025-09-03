@@ -1,7 +1,6 @@
 "use client"
 
 import type React from "react"
-
 import { useState, useEffect } from "react"
 import { AppLayout } from "@/components/app-layout"
 import { Button } from "@/components/ui/button"
@@ -10,17 +9,18 @@ import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import type { Truck } from "@/lib/types"
+import type { Truck as TruckType } from "@/lib/types"
 import { TruckIcon, Plus, Search, Edit, Trash2, CheckCircle } from "lucide-react"
+import { toast } from "sonner"
 
 export default function TrucksPage() {
-  const [trucks, setTrucks] = useState<Truck[]>([])
+  const [trucks, setTrucks] = useState<TruckType[]>([])
   const [loading, setLoading] = useState(true)
   const [apiError, setApiError] = useState<string | null>(null)
 
   const [searchTerm, setSearchTerm] = useState("")
   const [showForm, setShowForm] = useState(false)
-  const [editingTruck, setEditingTruck] = useState<Truck | null>(null)
+  const [editingTruck, setEditingTruck] = useState<TruckType | null>(null)
   const [formData, setFormData] = useState({
     placa: "",
     brand: "",
@@ -28,7 +28,6 @@ export default function TrucksPage() {
     capacity: 0,
   })
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [success, setSuccess] = useState("")
   
   useEffect(() => {
     const loadTrucks = async () => {
@@ -39,6 +38,7 @@ export default function TrucksPage() {
         setTrucks(await res.json());
       } catch (e: any) {
         setApiError(e?.message ?? "Error al cargar los camiones");
+        toast.error("Error al cargar camiones", { description: e.message });
       } finally {
         setLoading(false);
       }
@@ -62,11 +62,10 @@ export default function TrucksPage() {
       capacity: 0,
     })
     setShowForm(true)
-    setSuccess("")
     setApiError("")
   }
 
-  const handleEditTruck = (truck: Truck) => {
+  const handleEditTruck = (truck: TruckType) => {
     setEditingTruck(truck)
     setFormData({
       placa: truck.placa,
@@ -75,7 +74,6 @@ export default function TrucksPage() {
       capacity: truck.capacity || 0,
     })
     setShowForm(true)
-    setSuccess("")
     setApiError("")
   }
 
@@ -83,7 +81,6 @@ export default function TrucksPage() {
     e.preventDefault()
     setIsSubmitting(true)
     setApiError("")
-    setSuccess("")
 
     const method = editingTruck ? 'PATCH' : 'POST';
     const url = editingTruck ? `/api/trucks/${editingTruck.id}` : '/api/trucks';
@@ -95,40 +92,56 @@ export default function TrucksPage() {
         body: JSON.stringify(formData),
       });
 
-      if (!res.ok) throw new Error(await res.text());
+      if (!res.ok){
+        const errorText = await res.text();
+        throw new Error(errorText || "Error al guardar el camión");
+      }
       
       const savedTruck = await res.json();
       
       if (editingTruck) {
         setTrucks(trucks.map(t => t.id === savedTruck.id ? savedTruck : t));
-        setSuccess("Camión actualizado exitosamente.");
+        toast.success("Camión actualizado exitosamente.");
       } else {
         setTrucks([...trucks, savedTruck]);
-        setSuccess("Camión creado exitosamente.");
+        toast.success("Camión creado exitosamente.");
       }
 
       setShowForm(false);
     } catch (err: any) {
-      setApiError(err.message || "Error al guardar el camión");
+      setApiError(err.message);
+      toast.error("Error al guardar", { description: err.message });
     } finally {
       setIsSubmitting(false);
     }
   }
 
-  const handleToggleStatus = async (truck: Truck) => {
-    const originalTrucks = trucks;
-    const updatedTrucks = trucks.map((t) =>
-      t.id === truck.id ? { ...t, isActive: !t.isActive } : t,
-    );
-    setTrucks(updatedTrucks);
+  const handleToggleStatus = async (truck: TruckType) => {
+    const isActive = truck.isActive;
+    if (!confirm(`¿Estás seguro de que quieres ${isActive ? "desactivar" : "activar"} este camión?`)) {
+        return;
+    }
+
+    const originalTrucks = [...trucks];
 
     try {
-        const res = await fetch(`/api/trucks/${truck.id}`, { method: 'DELETE' });
-        if(!res.ok) throw new Error(await res.text());
-        setSuccess(`Camión ${truck.isActive ? "desactivado" : "activado"} exitosamente.`);
+        const res = await fetch(`/api/trucks/${truck.id}`, { 
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ...truck, is_active: !isActive }),
+        });
+        if(!res.ok) {
+            const errorText = await res.text();
+            throw new Error(errorText);
+        }
+
+        const updatedTruck = await res.json();
+        setTrucks(trucks.map(t => t.id === updatedTruck.id ? updatedTruck : t));
+        toast.success(`Camión ${updatedTruck.isActive ? "activado" : "desactivado"} exitosamente.`);
     } catch (err: any) {
         setTrucks(originalTrucks);
         setApiError(err.message || "Error al cambiar el estado del camión.");
+        toast.error("Error al cambiar el estado", { description: err.message });
     }
   }
   
@@ -161,14 +174,7 @@ export default function TrucksPage() {
             <span>Nuevo Camión</span>
           </Button>
         </div>
-
-        {success && (
-          <Alert className="border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-900/20">
-            <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400" />
-            <AlertDescription className="text-green-800 dark:text-green-300">{success}</AlertDescription>
-          </Alert>
-        )}
-
+        
         {apiError && showForm && (
           <Alert variant="destructive">
             <AlertDescription>{apiError}</AlertDescription>
@@ -217,7 +223,7 @@ export default function TrucksPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="capacity">Capacidad (m3)</Label>
+                  <Label htmlFor="capacity">Capacidad (m³)</Label>
                   <Input
                     id="capacity"
                     type="number"
@@ -254,7 +260,7 @@ export default function TrucksPage() {
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
               <Input
-                placeholder="Buscar por placas, marca, modelo o conductor..."
+                placeholder="Buscar por placas, marca o modelo..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-10"

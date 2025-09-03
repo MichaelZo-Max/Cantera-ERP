@@ -15,6 +15,7 @@ import { GradientButton } from "@/components/ui/gradient-button"
 import { LoadingSkeleton } from "@/components/ui/loading-skeleton"
 import type { Product, ProductArea } from "@/lib/types"
 import { Package, Plus, Search, Edit, Trash2, CheckCircle, Sparkles } from "lucide-react"
+import { toast } from "sonner"
 
 export default function ProductsPage() {
   const [products, setProducts] = useState<Product[]>([])
@@ -31,7 +32,6 @@ export default function ProductsPage() {
     area: "AGREGADOS" as ProductArea,
   })
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [success, setSuccess] = useState("")
   
   useEffect(() => {
     const loadProducts = async () => {
@@ -42,6 +42,7 @@ export default function ProductsPage() {
         setProducts(await res.json());
       } catch (e: any) {
         setError(e?.message ?? "Error al cargar los productos");
+        toast.error("Error al cargar productos", { description: e.message });
       } finally {
         setLoading(false);
       }
@@ -66,7 +67,6 @@ export default function ProductsPage() {
       area: "AGREGADOS",
     })
     setShowForm(true)
-    setSuccess("")
     setError("")
   }
 
@@ -79,7 +79,6 @@ export default function ProductsPage() {
       area: product.area,
     })
     setShowForm(true)
-    setSuccess("")
     setError("")
   }
 
@@ -87,7 +86,6 @@ export default function ProductsPage() {
     e.preventDefault()
     setIsSubmitting(true)
     setError("")
-    setSuccess("")
 
     const method = editingProduct ? 'PATCH' : 'POST';
     const url = editingProduct ? `/api/products/${editingProduct.id}` : '/api/products';
@@ -99,40 +97,56 @@ export default function ProductsPage() {
         body: JSON.stringify(formData),
       });
 
-      if (!res.ok) throw new Error(await res.text());
+      if (!res.ok) {
+        const errorText = await res.text();
+        throw new Error(errorText || "Error al guardar el producto");
+      }
 
       const savedProduct = await res.json();
       
       if (editingProduct) {
         setProducts(products.map(p => p.id === savedProduct.id ? savedProduct : p));
-        setSuccess("Producto actualizado exitosamente.");
+        toast.success("Producto actualizado exitosamente.");
       } else {
         setProducts([...products, savedProduct]);
-        setSuccess("Producto creado exitosamente.");
+        toast.success("Producto creado exitosamente.");
       }
 
       setShowForm(false);
     } catch (err: any) {
-      setError(err.message || "Error al guardar el producto");
+      setError(err.message);
+      toast.error("Error al guardar", { description: err.message });
     } finally {
       setIsSubmitting(false);
     }
   }
 
   const handleToggleStatus = async (product: Product) => {
-    const originalProducts = products;
-    const updatedProducts = products.map((p) =>
-        p.id === product.id ? { ...p, isActive: !p.isActive } : p
-    );
-    setProducts(updatedProducts);
+    const isActive = product.isActive;
+    if (!confirm(`¿Estás seguro de que quieres ${isActive ? "desactivar" : "activar"} este producto?`)) {
+        return;
+    }
+    
+    const originalProducts = [...products];
 
     try {
-        const res = await fetch(`/api/products/${product.id}`, { method: 'DELETE' });
-        if(!res.ok) throw new Error(await res.text());
-        setSuccess(`Producto ${product.isActive ? "desactivado" : "activado"} exitosamente.`);
+        const res = await fetch(`/api/products/${product.id}`, { 
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ...product, is_active: !isActive }),
+        });
+        if(!res.ok) {
+            const errorText = await res.text();
+            throw new Error(errorText);
+        }
+        
+        const updatedProduct = await res.json();
+        setProducts(products.map(p => p.id === updatedProduct.id ? updatedProduct : p));
+        toast.success(`Producto ${updatedProduct.isActive ? "activado" : "desactivado"} exitosamente.`);
     } catch (err: any) {
         setProducts(originalProducts);
         setError(err.message || "Error al cambiar el estado del producto");
+        toast.error("Error al cambiar el estado", { description: err.message });
     }
   }
   
@@ -176,18 +190,7 @@ export default function ProductsPage() {
             <Sparkles className="h-4 w-4 ml-1" />
           </GradientButton>
         </div>
-
-        {success && (
-          <AnimatedCard className="border-green-200 bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20">
-            <CardContent className="pt-4">
-              <div className="flex items-center space-x-2">
-                <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400" />
-                <p className="text-green-800 dark:text-green-300 font-medium">{success}</p>
-              </div>
-            </CardContent>
-          </AnimatedCard>
-        )}
-
+        
         {error && showForm && (
           <AnimatedCard className="border-red-200 bg-gradient-to-r from-red-50 to-orange-50 dark:from-red-900/20 dark:to-orange-900/20">
             <CardContent className="pt-4">

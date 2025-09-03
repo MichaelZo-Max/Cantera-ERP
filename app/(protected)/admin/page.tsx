@@ -1,5 +1,6 @@
 "use client"
 
+import type React from "react"
 import { useState, useEffect } from "react"
 import { AppLayout } from "@/components/app-layout"
 import { Button } from "@/components/ui/button"
@@ -222,167 +223,108 @@ export default function AdminPage() {
   }
 
   const handleSave = async () => {
-    setIsSubmitting(true)
+    setIsSubmitting(true);
+    
+    const type = dialogType;
+    const isEditing = !!editingItem;
+    const url = isEditing ? `/api/${type}s/${editingItem.id}` : `/api/${type}s`;
+    const method = isEditing ? 'PATCH' : 'POST';
+    
+    let body;
+    switch (type) {
+        case "producto": body = productForm; break;
+        case "formato": body = formatForm; break;
+        case "cliente": body = clientForm; break;
+        case "destino": body = { ...destinationForm, customer_id: destinationForm.clientId }; break;
+        case "camion": body = truckForm; break;
+        case "chofer": body = driverForm; break;
+        case "usuario": body = { ...userForm, password: "123456" }; break; // Default password for new users
+    }
 
     try {
+        const res = await fetch(url, {
+            method,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+        });
 
-      const now = new Date()
+        if (!res.ok) {
+            const errorText = await res.text();
+            throw new Error(errorText || `Error al guardar ${type}`);
+        }
 
-      switch (dialogType) {
-        case "producto":
-          if (editingItem) {
-            setProducts((prev) =>
-              prev.map((p) => (p.id === editingItem.id ? { ...p, ...productForm, updatedAt: now } : p)),
-            )
-          } else {
-            const newProduct: Product = {
-              id: Date.now().toString(),
-              ...productForm,
-              isActive: true,
-              createdAt: now,
-              updatedAt: now,
-            }
-            setProducts((prev) => [...prev, newProduct])
-          }
-          break
+        const savedItem = await res.json();
+        
+        const updateState = (setter: Function) => {
+            setter((prev: any[]) => 
+                isEditing 
+                    ? prev.map((item: any) => item.id === savedItem.id ? savedItem : item) 
+                    : [...prev, savedItem]
+            );
+        };
 
-        case "formato":
-          if (editingItem) {
-            setFormats((prev) =>
-              prev.map((f) => (f.id === editingItem.id ? { ...f, ...formatForm, updatedAt: now } : f)),
-            )
-          } else {
-            const newFormat: ProductFormat = {
-              id: Date.now().toString(),
-              ...formatForm,
-              activo: true,
-              createdAt: now,
-              updatedAt: now,
-            }
-            setFormats((prev) => [...prev, newFormat])
-          }
-          break
+        switch (type) {
+            case "producto": updateState(setProducts); break;
+            case "formato": updateState(setFormats); break;
+            case "cliente": updateState(setClients); break;
+            case "destino": updateState(setDestinations); break;
+            case "camion": updateState(setTrucks); break;
+            case "chofer": updateState(setDrivers); break;
+            case "usuario": updateState(setUsers); break;
+        }
 
-        case "cliente":
-          if (editingItem) {
-            setClients((prev) =>
-              prev.map((c) => (c.id === editingItem.id ? { ...c, ...clientForm, updatedAt: now } : c)),
-            )
-          } else {
-            const newClient: Client = {
-              id: Date.now().toString(),
-              ...clientForm,
-              isActive: true,
-              createdAt: now,
-              updatedAt: now,
-            }
-            setClients((prev) => [...prev, newClient])
-          }
-          break
+        toast.success(`'${type}' guardado exitosamente.`);
+        setShowDialog(false);
 
-        case "destino":
-          if (editingItem) {
-            setDestinations((prev) =>
-              prev.map((d) => (d.id === editingItem.id ? { ...d, ...destinationForm, updatedAt: now } : d)),
-            )
-          } else {
-            const newDestination: Destination = {
-              id: Date.now().toString(),
-              ...destinationForm,
-              isActive: true,
-              createdAt: now,
-              updatedAt: now,
-            }
-            setDestinations((prev) => [...prev, newDestination])
-          }
-          break
-
-        case "camion":
-          if (editingItem) {
-            setTrucks((prev) => prev.map((t) => (t.id === editingItem.id ? { ...t, ...truckForm, updatedAt: now } : t)))
-          } else {
-            const newTruck: TruckType = {
-              id: Date.now().toString(),
-              ...truckForm,
-              isActive: true,
-              createdAt: now,
-              updatedAt: now,
-            }
-            setTrucks((prev) => [...prev, newTruck])
-          }
-          break
-
-        case "chofer":
-          if (editingItem) {
-            setDrivers((prev) =>
-              prev.map((d) => (d.id === editingItem.id ? { ...d, ...driverForm, updatedAt: now } : d)),
-            )
-          } else {
-            const newDriver: Driver = {
-              id: Date.now().toString(),
-              ...driverForm,
-              isActive: true,
-              createdAt: now,
-              updatedAt: now,
-            }
-            setDrivers((prev) => [...prev, newDriver])
-          }
-          break
-
-        case "usuario":
-          if (editingItem) {
-            setUsers((prev) => prev.map((u) => (u.id === editingItem.id ? { ...u, ...userForm, updatedAt: now } : u)))
-          } else {
-            const newUser: User = {
-              id: Date.now().toString(),
-              ...userForm,
-              isActive: true,
-              createdAt: now,
-              updatedAt: now,
-            }
-            setUsers((prev) => [...prev, newUser])
-          }
-          break
-      }
-
-      toast.success(editingItem ? "Actualizado exitosamente" : "Creado exitosamente")
-      setShowDialog(false)
-    } catch (error) {
-      toast.error("Error al guardar")
+    } catch (err: any) {
+        toast.error(`Error al guardar`, { description: err.message });
     } finally {
-      setIsSubmitting(false)
+        setIsSubmitting(false);
     }
-  }
+  };
 
-  const handleToggleStatus = (type: string, id: string) => {
-    const now = new Date()
-
-    switch (type) {
-      case "producto":
-        setProducts((prev) => prev.map((p) => (p.id === id ? { ...p, isActive: !p.isActive, updatedAt: now } : p)))
-        break
-      case "formato":
-        setFormats((prev) => prev.map((f) => (f.id === id ? { ...f, activo: !f.activo, updatedAt: now } : f)))
-        break
-      case "cliente":
-        setClients((prev) => prev.map((c) => (c.id === id ? { ...c, isActive: !c.isActive, updatedAt: now } : c)))
-        break
-      case "destino":
-        setDestinations((prev) => prev.map((d) => (d.id === id ? { ...d, isActive: !d.isActive, updatedAt: now } : d)))
-        break
-      case "camion":
-        setTrucks((prev) => prev.map((t) => (t.id === id ? { ...t, isActive: !t.isActive, updatedAt: now } : t)))
-        break
-      case "chofer":
-        setDrivers((prev) => prev.map((d) => (d.id === id ? { ...d, isActive: !d.isActive, updatedAt: now } : d)))
-        break
-      case "usuario":
-        setUsers((prev) => prev.map((u) => (u.id === id ? { ...u, isActive: !u.isActive, updatedAt: now } : u)))
-        break
+  const handleToggleStatus = async (type: string, item: any) => {
+    const isActive = item.isActive ?? item.activo;
+    
+    // Usamos el confirm nativo para simplicidad, o podrías implementar un diálogo de confirmación más elegante
+    if (!confirm(`¿Estás seguro de que quieres ${isActive ? 'desactivar' : 'activar'} este ${type}?`)) {
+        return;
     }
 
-    toast.success("Estado actualizado")
-  }
+    try {
+        const res = await fetch(`/api/${type}s/${item.id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ...item, is_active: !isActive, activo: !isActive }),
+        });
+
+        if (!res.ok) {
+            const errorText = await res.text();
+            throw new Error(errorText || `Error al actualizar estado`);
+        }
+
+        const updatedItem = await res.json();
+
+        const updateState = (setter: Function) => {
+            setter((prev: any[]) => prev.map((i: any) => i.id === updatedItem.id ? updatedItem : i));
+        };
+
+        switch (type) {
+            case "producto": updateState(setProducts); break;
+            case "formato": updateState(setFormats); break;
+            case "cliente": updateState(setClients); break;
+            case "destino": updateState(setDestinations); break;
+            case "camion": updateState(setTrucks); break;
+            case "chofer": updateState(setDrivers); break;
+            case "usuario": updateState(setUsers); break;
+        }
+
+        toast.success("Estado actualizado correctamente.");
+
+    } catch (err: any) {
+        toast.error("Error al cambiar el estado", { description: err.message });
+    }
+  };
   
   if (loading) {
     return (
@@ -404,22 +346,14 @@ export default function AdminPage() {
     const getTitle = () => {
       const action = editingItem ? "Editar" : "Nuevo"
       switch (dialogType) {
-        case "producto":
-          return `${action} Producto`
-        case "formato":
-          return `${action} Formato`
-        case "cliente":
-          return `${action} Cliente`
-        case "destino":
-          return `${action} Destino`
-        case "camion":
-          return `${action} Camión`
-        case "chofer":
-          return `${action} Chofer`
-        case "usuario":
-          return `${action} Usuario`
-        default:
-          return action
+        case "producto": return `${action} Producto`;
+        case "formato": return `${action} Formato`;
+        case "cliente": return `${action} Cliente`;
+        case "destino": return `${action} Destino`;
+        case "camion": return `${action} Camión`;
+        case "chofer": return `${action} Chofer`;
+        case "usuario": return `${action} Usuario`;
+        default: return action;
       }
     }
 
@@ -451,9 +385,7 @@ export default function AdminPage() {
                       value={productForm.area}
                       onValueChange={(value: ProductArea) => setProductForm({ ...productForm, area: value })}
                     >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="AGREGADOS">Agregados</SelectItem>
                         <SelectItem value="ASFALTOS">Asfaltos</SelectItem>
@@ -482,9 +414,7 @@ export default function AdminPage() {
                     value={formatForm.productId}
                     onValueChange={(value) => setFormatForm({ ...formatForm, productId: value })}
                   >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Seleccionar producto..." />
-                    </SelectTrigger>
+                    <SelectTrigger><SelectValue placeholder="Seleccionar producto..." /></SelectTrigger>
                     <SelectContent>
                       {products.map((product) => (
                         <SelectItem key={product.id} value={product.id}>
@@ -501,9 +431,7 @@ export default function AdminPage() {
                       value={formatForm.unidadBase}
                       onValueChange={(value: UnitBase) => setFormatForm({ ...formatForm, unidadBase: value })}
                     >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="M3">m³</SelectItem>
                         <SelectItem value="TON">toneladas</SelectItem>
@@ -519,9 +447,7 @@ export default function AdminPage() {
                       step="0.1"
                       min="0.1"
                       value={formatForm.factorUnidadBase}
-                      onChange={(e) =>
-                        setFormatForm({ ...formatForm, factorUnidadBase: Number.parseFloat(e.target.value) || 1 })
-                      }
+                      onChange={(e) => setFormatForm({ ...formatForm, factorUnidadBase: Number.parseFloat(e.target.value) || 1 })}
                     />
                   </div>
                 </div>
@@ -541,9 +467,7 @@ export default function AdminPage() {
                       step="0.01"
                       min="0"
                       value={formatForm.pricePerUnit}
-                      onChange={(e) =>
-                        setFormatForm({ ...formatForm, pricePerUnit: Number.parseFloat(e.target.value) || 0 })
-                      }
+                      onChange={(e) => setFormatForm({ ...formatForm, pricePerUnit: Number.parseFloat(e.target.value) || 0 })}
                     />
                   </div>
                 </div>
@@ -609,9 +533,7 @@ export default function AdminPage() {
                     value={destinationForm.clientId}
                     onValueChange={(value) => setDestinationForm({ ...destinationForm, clientId: value })}
                   >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Seleccionar cliente..." />
-                    </SelectTrigger>
+                    <SelectTrigger><SelectValue placeholder="Seleccionar cliente..." /></SelectTrigger>
                     <SelectContent>
                       {clients.map((client) => (
                         <SelectItem key={client.id} value={client.id}>
@@ -739,9 +661,7 @@ export default function AdminPage() {
                     value={userForm.role}
                     onValueChange={(value: User["role"]) => setUserForm({ ...userForm, role: value })}
                   >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="CASHIER">Cajero</SelectItem>
                       <SelectItem value="YARD">Patio</SelectItem>
@@ -812,7 +732,6 @@ export default function AdminPage() {
             </TabsTrigger>
           </TabsList>
 
-          {/* Búsqueda y botón nuevo */}
           <div className="flex gap-4 items-center">
             <div className="flex-1 relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
@@ -873,7 +792,7 @@ export default function AdminPage() {
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                onClick={() => handleToggleStatus("producto", product.id)}
+                                onClick={() => handleToggleStatus("producto", product)}
                               >
                                 <Trash2 className="h-4 w-4" />
                               </Button>
@@ -940,7 +859,7 @@ export default function AdminPage() {
                                 <Button
                                   variant="ghost"
                                   size="sm"
-                                  onClick={() => handleToggleStatus("formato", format.id)}
+                                  onClick={() => handleToggleStatus("formato", format)}
                                 >
                                   <Trash2 className="h-4 w-4" />
                                 </Button>
@@ -999,7 +918,7 @@ export default function AdminPage() {
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                onClick={() => handleToggleStatus("cliente", client.id)}
+                                onClick={() => handleToggleStatus("cliente", client)}
                               >
                                 <Trash2 className="h-4 w-4" />
                               </Button>
@@ -1060,7 +979,7 @@ export default function AdminPage() {
                                 <Button
                                   variant="ghost"
                                   size="sm"
-                                  onClick={() => handleToggleStatus("destino", destination.id)}
+                                  onClick={() => handleToggleStatus("destino", destination)}
                                 >
                                   <Trash2 className="h-4 w-4" />
                                 </Button>
@@ -1116,7 +1035,7 @@ export default function AdminPage() {
                               <Button variant="ghost" size="sm" onClick={() => handleEdit("camion", truck)}>
                                 <Edit className="h-4 w-4" />
                               </Button>
-                              <Button variant="ghost" size="sm" onClick={() => handleToggleStatus("camion", truck.id)}>
+                              <Button variant="ghost" size="sm" onClick={() => handleToggleStatus("camion", truck)}>
                                 <Trash2 className="h-4 w-4" />
                               </Button>
                             </div>
@@ -1168,7 +1087,7 @@ export default function AdminPage() {
                               <Button variant="ghost" size="sm" onClick={() => handleEdit("chofer", driver)}>
                                 <Edit className="h-4 w-4" />
                               </Button>
-                              <Button variant="ghost" size="sm" onClick={() => handleToggleStatus("chofer", driver.id)}>
+                              <Button variant="ghost" size="sm" onClick={() => handleToggleStatus("chofer", driver)}>
                                 <Trash2 className="h-4 w-4" />
                               </Button>
                             </div>
@@ -1222,7 +1141,7 @@ export default function AdminPage() {
                               <Button variant="ghost" size="sm" onClick={() => handleEdit("usuario", user)}>
                                 <Edit className="h-4 w-4" />
                               </Button>
-                              <Button variant="ghost" size="sm" onClick={() => handleToggleStatus("usuario", user.id)}>
+                              <Button variant="ghost" size="sm" onClick={() => handleToggleStatus("usuario", user)}>
                                 <Trash2 className="h-4 w-4" />
                               </Button>
                             </div>
