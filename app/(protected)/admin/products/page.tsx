@@ -128,6 +128,7 @@ export default function ProductsPage() {
     }
     
     const originalProducts = [...products];
+    setProducts(products.map(p => p.id === product.id ? { ...p, isActive: !isActive } : p));
 
     try {
         const res = await fetch(`/api/products/${product.id}`, { 
@@ -140,9 +141,7 @@ export default function ProductsPage() {
             throw new Error(errorText);
         }
         
-        const updatedProduct = await res.json();
-        setProducts(products.map(p => p.id === updatedProduct.id ? updatedProduct : p));
-        toast.success(`Producto ${updatedProduct.isActive ? "activado" : "desactivado"} exitosamente.`);
+        toast.success(`Producto ${!isActive ? "activado" : "desactivado"} exitosamente.`);
     } catch (err: any) {
         setProducts(originalProducts);
         setError(err.message || "Error al cambiar el estado del producto");

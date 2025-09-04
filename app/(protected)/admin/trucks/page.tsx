@@ -123,6 +123,7 @@ export default function TrucksPage() {
     }
 
     const originalTrucks = [...trucks];
+    setTrucks(trucks.map(t => t.id === truck.id ? { ...t, isActive: !isActive } : t));
 
     try {
         const res = await fetch(`/api/trucks/${truck.id}`, { 
@@ -134,10 +135,8 @@ export default function TrucksPage() {
             const errorText = await res.text();
             throw new Error(errorText);
         }
-
-        const updatedTruck = await res.json();
-        setTrucks(trucks.map(t => t.id === updatedTruck.id ? updatedTruck : t));
-        toast.success(`Camión ${updatedTruck.isActive ? "activado" : "desactivado"} exitosamente.`);
+        
+        toast.success(`Camión ${!isActive ? "activado" : "desactivado"} exitosamente.`);
     } catch (err: any) {
         setTrucks(originalTrucks);
         setApiError(err.message || "Error al cambiar el estado del camión.");

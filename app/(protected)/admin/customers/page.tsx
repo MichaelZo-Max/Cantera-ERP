@@ -132,6 +132,7 @@ export default function CustomersPage() {
     }
 
     const originalCustomers = [...customers];
+    setCustomers(customers.map(c => c.id === customer.id ? { ...c, isActive: !isActive } : c));
     
     try {
       const res = await fetch(`/api/customers/${customer.id}`, { 
@@ -144,10 +145,8 @@ export default function CustomersPage() {
         const errorText = await res.text();
         throw new Error(errorText);
       }
-
-      const updatedCustomer = await res.json();
-      setCustomers(customers.map(c => c.id === updatedCustomer.id ? updatedCustomer : c));
-      toast.success(`Cliente ${updatedCustomer.isActive ? "activado" : "desactivado"} exitosamente.`);
+      
+      toast.success(`Cliente ${!isActive ? "activado" : "desactivado"} exitosamente.`);
     } catch (err: any) {
         setCustomers(originalCustomers);
         setError(err.message || "Error al cambiar el estado del cliente");
