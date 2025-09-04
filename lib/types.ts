@@ -8,8 +8,6 @@ export type OrderStatus = "CREADA" | "PAGADA" | "EN_DESPACHO" | "PARCIAL" | "CER
 
 export type DeliveryStatus = "ASIGNADA" | "EN_CARGA" | "CARGADA" | "SALIDA_OK" | "RECHAZADA"
 
-export type ProductArea = "AGREGADOS" | "ASFALTOS" | "VIVEROS" | "SERVICIOS"
-
 // Core entity types
 export interface User {
   id: string
@@ -48,7 +46,6 @@ export interface Product {
   codigo: string
   nombre: string
   description?: string
-  area: ProductArea
   isActive: boolean
   createdAt: Date
   updatedAt: Date

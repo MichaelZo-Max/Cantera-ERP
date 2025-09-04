@@ -38,8 +38,7 @@ import type {
   Truck as TruckType,
   Driver,
   User,
-  UnitBase,
-  ProductArea,
+  UnitBase
 } from "@/lib/types"
 
 export default function AdminPage() {
@@ -104,7 +103,6 @@ export default function AdminPage() {
   const [productForm, setProductForm] = useState({
     codigo: "",
     nombre: "",
-    area: "AGREGADOS" as ProductArea,
   })
 
   const [formatForm, setFormatForm] = useState({
@@ -152,7 +150,7 @@ export default function AdminPage() {
     setDialogType(type)
     setEditingItem(null)
     // Reset forms
-    setProductForm({ codigo: "", nombre: "", area: "AGREGADOS" })
+    setProductForm({ codigo: "", nombre: ""})
     setFormatForm({ productId: "", unidadBase: "M3", factorUnidadBase: 1, sku: "", pricePerUnit: 0 })
     setClientForm({ nombre: "", rif: "", address: "", phone: "", email: "" })
     setDestinationForm({ clientId: "", nombre: "", direccion: "" })
@@ -169,7 +167,7 @@ export default function AdminPage() {
     // Pre-llenar formularios según el tipo
     switch (type) {
       case "producto":
-        setProductForm({ codigo: item.codigo, nombre: item.nombre, area: item.area })
+        setProductForm({ codigo: item.codigo, nombre: item.nombre})
         break
       case "formato":
         setFormatForm({
@@ -378,21 +376,6 @@ export default function AdminPage() {
                       onChange={(e) => setProductForm({ ...productForm, codigo: e.target.value })}
                       placeholder="AGR001"
                     />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Área *</Label>
-                    <Select
-                      value={productForm.area}
-                      onValueChange={(value: ProductArea) => setProductForm({ ...productForm, area: value })}
-                    >
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="AGREGADOS">Agregados</SelectItem>
-                        <SelectItem value="ASFALTOS">Asfaltos</SelectItem>
-                        <SelectItem value="VIVEROS">Viveros</SelectItem>
-                        <SelectItem value="SERVICIOS">Servicios</SelectItem>
-                      </SelectContent>
-                    </Select>
                   </div>
                 </div>
                 <div className="space-y-2">
@@ -776,9 +759,6 @@ export default function AdminPage() {
                         <TableRow key={product.id}>
                           <TableCell className="font-medium">{product.codigo}</TableCell>
                           <TableCell>{product.nombre}</TableCell>
-                          <TableCell>
-                            <Badge variant="outline">{product.area}</Badge>
-                          </TableCell>
                           <TableCell>
                             <Badge variant={product.isActive ? "default" : "secondary"}>
                               {product.isActive ? "Activo" : "Inactivo"}

@@ -325,7 +325,6 @@ SELECT
     A.CODARTICULO AS id,
     A.REFPROVEEDOR AS codigo,
     A.DESCRIPCION AS name,
-    NULL AS area,
     NULL AS description,
     ISNULL(P.PRECIO, 0.00) AS price_per_unit,
     A.UNIDADMEDIDA AS unit,

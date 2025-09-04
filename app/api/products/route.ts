@@ -26,7 +26,8 @@ export async function GET() {
         A.USASTOCKS,
         A.DESCATALOGADO,
         A.FECHAMODIFICADO,
-        A.FAMILIA AS CATEGORIA_O_AREA,
+        -- Un campo de descripción, puedes usar el mismo nombre o un campo específico si lo tienes
+        A.DESCRIPCION AS description,
         MAX(AL.PRECIO) AS PRECIO_UNITARIO
       FROM dbo.ARTICULOS A
       LEFT JOIN dbo.ALBVENTALIN AL
@@ -35,20 +36,21 @@ export async function GET() {
         AND A.USASTOCKS = 'T'
       GROUP BY
         A.CODARTICULO, A.DESCRIPCION, A.REFPROVEEDOR, A.UNIDADMEDIDA,
-        A.USASTOCKS, A.DESCATALOGADO, A.FECHAMODIFICADO, A.FAMILIA
+        A.USASTOCKS, A.DESCATALOGADO, A.FECHAMODIFICADO
       ORDER BY A.DESCRIPCION ASC;
     `;
     const rows = await executeQuery<any>(sql);
 
     const out = rows.map((r: any) => ({
-      id: r.CODARTICULO,
+      id: r.CODARTICULO.toString(),
       nombre: r.DESCRIPCION ?? '',
-      codigoProveedor: r.REFPROVEEDOR ?? null,
+      codigo: r.REFPROVEEDOR ?? null, // Renombrado de codigoProveedor a codigo
+      description: r.description ?? null, // Nuevo campo añadido
       unidad: r.UNIDADMEDIDA ?? null,
       usaStocks: String(r.USASTOCKS ?? 'F').toUpperCase() === 'T',
       isActive: String(r.DESCATALOGADO ?? 'F').toUpperCase() !== 'T',
-      fechaModificado: r.FECHAMODIFICADO ?? null,
-      categoriaArea: r.CATEGORIA_O_AREA ?? null,
+      createdAt: r.FECHAMODIFICADO ?? new Date(), // Mapeado a createdAt
+      updatedAt: r.FECHAMODIFICADO ?? new Date(), // Mapeado a updatedAt
       precioUnitario: r.PRECIO_UNITARIO != null ? Number(r.PRECIO_UNITARIO) : null,
     }));
 
@@ -62,8 +64,8 @@ export async function GET() {
 /**
  * @route   POST /api/products
  * @desc    Crear un artículo en dbo.ARTICULOS.
- *          Front mínimo: { nombre, codigoProveedor, unidad, usaStocks, is_active }
- *          Opcional: id (si falta => MAX+1)
+ * Front mínimo: { nombre, codigo }
+ * Opcional: id (si falta => MAX+1)
  */
 export async function POST(req: Request) {
   try {
@@ -72,21 +74,15 @@ export async function POST(req: Request) {
 
     let id = pickFirst<number>(body, ['id', 'codArticulo', 'codarticulo', 'codigo', 'code']);
     const nombre = (pickFirst<string>(body, ['nombre', 'descripcion', 'DESCRIPCION']) ?? '').toString().trim();
-    const codigoProveedor = pickFirst<string>(body, ['codigoProveedor', 'refProveedor', 'REFPROVEEDOR']);
-    const unidad = pickFirst<string>(body, ['unidad', 'unidadMedida', 'UNIDADMEDIDA']);
-    let usaStocks: boolean | undefined =
-      typeof body?.usaStocks === 'boolean' ? body.usaStocks :
-      (typeof body?.USASTOCKS === 'string' ? body.USASTOCKS.toUpperCase() === 'T' : undefined);
+    const codigo = pickFirst<string>(body, ['codigo', 'codigoProveedor', 'refProveedor', 'REFPROVEEDOR']);
     let isActive: boolean | undefined =
       typeof body?.is_active === 'boolean' ? body.is_active :
       (typeof body?.isActive === 'boolean' ? body.isActive : undefined);
 
-    if (!nombre) return new NextResponse('El campo nombre/descripción es obligatorio', { status: 400 });
+    if (!nombre || !codigo) return new NextResponse('El nombre y el código son obligatorios', { status: 400 });
 
     // Defaults
-    const usaStocksTF = (usaStocks ?? true) ? 'T' : 'F';
     const descatalogadoTF = (isActive ?? true) ? 'F' : 'T';
-    const unidadVal = (unidad ?? 'unidad').toString().trim(); // default razonable
 
     if (id == null) {
       const next = await executeQuery<{ nextId: number }>(`SELECT ISNULL(MAX(CODARTICULO), 0) + 1 AS nextId FROM dbo.ARTICULOS;`);
@@ -95,31 +91,24 @@ export async function POST(req: Request) {
 
     const insertSql = `
       INSERT INTO dbo.ARTICULOS (
-        CODARTICULO, DESCRIPCION, REFPROVEEDOR, UNIDADMEDIDA,
-        USASTOCKS, DESCATALOGADO, FECHAMODIFICADO
+        CODARTICULO, DESCRIPCION, REFPROVEEDOR,
+        DESCATALOGADO, FECHAMODIFICADO
       )
       VALUES (
-        @id, @descripcion, @refProveedor, @unidad,
-        @usaStocks, @descatalogado, GETDATE()
+        @id, @descripcion, @refProveedor,
+        @descatalogado, GETDATE()
       );
 
       SELECT
-        A.CODARTICULO, A.DESCRIPCION, A.REFPROVEEDOR, A.UNIDADMEDIDA,
-        A.USASTOCKS, A.DESCATALOGADO, A.FECHAMODIFICADO, A.FAMILIA AS CATEGORIA_O_AREA,
-        MAX(AL.PRECIO) AS PRECIO_UNITARIO
+        A.CODARTICULO, A.DESCRIPCION, A.REFPROVEEDOR,
+        A.DESCATALOGADO, A.FECHAMODIFICADO
       FROM dbo.ARTICULOS A
-      LEFT JOIN dbo.ALBVENTALIN AL ON AL.CODARTICULO = A.CODARTICULO
       WHERE A.CODARTICULO = @id
-      GROUP BY
-        A.CODARTICULO, A.DESCRIPCION, A.REFPROVEEDOR, A.UNIDADMEDIDA,
-        A.USASTOCKS, A.DESCATALOGADO, A.FECHAMODIFICADO, A.FAMILIA;
     `;
     const params = [
       { name: 'id',            type: TYPES.Int,       value: id },
       { name: 'descripcion',   type: TYPES.NVarChar,  value: nombre,          options: { length: 250 } },
-      { name: 'refProveedor',  type: TYPES.NVarChar,  value: codigoProveedor ?? null, options: { length: 100 } },
-      { name: 'unidad',        type: TYPES.NVarChar,  value: unidadVal,       options: { length: 20 } },
-      { name: 'usaStocks',     type: TYPES.NVarChar,  value: usaStocksTF,     options: { length: 1 } },
+      { name: 'refProveedor',  type: TYPES.NVarChar,  value: codigo ?? null, options: { length: 100 } },
       { name: 'descatalogado', type: TYPES.NVarChar,  value: descatalogadoTF, options: { length: 1 } },
     ];
 
@@ -127,15 +116,12 @@ export async function POST(req: Request) {
     const r = rows[0];
 
     return NextResponse.json({
-      id: r.CODARTICULO,
+      id: r.CODARTICULO.toString(),
       nombre: r.DESCRIPCION ?? '',
-      codigoProveedor: r.REFPROVEEDOR ?? null,
-      unidad: r.UNIDADMEDIDA ?? null,
-      usaStocks: String(r.USASTOCKS ?? 'F').toUpperCase() === 'T',
+      codigo: r.REFPROVEEDOR ?? null,
       isActive: String(r.DESCATALOGADO ?? 'F').toUpperCase() !== 'T',
-      fechaModificado: r.FECHAMODIFICADO ?? null,
-      categoriaArea: r.CATEGORIA_O_AREA ?? null,
-      precioUnitario: r.PRECIO_UNITARIO != null ? Number(r.PRECIO_UNITARIO) : null,
+      createdAt: r.FECHAMODIFICADO ?? new Date(),
+      updatedAt: r.FECHAMODIFICADO ?? new Date(),
     }, { status: 201 });
   } catch (error: any) {
     if (error?.number === 2627 || error?.number === 2601) {

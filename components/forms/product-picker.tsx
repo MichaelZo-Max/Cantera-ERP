@@ -109,9 +109,6 @@ export function ProductPicker({
                 <div className="flex items-center gap-2">
                   <Package className="h-4 w-4" />
                   <span className="truncate">{selectedProduct.nombre}</span>
-                  <Badge variant="secondary" className="ml-auto">
-                    {selectedProduct.area}
-                  </Badge>
                 </div>
               ) : (
                 <span className="text-muted-foreground">{placeholder}</span>
@@ -139,7 +136,6 @@ export function ProductPicker({
                             <div className="text-sm text-muted-foreground">Código: {product.codigo}</div>
                           </div>
                         </div>
-                        <Badge variant="outline">{product.area}</Badge>
                       </div>
                     </CommandItem>
                   ))}
