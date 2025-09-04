@@ -212,7 +212,7 @@ export default function YardDeliveriesPage() {
               </DialogDescription>
             </DialogHeader>
 
-            {selectedDelivery && (
+            {selectedDelivery && selectedDelivery.productFormat && (
               <div className="space-y-4">
                 <div className="p-3 bg-muted/50 rounded-lg">
                   <h4 className="font-medium mb-2 text-sm">Información del Viaje</h4>
@@ -240,7 +240,7 @@ export default function YardDeliveriesPage() {
 
                 <div className="space-y-3">
                   <QuantityInput
-                    unitBase={selectedDelivery.productFormat?.unidadBase as any}
+                    unitBase={selectedDelivery.productFormat.unidadBase}
                     value={loadedQuantity}
                     onChange={setLoadedQuantity}
                     label="Cantidad real cargada"
