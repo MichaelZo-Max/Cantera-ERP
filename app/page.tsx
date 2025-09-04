@@ -21,6 +21,7 @@ import {
   Users,
   FileText,
   MapPin,
+  UserCheck, // Importamos el ícono que faltaba
 } from "lucide-react";
 import Link from "next/link";
 
@@ -82,7 +83,6 @@ function Dashboard() {
             href: "/admin/customers",
             color: "bg-primary",
           },
-          // AÑADIR ESTE BLOQUE
           {
             title: "Destinos",
             description: "Gestionar direcciones de entrega",
@@ -90,7 +90,6 @@ function Dashboard() {
             href: "/admin/destinations",
             color: "bg-primary",
           },
-          // FIN DEL BLOQUE A AÑADIR
           {
             title: "Productos",
             description: "Gestionar catálogo de productos",
@@ -105,6 +104,15 @@ function Dashboard() {
             href: "/admin/trucks",
             color: "bg-primary",
           },
+          // BLOQUE AÑADIDO
+          {
+            title: "Choferes",
+            description: "Gestionar el personal de conducción",
+            icon: UserCheck,
+            href: "/admin/drivers", // Asegúrate que esta sea la ruta correcta
+            color: "bg-primary",
+          },
+          // FIN DEL BLOQUE AÑADIDO
           {
             title: "Configuración",
             description: "Configuración del sistema",

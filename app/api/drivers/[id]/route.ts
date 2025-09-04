@@ -1,6 +1,11 @@
+// app/api/drivers/[id]/route.ts
 import { NextResponse } from 'next/server';
 import { executeQuery, TYPES } from '@/lib/db';
 
+/**
+ * @route PATCH /api/drivers/[id]
+ * @desc Actualizar un chofer dinámicamente en la base de datos.
+ */
 export async function PATCH(request: Request, { params }: { params: { id: string } }) {
     try {
         const id = parseInt(params.id, 10);
@@ -37,7 +42,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
 
         const query = `
             UPDATE RIP.APP_CHOFERES SET ${updates.join(', ')}
-            OUTPUT INSERTED.*
+            OUTPUT INSERTED.id, INSERTED.nombre, INSERTED.docId, INSERTED.phone, INSERTED.is_active
             WHERE id = @id;
         `;
 

@@ -347,3 +347,36 @@ ALTER TABLE RIP.APP_PEDIDOS_ITEMS
 ADD CONSTRAINT FK_APP_PEDIDOS_ITEMS_FORMATOS
 FOREIGN KEY (format_id) REFERENCES RIP.APP_PRODUCTOS_FORMATOS(id);
 GO
+
+-- SCRIPT PARA CREAR LA TABLA DE CHOFERES (CONDUCTORES)
+
+IF OBJECT_ID('RIP.APP_CHOFERES', 'U') IS NULL
+BEGIN
+    CREATE TABLE RIP.APP_CHOFERES (
+        id INT IDENTITY(1,1) PRIMARY KEY,
+        nombre NVARCHAR(255) NOT NULL,
+        docId NVARCHAR(50) NULL,      -- Documento de identidad (cédula, etc.)
+        phone NVARCHAR(50) NULL,      -- Teléfono de contacto
+        is_active BIT NOT NULL DEFAULT 1,
+        created_at DATETIME NOT NULL DEFAULT GETDATE(),
+        updated_at DATETIME NOT NULL DEFAULT GETDATE()
+    );
+    
+    PRINT 'Tabla RIP.APP_CHOFERES creada exitosamente.';
+END
+ELSE
+BEGIN
+    PRINT 'La tabla RIP.APP_CHOFERES ya existe.';
+END
+GO
+
+-- 1. Añade la columna para la clave foránea del chofer
+ALTER TABLE RIP.APP_CAMIONES
+ADD driver_id INT NULL;
+GO
+
+-- 2. (Opcional) Crea la relación formal para mantener la integridad de los datos
+ALTER TABLE RIP.APP_CAMIONES
+ADD CONSTRAINT FK_APP_CAMIONES_CHOFERES
+FOREIGN KEY (driver_id) REFERENCES RIP.APP_CHOFERES(id);
+GO

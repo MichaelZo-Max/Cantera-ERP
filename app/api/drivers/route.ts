@@ -1,10 +1,19 @@
+// app/api/drivers/route.ts
 import { NextResponse } from 'next/server';
 import { executeQuery, TYPES } from '@/lib/db';
 import type { Driver } from '@/lib/types';
 
+/**
+ * @route GET /api/drivers
+ * @desc Obtener todos los choferes desde la tabla RIP.APP_CHOFERES.
+ */
 export async function GET() {
   try {
-    const query = `SELECT id, nombre, docId, phone, is_active FROM RIP.APP_CHOFERES ORDER BY nombre;`;
+    const query = `
+      SELECT id, nombre, docId, phone, is_active 
+      FROM RIP.APP_CHOFERES 
+      ORDER BY nombre;
+    `;
     const drivers = await executeQuery(query);
     return NextResponse.json(drivers);
   } catch (error) {
@@ -13,6 +22,10 @@ export async function GET() {
   }
 }
 
+/**
+ * @route POST /api/drivers
+ * @desc Crear un nuevo chofer en la tabla RIP.APP_CHOFERES.
+ */
 export async function POST(request: Request) {
     try {
         const body = await request.json();
@@ -24,7 +37,7 @@ export async function POST(request: Request) {
 
         const query = `
             INSERT INTO RIP.APP_CHOFERES (nombre, docId, phone)
-            OUTPUT INSERTED.*
+            OUTPUT INSERTED.id, INSERTED.nombre, INSERTED.docId, INSERTED.phone, INSERTED.is_active
             VALUES (@nombre, @docId, @phone);
         `;
         const params = [
