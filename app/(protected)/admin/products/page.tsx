@@ -1,36 +1,59 @@
-"use client"
+"use client";
 
-import type React from "react"
-import { useState, useEffect } from "react"
-import { AppLayout } from "@/components/app-layout"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { Textarea } from "@/components/ui/textarea"
-import { AnimatedCard } from "@/components/ui/animated-card"
-import { GradientButton } from "@/components/ui/gradient-button"
-import { LoadingSkeleton } from "@/components/ui/loading-skeleton"
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from "@/components/ui/dialog"
-import type { Product } from "@/lib/types"
-import { Package, Plus, Search, Edit, Trash2, CheckCircle, Sparkles, Save } from "lucide-react"
-import { toast } from "sonner"
+import type React from "react";
+import { useState, useEffect } from "react";
+import { AppLayout } from "@/components/app-layout";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Textarea } from "@/components/ui/textarea";
+import { AnimatedCard } from "@/components/ui/animated-card";
+import { GradientButton } from "@/components/ui/gradient-button";
+import { LoadingSkeleton } from "@/components/ui/loading-skeleton";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import type { Product } from "@/lib/types";
+import {
+  Package,
+  Plus,
+  Search,
+  Edit,
+  Trash2,
+  CheckCircle,
+  Sparkles,
+  Save,
+} from "lucide-react";
+import { toast } from "sonner";
 
 export default function ProductsPage() {
-  const [products, setProducts] = useState<Product[]>([])
-  const [loading, setLoading] = useState(true)
-  const [apiError, setApiError] = useState<string | null>(null)
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [apiError, setApiError] = useState<string | null>(null);
 
-  const [searchTerm, setSearchTerm] = useState("")
-  const [showDialog, setShowDialog] = useState(false)
-  const [editingProduct, setEditingProduct] = useState<Product | null>(null)
+  const [searchTerm, setSearchTerm] = useState("");
+  const [showDialog, setShowDialog] = useState(false);
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [formData, setFormData] = useState({
     codigo: "",
     nombre: "",
     description: "",
-  })
-  const [isSubmitting, setIsSubmitting] = useState(false)
+  });
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     const loadProducts = async () => {
@@ -53,43 +76,45 @@ export default function ProductsPage() {
     (product) =>
       product.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
       product.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      product.codigo.toLowerCase().includes(searchTerm.toLowerCase()),
-  )
+      product.codigo.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
   const handleNewProduct = () => {
-    setEditingProduct(null)
+    setEditingProduct(null);
     setFormData({
       codigo: "",
       nombre: "",
       description: "",
-    })
-    setApiError(null)
-    setShowDialog(true)
-  }
+    });
+    setApiError(null);
+    setShowDialog(true);
+  };
 
   const handleEditProduct = (product: Product) => {
-    setEditingProduct(product)
+    setEditingProduct(product);
     setFormData({
       codigo: product.codigo,
       nombre: product.nombre,
       description: product.description || "",
-    })
-    setApiError(null)
-    setShowDialog(true)
-  }
+    });
+    setApiError(null);
+    setShowDialog(true);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setIsSubmitting(true)
-    setApiError(null)
+    e.preventDefault();
+    setIsSubmitting(true);
+    setApiError(null);
 
-    const method = editingProduct ? 'PATCH' : 'POST';
-    const url = editingProduct ? `/api/products/${editingProduct.id}` : '/api/products';
+    const method = editingProduct ? "PATCH" : "POST";
+    const url = editingProduct
+      ? `/api/products/${editingProduct.id}`
+      : "/api/products";
 
     try {
       const res = await fetch(url, {
         method,
-        headers: { 'Content-Type': 'application/json' },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(formData),
       });
 
@@ -99,12 +124,14 @@ export default function ProductsPage() {
       }
 
       const savedProduct = await res.json();
-      
+
       if (editingProduct) {
-        setProducts(products.map(p => p.id === savedProduct.id ? savedProduct : p));
+        setProducts(
+          products.map((p) => (p.id === savedProduct.id ? savedProduct : p))
+        );
         toast.success("Producto actualizado exitosamente.");
       } else {
-        setProducts(prevProducts => [...prevProducts, savedProduct]);
+        setProducts((prevProducts) => [...prevProducts, savedProduct]);
         toast.success("Producto creado exitosamente.");
       }
 
@@ -115,36 +142,48 @@ export default function ProductsPage() {
     } finally {
       setIsSubmitting(false);
     }
-  }
+  };
 
   const handleToggleStatus = async (product: Product) => {
-    const isActive = product.isActive;
-    if (!confirm(`¿Estás seguro de que quieres ${isActive ? "desactivar" : "activar"} este producto?`)) {
-        return;
+    const is_active = product.is_active;
+    if (
+      !confirm(
+        `¿Estás seguro de que quieres ${
+          is_active ? "desactivar" : "activar"
+        } este producto?`
+      )
+    ) {
+      return;
     }
-    
+
     const originalProducts = [...products];
-    setProducts(products.map(p => p.id === product.id ? { ...p, isActive: !isActive } : p));
+    setProducts(
+      products.map((p) =>
+        p.id === product.id ? { ...p, is_active: !is_active } : p
+      )
+    );
 
     try {
-        const res = await fetch(`/api/products/${product.id}`, { 
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ is_active: !isActive }), // Solo enviamos el cambio de estado
-        });
-        if(!res.ok) {
-            const errorText = await res.text();
-            throw new Error(errorText);
-        }
-        
-        toast.success(`Producto ${!isActive ? "activado" : "desactivado"} exitosamente.`);
+      const res = await fetch(`/api/products/${product.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ is_active: !is_active }), // Solo enviamos el cambio de estado
+      });
+      if (!res.ok) {
+        const errorText = await res.text();
+        throw new Error(errorText);
+      }
+
+      toast.success(
+        `Producto ${!is_active ? "activado" : "desactivado"} exitosamente.`
+      );
     } catch (err: any) {
-        setProducts(originalProducts);
-        setApiError(err.message || "Error al cambiar el estado del producto");
-        toast.error("Error al cambiar el estado", { description: err.message });
+      setProducts(originalProducts);
+      setApiError(err.message || "Error al cambiar el estado del producto");
+      toast.error("Error al cambiar el estado", { description: err.message });
     }
-  }
-  
+  };
+
   if (loading) {
     return (
       <AppLayout title="Gestión de Productos">
@@ -166,11 +205,16 @@ export default function ProductsPage() {
                 <h2 className="text-3xl font-bold bg-gradient-to-r from-foreground to-muted-foreground bg-clip-text text-transparent">
                   Productos
                 </h2>
-                <p className="text-muted-foreground">Gestiona el catálogo de productos con estilo</p>
+                <p className="text-muted-foreground">
+                  Gestiona el catálogo de productos con estilo
+                </p>
               </div>
             </div>
           </div>
-          <GradientButton onClick={handleNewProduct} className="flex items-center space-x-2 animate-pulse-glow">
+          <GradientButton
+            onClick={handleNewProduct}
+            className="flex items-center space-x-2 animate-pulse-glow"
+          >
             <Plus className="h-4 w-4" />
             <span>Nuevo Producto</span>
             <Sparkles className="h-4 w-4 ml-1" />
@@ -198,8 +242,12 @@ export default function ProductsPage() {
               <AnimatedCard className="glass">
                 <CardContent className="pt-12 pb-12 text-center">
                   <Package className="h-16 w-16 text-muted-foreground mx-auto mb-4 opacity-50" />
-                  <p className="text-muted-foreground text-lg">No se encontraron productos</p>
-                  <p className="text-sm text-muted-foreground mt-2">Intenta con otros términos de búsqueda o crea uno nuevo.</p>
+                  <p className="text-muted-foreground text-lg">
+                    No se encontraron productos
+                  </p>
+                  <p className="text-sm text-muted-foreground mt-2">
+                    Intenta con otros términos de búsqueda o crea uno nuevo.
+                  </p>
                 </CardContent>
               </AnimatedCard>
             </div>
@@ -218,19 +266,23 @@ export default function ProductsPage() {
                       <CardTitle className="text-xl font-bold bg-gradient-to-r from-foreground to-muted-foreground bg-clip-text text-transparent">
                         {product.nombre}
                       </CardTitle>
-                      <p className="text-sm text-muted-foreground mt-1 font-medium">Código: {product.codigo}</p>
+                      <p className="text-sm text-muted-foreground mt-1 font-medium">
+                        Código: {product.codigo}
+                      </p>
                     </div>
                     <Badge
-                      variant={product.isActive ? "default" : "secondary"}
-                      className={product.isActive ? "bg-gradient-primary" : ""}
+                      variant={product.is_active ? "default" : "secondary"}
+                      className={product.is_active ? "bg-gradient-primary" : ""}
                     >
-                      {product.isActive ? "Activo" : "Inactivo"}
+                      {product.is_active ? "Activo" : "Inactivo"}
                     </Badge>
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   {product.description && (
-                    <p className="text-sm text-muted-foreground line-clamp-3 leading-relaxed">{product.description}</p>
+                    <p className="text-sm text-muted-foreground line-clamp-3 leading-relaxed">
+                      {product.description}
+                    </p>
                   )}
                   <div className="flex space-x-2 pt-4 border-t">
                     <Button
@@ -243,13 +295,19 @@ export default function ProductsPage() {
                       <span>Editar</span>
                     </Button>
                     <Button
-                      variant={product.isActive ? "destructive" : "default"}
+                      variant={product.is_active ? "destructive" : "default"}
                       size="sm"
                       onClick={() => handleToggleStatus(product)}
                       className="flex items-center space-x-1 transition-smooth"
                     >
-                      {product.isActive ? <Trash2 className="h-3 w-3" /> : <CheckCircle className="h-3 w-3" />}
-                      <span>{product.isActive ? "Desactivar" : "Activar"}</span>
+                      {product.is_active ? (
+                        <Trash2 className="h-3 w-3" />
+                      ) : (
+                        <CheckCircle className="h-3 w-3" />
+                      )}
+                      <span>
+                        {product.is_active ? "Desactivar" : "Activar"}
+                      </span>
                     </Button>
                   </div>
                 </CardContent>
@@ -260,55 +318,93 @@ export default function ProductsPage() {
 
         {/* Create/Edit Dialog */}
         <Dialog open={showDialog} onOpenChange={setShowDialog}>
-            <DialogContent className="sm:max-w-xl">
-                <DialogHeader>
-                    <DialogTitle className="text-2xl font-bold flex items-center gap-2">
-                        <Sparkles className="h-5 w-5 text-primary" />
-                        {editingProduct ? "Editar Producto" : "Nuevo Producto"}
-                    </DialogTitle>
-                    <DialogDescription>
-                        {editingProduct ? "Actualiza la información del producto." : "Completa los datos del nuevo producto."}
-                    </DialogDescription>
-                </DialogHeader>
-                <form onSubmit={handleSubmit} className="space-y-6 pt-4">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                            <Label htmlFor="codigo" className="font-semibold">Código *</Label>
-                            <Input id="codigo" value={formData.codigo} onChange={(e) => setFormData({ ...formData, codigo: e.target.value })} placeholder="Ej: ARE-001" required className="focus-ring"/>
-                        </div>
-                        <div className="space-y-2">
-                            <Label htmlFor="nombre" className="font-semibold">Nombre *</Label>
-                            <Input id="nombre" value={formData.nombre} onChange={(e) => setFormData({ ...formData, nombre: e.target.value })} placeholder="Ej: Arena Fina" required className="focus-ring"/>
-                        </div>
-                    </div>
-                    <div className="space-y-2">
-                        <Label htmlFor="description" className="font-semibold">Descripción</Label>
-                        <Textarea id="description" value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} placeholder="Descripción detallada del producto (opcional)" rows={3} className="focus-ring"/>
-                    </div>
-                    {apiError && (
-                      <p className="text-sm text-red-500">{apiError}</p>
-                    )}
-                    <DialogFooter className="pt-4">
-                        <Button type="button" variant="outline" onClick={() => setShowDialog(false)}>Cancelar</Button>
-                        <GradientButton type="submit" disabled={isSubmitting}>
-                            {isSubmitting ? (
-                                <>
-                                    <LoadingSkeleton className="w-4 h-4 mr-2" />
-                                    Guardando...
-                                </>
-                            ) : (
-                                <>
-                                    <Save className="h-4 w-4 mr-2" />
-                                    {editingProduct ? "Guardar Cambios" : "Crear Producto"}
-                                </>
-                            )}
-                        </GradientButton>
-                    </DialogFooter>
-                </form>
-            </DialogContent>
+          <DialogContent className="sm:max-w-xl">
+            <DialogHeader>
+              <DialogTitle className="text-2xl font-bold flex items-center gap-2">
+                <Sparkles className="h-5 w-5 text-primary" />
+                {editingProduct ? "Editar Producto" : "Nuevo Producto"}
+              </DialogTitle>
+              <DialogDescription>
+                {editingProduct
+                  ? "Actualiza la información del producto."
+                  : "Completa los datos del nuevo producto."}
+              </DialogDescription>
+            </DialogHeader>
+            <form onSubmit={handleSubmit} className="space-y-6 pt-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="codigo" className="font-semibold">
+                    Código *
+                  </Label>
+                  <Input
+                    id="codigo"
+                    value={formData.codigo}
+                    onChange={(e) =>
+                      setFormData({ ...formData, codigo: e.target.value })
+                    }
+                    placeholder="Ej: ARE-001"
+                    required
+                    className="focus-ring"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="nombre" className="font-semibold">
+                    Nombre *
+                  </Label>
+                  <Input
+                    id="nombre"
+                    value={formData.nombre}
+                    onChange={(e) =>
+                      setFormData({ ...formData, nombre: e.target.value })
+                    }
+                    placeholder="Ej: Arena Fina"
+                    required
+                    className="focus-ring"
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="description" className="font-semibold">
+                  Descripción
+                </Label>
+                <Textarea
+                  id="description"
+                  value={formData.description}
+                  onChange={(e) =>
+                    setFormData({ ...formData, description: e.target.value })
+                  }
+                  placeholder="Descripción detallada del producto (opcional)"
+                  rows={3}
+                  className="focus-ring"
+                />
+              </div>
+              {apiError && <p className="text-sm text-red-500">{apiError}</p>}
+              <DialogFooter className="pt-4">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setShowDialog(false)}
+                >
+                  Cancelar
+                </Button>
+                <GradientButton type="submit" disabled={isSubmitting}>
+                  {isSubmitting ? (
+                    <>
+                      <LoadingSkeleton className="w-4 h-4 mr-2" />
+                      Guardando...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="h-4 w-4 mr-2" />
+                      {editingProduct ? "Guardar Cambios" : "Crear Producto"}
+                    </>
+                  )}
+                </GradientButton>
+              </DialogFooter>
+            </form>
+          </DialogContent>
         </Dialog>
-
       </div>
     </AppLayout>
-  )
+  );
 }

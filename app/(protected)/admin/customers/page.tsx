@@ -1,159 +1,190 @@
-"use client"
+"use client";
 
-import type React from "react"
+import type React from "react";
 
-import { useState, useEffect } from "react"
-import { AppLayout } from "@/components/app-layout"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { Alert, AlertDescription } from "@/components/ui/alert"
-import type { Client } from "@/lib/types"
-import { Users, Plus, Search, Edit, Trash2, Phone, Mail, MapPin, CheckCircle } from "lucide-react"
-import { toast } from "sonner"
-
+import { useState, useEffect } from "react";
+import { AppLayout } from "@/components/app-layout";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import type { Client } from "@/lib/types";
+import {
+  Users,
+  Plus,
+  Search,
+  Edit,
+  Trash2,
+  Phone,
+  Mail,
+  MapPin,
+  CheckCircle,
+} from "lucide-react";
+import { toast } from "sonner";
 
 export default function CustomersPage() {
-  const [customers, setCustomers] = useState<Client[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  
-  const [searchTerm, setSearchTerm] = useState("")
-  const [showForm, setShowForm] = useState(false)
-  const [editingCustomer, setEditingCustomer] = useState<Client | null>(null)
+  const [customers, setCustomers] = useState<Client[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const [searchTerm, setSearchTerm] = useState("");
+  const [showForm, setShowForm] = useState(false);
+  const [editingCustomer, setEditingCustomer] = useState<Client | null>(null);
   const [formData, setFormData] = useState({
     nombre: "",
     rif: "",
     address: "",
     phone: "",
     email: "",
-  })
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const [success, setSuccess] = useState("")
+  });
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [success, setSuccess] = useState("");
 
   useEffect(() => {
     const loadCustomers = async () => {
       try {
-        setLoading(true)
-        const res = await fetch("/api/customers", { cache: "no-store" })
-        if (!res.ok) throw new Error(await res.text())
-        setCustomers(await res.json())
+        setLoading(true);
+        const res = await fetch("/api/customers", { cache: "no-store" });
+        if (!res.ok) throw new Error(await res.text());
+        setCustomers(await res.json());
       } catch (e: any) {
-        setError(e?.message ?? "Error al cargar clientes")
-        toast.error("Error al cargar clientes", { description: e.message })
+        setError(e?.message ?? "Error al cargar clientes");
+        toast.error("Error al cargar clientes", { description: e.message });
       } finally {
-        setLoading(false)
+        setLoading(false);
       }
-    }
-    loadCustomers()
-  }, [])
+    };
+    loadCustomers();
+  }, []);
 
   const filteredCustomers = customers.filter(
     (customer) =>
       customer.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
       customer.rif?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      customer.email?.toLowerCase().includes(searchTerm.toLowerCase()),
-  )
+      customer.email?.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
   const handleNewCustomer = () => {
-    setEditingCustomer(null)
+    setEditingCustomer(null);
     setFormData({
       nombre: "",
       rif: "",
       address: "",
       phone: "",
       email: "",
-    })
-    setShowForm(true)
-    setSuccess("")
-    setError("")
-  }
+    });
+    setShowForm(true);
+    setSuccess("");
+    setError("");
+  };
 
   const handleEditCustomer = (customer: Client) => {
-    setEditingCustomer(customer)
+    setEditingCustomer(customer);
     setFormData({
       nombre: customer.nombre,
       rif: customer.rif || "",
       address: customer.address || "",
       phone: customer.phone || "",
       email: customer.email || "",
-    })
-    setShowForm(true)
-    setSuccess("")
-    setError("")
-  }
+    });
+    setShowForm(true);
+    setSuccess("");
+    setError("");
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setIsSubmitting(true)
-    setError("")
-    setSuccess("")
+    e.preventDefault();
+    setIsSubmitting(true);
+    setError("");
+    setSuccess("");
 
-    const method = editingCustomer ? 'PATCH' : 'POST';
-    const url = editingCustomer ? `/api/customers/${editingCustomer.id}` : '/api/customers';
+    const method = editingCustomer ? "PATCH" : "POST";
+    const url = editingCustomer
+      ? `/api/customers/${editingCustomer.id}`
+      : "/api/customers";
 
     try {
       const res = await fetch(url, {
         method,
-        headers: { 'Content-Type': 'application/json' },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(formData),
       });
 
-      if (!res.ok){
+      if (!res.ok) {
         const errorText = await res.text();
         throw new Error(errorText || "Error al guardar el cliente");
       }
 
       const savedCustomer = await res.json();
-      
+
       if (editingCustomer) {
-        setCustomers(customers.map(c => c.id === savedCustomer.id ? savedCustomer : c));
+        setCustomers(
+          customers.map((c) => (c.id === savedCustomer.id ? savedCustomer : c))
+        );
         toast.success("Cliente actualizado exitosamente.");
       } else {
         setCustomers([...customers, savedCustomer]);
         toast.success("Cliente creado exitosamente.");
       }
 
-      setShowForm(false)
+      setShowForm(false);
     } catch (err: any) {
       setError(err.message);
       toast.error("Error al guardar", { description: err.message });
     } finally {
-      setIsSubmitting(false)
+      setIsSubmitting(false);
     }
-  }
+  };
 
   const handleToggleStatus = async (customer: Client) => {
-    const isActive = customer.isActive;
-    if (!confirm(`¿Estás seguro de que quieres ${isActive ? 'desactivar' : 'activar'} este cliente?`)) {
+    const is_active = customer.is_active;
+    if (
+      !confirm(
+        `¿Estás seguro de que quieres ${
+          is_active ? "desactivar" : "activar"
+        } este cliente?`
+      )
+    ) {
       return;
     }
 
     const originalCustomers = [...customers];
-    setCustomers(customers.map(c => c.id === customer.id ? { ...c, isActive: !isActive } : c));
-    
+    setCustomers(
+      customers.map((c) =>
+        c.id === customer.id ? { ...c, is_active: !is_active } : c
+      )
+    );
+
     try {
-      const res = await fetch(`/api/customers/${customer.id}`, { 
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ...customer, is_active: !isActive }),
+      const res = await fetch(`/api/customers/${customer.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...customer, is_active: !is_active }),
       });
 
-      if(!res.ok) {
+      if (!res.ok) {
         const errorText = await res.text();
         throw new Error(errorText);
       }
-      
-      toast.success(`Cliente ${!isActive ? "activado" : "desactivado"} exitosamente.`);
+
+      toast.success(
+        `Cliente ${!is_active ? "activado" : "desactivado"} exitosamente.`
+      );
     } catch (err: any) {
-        setCustomers(originalCustomers);
-        setError(err.message || "Error al cambiar el estado del cliente");
-        toast.error("Error al cambiar el estado", { description: err.message });
+      setCustomers(originalCustomers);
+      setError(err.message || "Error al cambiar el estado del cliente");
+      toast.error("Error al cambiar el estado", { description: err.message });
     }
-  }
-  
+  };
+
   if (loading) {
     return (
       <AppLayout title="Gestión de Clientes">
@@ -176,9 +207,14 @@ export default function CustomersPage() {
         <div className="flex justify-between items-center">
           <div>
             <h2 className="text-2xl font-bold text-foreground">Clientes</h2>
-            <p className="text-muted-foreground">Gestiona el catálogo de clientes</p>
+            <p className="text-muted-foreground">
+              Gestiona el catálogo de clientes
+            </p>
           </div>
-          <Button onClick={handleNewCustomer} className="flex items-center space-x-2">
+          <Button
+            onClick={handleNewCustomer}
+            className="flex items-center space-x-2"
+          >
             <Plus className="h-4 w-4" />
             <span>Nuevo Cliente</span>
           </Button>
@@ -187,7 +223,9 @@ export default function CustomersPage() {
         {success && (
           <Alert className="border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-900/20">
             <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400" />
-            <AlertDescription className="text-green-800 dark:text-green-300">{success}</AlertDescription>
+            <AlertDescription className="text-green-800 dark:text-green-300">
+              {success}
+            </AlertDescription>
           </Alert>
         )}
 
@@ -200,9 +238,13 @@ export default function CustomersPage() {
         {showForm && (
           <Card>
             <CardHeader>
-              <CardTitle>{editingCustomer ? "Editar Cliente" : "Nuevo Cliente"}</CardTitle>
+              <CardTitle>
+                {editingCustomer ? "Editar Cliente" : "Nuevo Cliente"}
+              </CardTitle>
               <CardDescription>
-                {editingCustomer ? "Actualiza la información del cliente" : "Completa los datos del nuevo cliente"}
+                {editingCustomer
+                  ? "Actualiza la información del cliente"
+                  : "Completa los datos del nuevo cliente"}
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -213,7 +255,9 @@ export default function CustomersPage() {
                     <Input
                       id="name"
                       value={formData.nombre}
-                      onChange={(e) => setFormData({ ...formData, nombre: e.target.value })}
+                      onChange={(e) =>
+                        setFormData({ ...formData, nombre: e.target.value })
+                      }
                       placeholder="Nombre del cliente o empresa"
                       required
                     />
@@ -223,7 +267,9 @@ export default function CustomersPage() {
                     <Input
                       id="rfc"
                       value={formData.rif}
-                      onChange={(e) => setFormData({ ...formData, rif: e.target.value })}
+                      onChange={(e) =>
+                        setFormData({ ...formData, rif: e.target.value })
+                      }
                       placeholder="RFC del cliente"
                     />
                   </div>
@@ -234,7 +280,9 @@ export default function CustomersPage() {
                   <Input
                     id="address"
                     value={formData.address}
-                    onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                    onChange={(e) =>
+                      setFormData({ ...formData, address: e.target.value })
+                    }
                     placeholder="Dirección completa"
                   />
                 </div>
@@ -245,7 +293,9 @@ export default function CustomersPage() {
                     <Input
                       id="phone"
                       value={formData.phone}
-                      onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                      onChange={(e) =>
+                        setFormData({ ...formData, phone: e.target.value })
+                      }
                       placeholder="Número de teléfono"
                     />
                   </div>
@@ -255,22 +305,31 @@ export default function CustomersPage() {
                       id="email"
                       type="email"
                       value={formData.email}
-                      onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                      onChange={(e) =>
+                        setFormData({ ...formData, email: e.target.value })
+                      }
                       placeholder="correo@ejemplo.com"
                     />
                   </div>
                 </div>
 
                 <div className="flex space-x-3">
-                  <Button type="submit" disabled={isSubmitting || !formData.nombre}>
-                    {isSubmitting ? "Guardando..." : editingCustomer ? "Actualizar" : "Crear Cliente"}
+                  <Button
+                    type="submit"
+                    disabled={isSubmitting || !formData.nombre}
+                  >
+                    {isSubmitting
+                      ? "Guardando..."
+                      : editingCustomer
+                      ? "Actualizar"
+                      : "Crear Cliente"}
                   </Button>
                   <Button
                     type="button"
                     variant="outline"
                     onClick={() => {
-                      setShowForm(false)
-                      setEditingCustomer(null)
+                      setShowForm(false);
+                      setEditingCustomer(null);
                     }}
                   >
                     Cancelar
@@ -301,21 +360,34 @@ export default function CustomersPage() {
               <Card>
                 <CardContent className="pt-6 text-center">
                   <Users className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                  <p className="text-muted-foreground">No se encontraron clientes</p>
+                  <p className="text-muted-foreground">
+                    No se encontraron clientes
+                  </p>
                 </CardContent>
               </Card>
             </div>
           ) : (
             filteredCustomers.map((customer) => (
-              <Card key={customer.id} className="hover:shadow-md transition-shadow">
+              <Card
+                key={customer.id}
+                className="hover:shadow-md transition-shadow"
+              >
                 <CardHeader className="pb-3">
                   <div className="flex justify-between items-start">
                     <div className="flex-1">
-                      <CardTitle className="text-lg truncate">{customer.nombre}</CardTitle>
-                      {customer.rif && <p className="text-sm text-muted-foreground mt-1">{customer.rif}</p>}
+                      <CardTitle className="text-lg truncate">
+                        {customer.nombre}
+                      </CardTitle>
+                      {customer.rif && (
+                        <p className="text-sm text-muted-foreground mt-1">
+                          {customer.rif}
+                        </p>
+                      )}
                     </div>
-                    <Badge variant={customer.isActive ? "default" : "secondary"}>
-                      {customer.isActive ? "Activo" : "Inactivo"}
+                    <Badge
+                      variant={customer.is_active ? "default" : "secondary"}
+                    >
+                      {customer.is_active ? "Activo" : "Inactivo"}
                     </Badge>
                   </div>
                 </CardHeader>
@@ -323,21 +395,27 @@ export default function CustomersPage() {
                   {customer.address && (
                     <div className="flex items-start space-x-2">
                       <MapPin className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
-                      <p className="text-sm text-muted-foreground line-clamp-2">{customer.address}</p>
+                      <p className="text-sm text-muted-foreground line-clamp-2">
+                        {customer.address}
+                      </p>
                     </div>
                   )}
 
                   {customer.phone && (
                     <div className="flex items-center space-x-2">
                       <Phone className="h-4 w-4 text-muted-foreground" />
-                      <p className="text-sm text-muted-foreground">{customer.phone}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {customer.phone}
+                      </p>
                     </div>
                   )}
 
                   {customer.email && (
                     <div className="flex items-center space-x-2">
                       <Mail className="h-4 w-4 text-muted-foreground" />
-                      <p className="text-sm text-muted-foreground truncate">{customer.email}</p>
+                      <p className="text-sm text-muted-foreground truncate">
+                        {customer.email}
+                      </p>
                     </div>
                   )}
 
@@ -352,13 +430,19 @@ export default function CustomersPage() {
                       <span>Editar</span>
                     </Button>
                     <Button
-                      variant={customer.isActive ? "destructive" : "default"}
+                      variant={customer.is_active ? "destructive" : "default"}
                       size="sm"
                       onClick={() => handleToggleStatus(customer)}
                       className="flex items-center space-x-1"
                     >
-                      {customer.isActive ? <Trash2 className="h-3 w-3" /> : <CheckCircle className="h-3 w-3" />}
-                      <span>{customer.isActive ? "Desactivar" : "Activar"}</span>
+                      {customer.is_active ? (
+                        <Trash2 className="h-3 w-3" />
+                      ) : (
+                        <CheckCircle className="h-3 w-3" />
+                      )}
+                      <span>
+                        {customer.is_active ? "Desactivar" : "Activar"}
+                      </span>
                     </Button>
                   </div>
                 </CardContent>
@@ -368,5 +452,5 @@ export default function CustomersPage() {
         </div>
       </div>
     </AppLayout>
-  )
+  );
 }

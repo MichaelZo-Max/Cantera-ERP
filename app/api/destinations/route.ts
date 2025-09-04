@@ -1,7 +1,7 @@
 // app/api/destinations/route.ts
-import { NextResponse } from 'next/server';
-import { executeQuery, TYPES } from '@/lib/db';
-import type { Destination } from '@/lib/types';
+import { NextResponse } from "next/server";
+import { executeQuery, TYPES } from "@/lib/db";
+import type { Destination } from "@/lib/types";
 
 /**
  * @route GET /api/destinations
@@ -10,38 +10,38 @@ import type { Destination } from '@/lib/types';
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
-    const clientId = searchParams.get('clientId');
+    const clientId = searchParams.get("clientId");
 
     if (!clientId) {
       return NextResponse.json([]);
     }
 
     const query = `
-      SELECT id, name AS nombre, address AS direccion, is_active AS isActive
+      SELECT id, name AS nombre, address AS direccion, is_active AS is_active
       FROM RIP.APP_DESTINOS
       WHERE customer_id = @clientId AND is_active = 1;
     `;
-    
+
     const params = [
-      { name: 'clientId', type: TYPES.Int, value: parseInt(clientId, 10) }
+      { name: "clientId", type: TYPES.Int, value: parseInt(clientId, 10) },
     ];
 
     const destinationsData = await executeQuery(query, params);
 
-    const destinations: Destination[] = destinationsData.map(d => ({
-        id: d.id.toString(),
-        clientId: clientId,
-        nombre: d.nombre,
-        direccion: d.direccion,
-        isActive: d.isActive,
-        createdAt: new Date(),
-        updatedAt: new Date(),
+    const destinations: Destination[] = destinationsData.map((d) => ({
+      id: d.id.toString(),
+      clientId: clientId,
+      nombre: d.nombre,
+      direccion: d.direccion,
+      is_active: d.is_active,
+      createdAt: new Date(),
+      updatedAt: new Date(),
     }));
 
     return NextResponse.json(destinations);
   } catch (error) {
-    console.error('[API_DESTINATIONS_GET]', error);
-    return new NextResponse('Error al obtener los destinos', { status: 500 });
+    console.error("[API_DESTINATIONS_GET]", error);
+    return new NextResponse("Error al obtener los destinos", { status: 500 });
   }
 }
 
@@ -55,7 +55,10 @@ export async function POST(request: Request) {
     const { customer_id, name, address } = body;
 
     if (!customer_id || !name) {
-      return new NextResponse('El ID del cliente y el nombre del destino son requeridos', { status: 400 });
+      return new NextResponse(
+        "El ID del cliente y el nombre del destino son requeridos",
+        { status: 400 }
+      );
     }
 
     const query = `
@@ -65,16 +68,15 @@ export async function POST(request: Request) {
     `;
 
     const params = [
-      { name: 'customer_id', type: TYPES.Int, value: customer_id },
-      { name: 'name', type: TYPES.NVarChar, value: name },
-      { name: 'address', type: TYPES.NVarChar, value: address },
+      { name: "customer_id", type: TYPES.Int, value: customer_id },
+      { name: "name", type: TYPES.NVarChar, value: name },
+      { name: "address", type: TYPES.NVarChar, value: address },
     ];
 
     const result = await executeQuery(query, params);
     return NextResponse.json(result[0], { status: 201 });
-
   } catch (error) {
-    console.error('[API_DESTINATIONS_POST]', error);
-    return new NextResponse('Error al crear el destino', { status: 500 });
+    console.error("[API_DESTINATIONS_POST]", error);
+    return new NextResponse("Error al crear el destino", { status: 500 });
   }
 }

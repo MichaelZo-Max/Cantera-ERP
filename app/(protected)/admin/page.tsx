@@ -1,19 +1,44 @@
-"use client"
+"use client";
 
-import type React from "react"
-import { useState, useEffect } from "react"
-import { AppLayout } from "@/components/app-layout"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { Textarea } from "@/components/ui/textarea"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { TruckPlateInput } from "@/components/forms/truck-plate-input"
+import type React from "react";
+import { useState, useEffect } from "react";
+import { AppLayout } from "@/components/app-layout";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { TruckPlateInput } from "@/components/forms/truck-plate-input";
 import {
   Settings,
   Package,
@@ -28,8 +53,8 @@ import {
   Edit,
   Trash2,
   Save,
-} from "lucide-react"
-import { toast } from "sonner"
+} from "lucide-react";
+import { toast } from "sonner";
 import type {
   Product,
   ProductFormat,
@@ -38,32 +63,32 @@ import type {
   Truck as TruckType,
   Driver,
   User,
-  UnitBase
-} from "@/lib/types"
+  UnitBase,
+} from "@/lib/types";
 
 export default function AdminPage() {
-  const [activeTab, setActiveTab] = useState("productos")
-  const [searchTerm, setSearchTerm] = useState("")
-  const [showDialog, setShowDialog] = useState(false)
-  const [dialogType, setDialogType] = useState<string>("")
-  const [editingItem, setEditingItem] = useState<any>(null)
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const [activeTab, setActiveTab] = useState("productos");
+  const [searchTerm, setSearchTerm] = useState("");
+  const [showDialog, setShowDialog] = useState(false);
+  const [dialogType, setDialogType] = useState<string>("");
+  const [editingItem, setEditingItem] = useState<any>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   // Estados para cada catálogo
-  const [products, setProducts] = useState<Product[]>([])
-  const [formats, setFormats] = useState<ProductFormat[]>([])
-  const [clients, setClients] = useState<Client[]>([])
-  const [destinations, setDestinations] = useState<Destination[]>([])
-  const [trucks, setTrucks] = useState<TruckType[]>([])
-  const [drivers, setDrivers] = useState<Driver[]>([])
-  const [users, setUsers] = useState<User[]>([])
+  const [products, setProducts] = useState<Product[]>([]);
+  const [formats, setFormats] = useState<ProductFormat[]>([]);
+  const [clients, setClients] = useState<Client[]>([]);
+  const [destinations, setDestinations] = useState<Destination[]>([]);
+  const [trucks, setTrucks] = useState<TruckType[]>([]);
+  const [drivers, setDrivers] = useState<Driver[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
 
   useEffect(() => {
     const loadCatalogs = async () => {
       try {
-        setLoading(true)
+        setLoading(true);
         const responses = await Promise.all([
           fetch("/api/products", { cache: "no-store" }),
           fetch("/api/product-formats", { cache: "no-store" }),
@@ -72,38 +97,44 @@ export default function AdminPage() {
           fetch("/api/trucks", { cache: "no-store" }),
           fetch("/api/drivers", { cache: "no-store" }),
           fetch("/api/users", { cache: "no-store" }),
-        ])
+        ]);
 
         for (const res of responses) {
-            if (!res.ok) throw new Error(`Failed to fetch: ${res.url}`)
+          if (!res.ok) throw new Error(`Failed to fetch: ${res.url}`);
         }
 
-        const [productsData, formatsData, clientsData, destinationsData, trucksData, driversData, usersData] = await Promise.all(responses.map(res => res.json()));
+        const [
+          productsData,
+          formatsData,
+          clientsData,
+          destinationsData,
+          trucksData,
+          driversData,
+          usersData,
+        ] = await Promise.all(responses.map((res) => res.json()));
 
-        setProducts(productsData)
-        setFormats(formatsData)
-        setClients(clientsData)
-        setDestinations(destinationsData)
-        setTrucks(trucksData)
-        setDrivers(driversData)
-        setUsers(usersData)
-
+        setProducts(productsData);
+        setFormats(formatsData);
+        setClients(clientsData);
+        setDestinations(destinationsData);
+        setTrucks(trucksData);
+        setDrivers(driversData);
+        setUsers(usersData);
       } catch (e: any) {
-        setError(e.message)
-        toast.error("Error al cargar catálogos", { description: e.message })
+        setError(e.message);
+        toast.error("Error al cargar catálogos", { description: e.message });
       } finally {
-        setLoading(false)
+        setLoading(false);
       }
-    }
-    loadCatalogs()
-  }, [])
-
+    };
+    loadCatalogs();
+  }, []);
 
   // Formularios
   const [productForm, setProductForm] = useState({
     codigo: "",
     nombre: "",
-  })
+  });
 
   const [formatForm, setFormatForm] = useState({
     productId: "",
@@ -111,7 +142,7 @@ export default function AdminPage() {
     factorUnidadBase: 1,
     sku: "",
     pricePerUnit: 0,
-  })
+  });
 
   const [clientForm, setClientForm] = useState({
     nombre: "",
@@ -119,56 +150,62 @@ export default function AdminPage() {
     address: "",
     phone: "",
     email: "",
-  })
+  });
 
   const [destinationForm, setDestinationForm] = useState({
     clientId: "",
     nombre: "",
     direccion: "",
-  })
+  });
 
   const [truckForm, setTruckForm] = useState({
     placa: "",
     brand: "",
     model: "",
     capacity: 0,
-  })
+  });
 
   const [driverForm, setDriverForm] = useState({
     nombre: "",
     docId: "",
     phone: "",
-  })
+  });
 
   const [userForm, setUserForm] = useState({
     email: "",
     name: "",
     role: "CASHIER" as User["role"],
-  })
+  });
 
   const handleNew = (type: string) => {
-    setDialogType(type)
-    setEditingItem(null)
+    setDialogType(type);
+    setEditingItem(null);
     // Reset forms
-    setProductForm({ codigo: "", nombre: ""})
-    setFormatForm({ productId: "", unidadBase: "M3", factorUnidadBase: 1, sku: "", pricePerUnit: 0 })
-    setClientForm({ nombre: "", rif: "", address: "", phone: "", email: "" })
-    setDestinationForm({ clientId: "", nombre: "", direccion: "" })
-    setTruckForm({ placa: "", brand: "", model: "", capacity: 0 })
-    setDriverForm({ nombre: "", docId: "", phone: "" })
-    setUserForm({ email: "", name: "", role: "CASHIER" })
-    setShowDialog(true)
-  }
+    setProductForm({ codigo: "", nombre: "" });
+    setFormatForm({
+      productId: "",
+      unidadBase: "M3",
+      factorUnidadBase: 1,
+      sku: "",
+      pricePerUnit: 0,
+    });
+    setClientForm({ nombre: "", rif: "", address: "", phone: "", email: "" });
+    setDestinationForm({ clientId: "", nombre: "", direccion: "" });
+    setTruckForm({ placa: "", brand: "", model: "", capacity: 0 });
+    setDriverForm({ nombre: "", docId: "", phone: "" });
+    setUserForm({ email: "", name: "", role: "CASHIER" });
+    setShowDialog(true);
+  };
 
   const handleEdit = (type: string, item: any) => {
-    setDialogType(type)
-    setEditingItem(item)
+    setDialogType(type);
+    setEditingItem(item);
 
     // Pre-llenar formularios según el tipo
     switch (type) {
       case "producto":
-        setProductForm({ codigo: item.codigo, nombre: item.nombre})
-        break
+        setProductForm({ codigo: item.codigo, nombre: item.nombre });
+        break;
       case "formato":
         setFormatForm({
           productId: item.productId,
@@ -176,8 +213,8 @@ export default function AdminPage() {
           factorUnidadBase: item.factorUnidadBase,
           sku: item.sku || "",
           pricePerUnit: item.pricePerUnit || 0,
-        })
-        break
+        });
+        break;
       case "cliente":
         setClientForm({
           nombre: item.nombre,
@@ -185,175 +222,232 @@ export default function AdminPage() {
           address: item.address || "",
           phone: item.phone || "",
           email: item.email || "",
-        })
-        break
+        });
+        break;
       case "destino":
         setDestinationForm({
           clientId: item.clientId,
           nombre: item.nombre,
           direccion: item.direccion || "",
-        })
-        break
+        });
+        break;
       case "camion":
         setTruckForm({
           placa: item.placa,
           brand: item.brand || "",
           model: item.model || "",
           capacity: item.capacity || 0,
-        })
-        break
+        });
+        break;
       case "chofer":
         setDriverForm({
           nombre: item.nombre,
           docId: item.docId || "",
           phone: item.phone || "",
-        })
-        break
+        });
+        break;
       case "usuario":
         setUserForm({
           email: item.email,
           name: item.name,
           role: item.role,
-        })
-        break
+        });
+        break;
     }
-    setShowDialog(true)
-  }
+    setShowDialog(true);
+  };
 
   const handleSave = async () => {
     setIsSubmitting(true);
-    
+
     const type = dialogType;
     const isEditing = !!editingItem;
     const url = isEditing ? `/api/${type}s/${editingItem.id}` : `/api/${type}s`;
-    const method = isEditing ? 'PATCH' : 'POST';
-    
+    const method = isEditing ? "PATCH" : "POST";
+
     let body;
     switch (type) {
-        case "producto": body = productForm; break;
-        case "formato": body = formatForm; break;
-        case "cliente": body = clientForm; break;
-        case "destino": body = { ...destinationForm, customer_id: destinationForm.clientId }; break;
-        case "camion": body = truckForm; break;
-        case "chofer": body = driverForm; break;
-        case "usuario": body = { ...userForm, password: "123456" }; break; // Default password for new users
+      case "producto":
+        body = productForm;
+        break;
+      case "formato":
+        body = formatForm;
+        break;
+      case "cliente":
+        body = clientForm;
+        break;
+      case "destino":
+        body = { ...destinationForm, customer_id: destinationForm.clientId };
+        break;
+      case "camion":
+        body = truckForm;
+        break;
+      case "chofer":
+        body = driverForm;
+        break;
+      case "usuario":
+        body = { ...userForm, password: "123456" };
+        break; // Default password for new users
     }
 
     try {
-        const res = await fetch(url, {
-            method,
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(body),
-        });
+      const res = await fetch(url, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
 
-        if (!res.ok) {
-            const errorText = await res.text();
-            throw new Error(errorText || `Error al guardar ${type}`);
-        }
+      if (!res.ok) {
+        const errorText = await res.text();
+        throw new Error(errorText || `Error al guardar ${type}`);
+      }
 
-        const savedItem = await res.json();
-        
-        const updateState = (setter: Function) => {
-            setter((prev: any[]) => 
-                isEditing 
-                    ? prev.map((item: any) => item.id === savedItem.id ? savedItem : item) 
-                    : [...prev, savedItem]
-            );
-        };
+      const savedItem = await res.json();
 
-        switch (type) {
-            case "producto": updateState(setProducts); break;
-            case "formato": updateState(setFormats); break;
-            case "cliente": updateState(setClients); break;
-            case "destino": updateState(setDestinations); break;
-            case "camion": updateState(setTrucks); break;
-            case "chofer": updateState(setDrivers); break;
-            case "usuario": updateState(setUsers); break;
-        }
+      const updateState = (setter: Function) => {
+        setter((prev: any[]) =>
+          isEditing
+            ? prev.map((item: any) =>
+                item.id === savedItem.id ? savedItem : item
+              )
+            : [...prev, savedItem]
+        );
+      };
 
-        toast.success(`'${type}' guardado exitosamente.`);
-        setShowDialog(false);
+      switch (type) {
+        case "producto":
+          updateState(setProducts);
+          break;
+        case "formato":
+          updateState(setFormats);
+          break;
+        case "cliente":
+          updateState(setClients);
+          break;
+        case "destino":
+          updateState(setDestinations);
+          break;
+        case "camion":
+          updateState(setTrucks);
+          break;
+        case "chofer":
+          updateState(setDrivers);
+          break;
+        case "usuario":
+          updateState(setUsers);
+          break;
+      }
 
+      toast.success(`'${type}' guardado exitosamente.`);
+      setShowDialog(false);
     } catch (err: any) {
-        toast.error(`Error al guardar`, { description: err.message });
+      toast.error(`Error al guardar`, { description: err.message });
     } finally {
-        setIsSubmitting(false);
+      setIsSubmitting(false);
     }
   };
 
   const handleToggleStatus = async (type: string, item: any) => {
-    const isActive = item.isActive ?? item.activo;
-    
-    // Usamos el confirm nativo para simplicidad, o podrías implementar un diálogo de confirmación más elegante
-    if (!confirm(`¿Estás seguro de que quieres ${isActive ? 'desactivar' : 'activar'} este ${type}?`)) {
-        return;
+    const is_active = item.is_active ?? item.activo; // CORREGIDO
+
+    if (
+      !confirm(
+        `¿Estás seguro de que quieres ${
+          is_active ? "desactivar" : "activar"
+        } este ${type}?`
+      )
+    ) {
+      return;
     }
 
     try {
-        const res = await fetch(`/api/${type}s/${item.id}`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ ...item, is_active: !isActive, activo: !isActive }),
-        });
+      const res = await fetch(`/api/${type}s/${item.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ is_active: !is_active, activo: !is_active }), // Enviamos ambos por si la API usa uno u otro
+      });
 
-        if (!res.ok) {
-            const errorText = await res.text();
-            throw new Error(errorText || `Error al actualizar estado`);
-        }
+      if (!res.ok) {
+        const errorText = await res.text();
+        throw new Error(errorText || `Error al actualizar estado`);
+      }
 
-        const updatedItem = await res.json();
+      const updatedItem = await res.json();
 
-        const updateState = (setter: Function) => {
-            setter((prev: any[]) => prev.map((i: any) => i.id === updatedItem.id ? updatedItem : i));
-        };
+      const updateState = (setter: Function) => {
+        setter((prev: any[]) =>
+          prev.map((i: any) => (i.id === updatedItem.id ? updatedItem : i))
+        );
+      };
 
-        switch (type) {
-            case "producto": updateState(setProducts); break;
-            case "formato": updateState(setFormats); break;
-            case "cliente": updateState(setClients); break;
-            case "destino": updateState(setDestinations); break;
-            case "camion": updateState(setTrucks); break;
-            case "chofer": updateState(setDrivers); break;
-            case "usuario": updateState(setUsers); break;
-        }
+      switch (type) {
+        case "producto":
+          updateState(setProducts);
+          break;
+        case "formato":
+          updateState(setFormats);
+          break;
+        case "cliente":
+          updateState(setClients);
+          break;
+        case "destino":
+          updateState(setDestinations);
+          break;
+        case "camion":
+          updateState(setTrucks);
+          break;
+        case "chofer":
+          updateState(setDrivers);
+          break;
+        case "usuario":
+          updateState(setUsers);
+          break;
+      }
 
-        toast.success("Estado actualizado correctamente.");
-
+      toast.success("Estado actualizado correctamente.");
     } catch (err: any) {
-        toast.error("Error al cambiar el estado", { description: err.message });
+      toast.error("Error al cambiar el estado", { description: err.message });
     }
   };
-  
+
   if (loading) {
     return (
-        <AppLayout title="Administración">
-            <div className="text-center p-8">Cargando catálogos...</div>
-        </AppLayout>
-    )
+      <AppLayout title="Administración">
+        <div className="text-center p-8">Cargando catálogos...</div>
+      </AppLayout>
+    );
   }
 
   if (error) {
-      return (
-        <AppLayout title="Administración">
-            <div className="text-center p-8 text-destructive">{error}</div>
-        </AppLayout>
-      )
+    return (
+      <AppLayout title="Administración">
+        <div className="text-center p-8 text-destructive">{error}</div>
+      </AppLayout>
+    );
   }
 
   const renderDialog = () => {
     const getTitle = () => {
-      const action = editingItem ? "Editar" : "Nuevo"
+      const action = editingItem ? "Editar" : "Nuevo";
       switch (dialogType) {
-        case "producto": return `${action} Producto`;
-        case "formato": return `${action} Formato`;
-        case "cliente": return `${action} Cliente`;
-        case "destino": return `${action} Destino`;
-        case "camion": return `${action} Camión`;
-        case "chofer": return `${action} Chofer`;
-        case "usuario": return `${action} Usuario`;
-        default: return action;
+        case "producto":
+          return `${action} Producto`;
+        case "formato":
+          return `${action} Formato`;
+        case "cliente":
+          return `${action} Cliente`;
+        case "destino":
+          return `${action} Destino`;
+        case "camion":
+          return `${action} Camión`;
+        case "chofer":
+          return `${action} Chofer`;
+        case "usuario":
+          return `${action} Usuario`;
+        default:
+          return action;
       }
-    }
+    };
 
     return (
       <Dialog open={showDialog} onOpenChange={setShowDialog}>
@@ -361,7 +455,9 @@ export default function AdminPage() {
           <DialogHeader>
             <DialogTitle>{getTitle()}</DialogTitle>
             <DialogDescription>
-              {editingItem ? "Actualiza la información" : "Completa los datos requeridos"}
+              {editingItem
+                ? "Actualiza la información"
+                : "Completa los datos requeridos"}
             </DialogDescription>
           </DialogHeader>
 
@@ -373,18 +469,28 @@ export default function AdminPage() {
                     <Label>Código *</Label>
                     <Input
                       value={productForm.codigo}
-                      onChange={(e) => setProductForm({ ...productForm, codigo: e.target.value })}
+                      onChange={(e) =>
+                        setProductForm({
+                          ...productForm,
+                          codigo: e.target.value,
+                        })
+                      }
                       placeholder="AGR001"
                     />
                   </div>
-                </div>
-                <div className="space-y-2">
-                  <Label>Nombre *</Label>
-                  <Input
-                    value={productForm.nombre}
-                    onChange={(e) => setProductForm({ ...productForm, nombre: e.target.value })}
-                    placeholder="Nombre del producto"
-                  />
+                  <div className="space-y-2">
+                    <Label>Nombre *</Label>
+                    <Input
+                      value={productForm.nombre}
+                      onChange={(e) =>
+                        setProductForm({
+                          ...productForm,
+                          nombre: e.target.value,
+                        })
+                      }
+                      placeholder="Nombre del producto"
+                    />
+                  </div>
                 </div>
               </>
             )}
@@ -395,9 +501,13 @@ export default function AdminPage() {
                   <Label>Producto *</Label>
                   <Select
                     value={formatForm.productId}
-                    onValueChange={(value) => setFormatForm({ ...formatForm, productId: value })}
+                    onValueChange={(value) =>
+                      setFormatForm({ ...formatForm, productId: value })
+                    }
                   >
-                    <SelectTrigger><SelectValue placeholder="Seleccionar producto..." /></SelectTrigger>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Seleccionar producto..." />
+                    </SelectTrigger>
                     <SelectContent>
                       {products.map((product) => (
                         <SelectItem key={product.id} value={product.id}>
@@ -412,9 +522,13 @@ export default function AdminPage() {
                     <Label>Unidad Base *</Label>
                     <Select
                       value={formatForm.unidadBase}
-                      onValueChange={(value: UnitBase) => setFormatForm({ ...formatForm, unidadBase: value })}
+                      onValueChange={(value: UnitBase) =>
+                        setFormatForm({ ...formatForm, unidadBase: value })
+                      }
                     >
-                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="M3">m³</SelectItem>
                         <SelectItem value="TON">toneladas</SelectItem>
@@ -430,7 +544,13 @@ export default function AdminPage() {
                       step="0.1"
                       min="0.1"
                       value={formatForm.factorUnidadBase}
-                      onChange={(e) => setFormatForm({ ...formatForm, factorUnidadBase: Number.parseFloat(e.target.value) || 1 })}
+                      onChange={(e) =>
+                        setFormatForm({
+                          ...formatForm,
+                          factorUnidadBase:
+                            Number.parseFloat(e.target.value) || 1,
+                        })
+                      }
                     />
                   </div>
                 </div>
@@ -439,7 +559,9 @@ export default function AdminPage() {
                     <Label>SKU</Label>
                     <Input
                       value={formatForm.sku}
-                      onChange={(e) => setFormatForm({ ...formatForm, sku: e.target.value })}
+                      onChange={(e) =>
+                        setFormatForm({ ...formatForm, sku: e.target.value })
+                      }
                       placeholder="A granel (m³)"
                     />
                   </div>
@@ -450,7 +572,12 @@ export default function AdminPage() {
                       step="0.01"
                       min="0"
                       value={formatForm.pricePerUnit}
-                      onChange={(e) => setFormatForm({ ...formatForm, pricePerUnit: Number.parseFloat(e.target.value) || 0 })}
+                      onChange={(e) =>
+                        setFormatForm({
+                          ...formatForm,
+                          pricePerUnit: Number.parseFloat(e.target.value) || 0,
+                        })
+                      }
                     />
                   </div>
                 </div>
@@ -464,7 +591,9 @@ export default function AdminPage() {
                     <Label>Nombre *</Label>
                     <Input
                       value={clientForm.nombre}
-                      onChange={(e) => setClientForm({ ...clientForm, nombre: e.target.value })}
+                      onChange={(e) =>
+                        setClientForm({ ...clientForm, nombre: e.target.value })
+                      }
                       placeholder="Nombre del cliente"
                     />
                   </div>
@@ -472,7 +601,9 @@ export default function AdminPage() {
                     <Label>RIF</Label>
                     <Input
                       value={clientForm.rif}
-                      onChange={(e) => setClientForm({ ...clientForm, rif: e.target.value })}
+                      onChange={(e) =>
+                        setClientForm({ ...clientForm, rif: e.target.value })
+                      }
                       placeholder="J-12345678-9"
                     />
                   </div>
@@ -481,7 +612,9 @@ export default function AdminPage() {
                   <Label>Dirección</Label>
                   <Textarea
                     value={clientForm.address}
-                    onChange={(e) => setClientForm({ ...clientForm, address: e.target.value })}
+                    onChange={(e) =>
+                      setClientForm({ ...clientForm, address: e.target.value })
+                    }
                     placeholder="Dirección del cliente"
                     rows={2}
                   />
@@ -491,7 +624,9 @@ export default function AdminPage() {
                     <Label>Teléfono</Label>
                     <Input
                       value={clientForm.phone}
-                      onChange={(e) => setClientForm({ ...clientForm, phone: e.target.value })}
+                      onChange={(e) =>
+                        setClientForm({ ...clientForm, phone: e.target.value })
+                      }
                       placeholder="+58-414-1234567"
                     />
                   </div>
@@ -500,7 +635,9 @@ export default function AdminPage() {
                     <Input
                       type="email"
                       value={clientForm.email}
-                      onChange={(e) => setClientForm({ ...clientForm, email: e.target.value })}
+                      onChange={(e) =>
+                        setClientForm({ ...clientForm, email: e.target.value })
+                      }
                       placeholder="cliente@empresa.com"
                     />
                   </div>
@@ -514,9 +651,16 @@ export default function AdminPage() {
                   <Label>Cliente *</Label>
                   <Select
                     value={destinationForm.clientId}
-                    onValueChange={(value) => setDestinationForm({ ...destinationForm, clientId: value })}
+                    onValueChange={(value) =>
+                      setDestinationForm({
+                        ...destinationForm,
+                        clientId: value,
+                      })
+                    }
                   >
-                    <SelectTrigger><SelectValue placeholder="Seleccionar cliente..." /></SelectTrigger>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Seleccionar cliente..." />
+                    </SelectTrigger>
                     <SelectContent>
                       {clients.map((client) => (
                         <SelectItem key={client.id} value={client.id}>
@@ -530,7 +674,12 @@ export default function AdminPage() {
                   <Label>Nombre del Destino *</Label>
                   <Input
                     value={destinationForm.nombre}
-                    onChange={(e) => setDestinationForm({ ...destinationForm, nombre: e.target.value })}
+                    onChange={(e) =>
+                      setDestinationForm({
+                        ...destinationForm,
+                        nombre: e.target.value,
+                      })
+                    }
                     placeholder="Obra Av. Norte"
                   />
                 </div>
@@ -538,7 +687,12 @@ export default function AdminPage() {
                   <Label>Dirección</Label>
                   <Textarea
                     value={destinationForm.direccion}
-                    onChange={(e) => setDestinationForm({ ...destinationForm, direccion: e.target.value })}
+                    onChange={(e) =>
+                      setDestinationForm({
+                        ...destinationForm,
+                        direccion: e.target.value,
+                      })
+                    }
                     placeholder="Dirección específica del destino"
                     rows={2}
                   />
@@ -551,7 +705,9 @@ export default function AdminPage() {
                 <div className="space-y-2">
                   <TruckPlateInput
                     value={truckForm.placa}
-                    onChange={(value) => setTruckForm({ ...truckForm, placa: value })}
+                    onChange={(value) =>
+                      setTruckForm({ ...truckForm, placa: value })
+                    }
                     required
                   />
                 </div>
@@ -560,7 +716,9 @@ export default function AdminPage() {
                     <Label>Marca</Label>
                     <Input
                       value={truckForm.brand}
-                      onChange={(e) => setTruckForm({ ...truckForm, brand: e.target.value })}
+                      onChange={(e) =>
+                        setTruckForm({ ...truckForm, brand: e.target.value })
+                      }
                       placeholder="Volvo"
                     />
                   </div>
@@ -568,7 +726,9 @@ export default function AdminPage() {
                     <Label>Modelo</Label>
                     <Input
                       value={truckForm.model}
-                      onChange={(e) => setTruckForm({ ...truckForm, model: e.target.value })}
+                      onChange={(e) =>
+                        setTruckForm({ ...truckForm, model: e.target.value })
+                      }
                       placeholder="FH16"
                     />
                   </div>
@@ -579,7 +739,12 @@ export default function AdminPage() {
                     type="number"
                     min="0"
                     value={truckForm.capacity}
-                    onChange={(e) => setTruckForm({ ...truckForm, capacity: Number.parseInt(e.target.value) || 0 })}
+                    onChange={(e) =>
+                      setTruckForm({
+                        ...truckForm,
+                        capacity: Number.parseInt(e.target.value) || 0,
+                      })
+                    }
                     placeholder="25"
                   />
                 </div>
@@ -592,7 +757,9 @@ export default function AdminPage() {
                   <Label>Nombre *</Label>
                   <Input
                     value={driverForm.nombre}
-                    onChange={(e) => setDriverForm({ ...driverForm, nombre: e.target.value })}
+                    onChange={(e) =>
+                      setDriverForm({ ...driverForm, nombre: e.target.value })
+                    }
                     placeholder="Nombre completo"
                   />
                 </div>
@@ -601,7 +768,9 @@ export default function AdminPage() {
                     <Label>Documento de Identidad</Label>
                     <Input
                       value={driverForm.docId}
-                      onChange={(e) => setDriverForm({ ...driverForm, docId: e.target.value })}
+                      onChange={(e) =>
+                        setDriverForm({ ...driverForm, docId: e.target.value })
+                      }
                       placeholder="V-12345678"
                     />
                   </div>
@@ -609,7 +778,9 @@ export default function AdminPage() {
                     <Label>Teléfono</Label>
                     <Input
                       value={driverForm.phone}
-                      onChange={(e) => setDriverForm({ ...driverForm, phone: e.target.value })}
+                      onChange={(e) =>
+                        setDriverForm({ ...driverForm, phone: e.target.value })
+                      }
                       placeholder="+58-414-1234567"
                     />
                   </div>
@@ -624,7 +795,9 @@ export default function AdminPage() {
                     <Label>Nombre *</Label>
                     <Input
                       value={userForm.name}
-                      onChange={(e) => setUserForm({ ...userForm, name: e.target.value })}
+                      onChange={(e) =>
+                        setUserForm({ ...userForm, name: e.target.value })
+                      }
                       placeholder="Nombre completo"
                     />
                   </div>
@@ -633,7 +806,9 @@ export default function AdminPage() {
                     <Input
                       type="email"
                       value={userForm.email}
-                      onChange={(e) => setUserForm({ ...userForm, email: e.target.value })}
+                      onChange={(e) =>
+                        setUserForm({ ...userForm, email: e.target.value })
+                      }
                       placeholder="usuario@cantera.com"
                     />
                   </div>
@@ -642,9 +817,13 @@ export default function AdminPage() {
                   <Label>Rol *</Label>
                   <Select
                     value={userForm.role}
-                    onValueChange={(value: User["role"]) => setUserForm({ ...userForm, role: value })}
+                    onValueChange={(value: User["role"]) =>
+                      setUserForm({ ...userForm, role: value })
+                    }
                   >
-                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="CASHIER">Cajero</SelectItem>
                       <SelectItem value="YARD">Patio</SelectItem>
@@ -659,7 +838,11 @@ export default function AdminPage() {
           </div>
 
           <div className="flex gap-3">
-            <Button onClick={handleSave} disabled={isSubmitting} className="flex-1">
+            <Button
+              onClick={handleSave}
+              disabled={isSubmitting}
+              className="flex-1"
+            >
               <Save className="h-4 w-4 mr-2" />
               {isSubmitting ? "Guardando..." : "Guardar"}
             </Button>
@@ -669,8 +852,8 @@ export default function AdminPage() {
           </div>
         </DialogContent>
       </Dialog>
-    )
-  }
+    );
+  };
 
   return (
     <AppLayout title="Administración">
@@ -680,7 +863,9 @@ export default function AdminPage() {
             <Settings className="h-6 w-6" />
             Administración de Catálogos
           </h2>
-          <p className="text-muted-foreground">Gestiona todos los catálogos del sistema</p>
+          <p className="text-muted-foreground">
+            Gestiona todos los catálogos del sistema
+          </p>
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
@@ -735,7 +920,9 @@ export default function AdminPage() {
             <Card>
               <CardHeader>
                 <CardTitle>Productos</CardTitle>
-                <CardDescription>Gestiona el catálogo de productos</CardDescription>
+                <CardDescription>
+                  Gestiona el catálogo de productos
+                </CardDescription>
               </CardHeader>
               <CardContent>
                 <Table>
@@ -743,7 +930,6 @@ export default function AdminPage() {
                     <TableRow>
                       <TableHead>Código</TableHead>
                       <TableHead>Nombre</TableHead>
-                      <TableHead>Área</TableHead>
                       <TableHead>Estado</TableHead>
                       <TableHead className="w-[100px]">Acciones</TableHead>
                     </TableRow>
@@ -752,27 +938,43 @@ export default function AdminPage() {
                     {products
                       .filter(
                         (p) =>
-                          p.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          p.codigo.toLowerCase().includes(searchTerm.toLowerCase()),
+                          p.nombre
+                            .toLowerCase()
+                            .includes(searchTerm.toLowerCase()) ||
+                          p.codigo
+                            .toLowerCase()
+                            .includes(searchTerm.toLowerCase())
                       )
                       .map((product) => (
                         <TableRow key={product.id}>
-                          <TableCell className="font-medium">{product.codigo}</TableCell>
+                          <TableCell className="font-medium">
+                            {product.codigo}
+                          </TableCell>
                           <TableCell>{product.nombre}</TableCell>
                           <TableCell>
-                            <Badge variant={product.isActive ? "default" : "secondary"}>
-                              {product.isActive ? "Activo" : "Inactivo"}
+                            <Badge
+                              variant={
+                                product.is_active ? "default" : "secondary"
+                              }
+                            >
+                              {product.is_active ? "Activo" : "Inactivo"}
                             </Badge>
                           </TableCell>
                           <TableCell>
                             <div className="flex gap-1">
-                              <Button variant="ghost" size="sm" onClick={() => handleEdit("producto", product)}>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleEdit("producto", product)}
+                              >
                                 <Edit className="h-4 w-4" />
                               </Button>
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                onClick={() => handleToggleStatus("producto", product)}
+                                onClick={() =>
+                                  handleToggleStatus("producto", product)
+                                }
                               >
                                 <Trash2 className="h-4 w-4" />
                               </Button>
@@ -790,7 +992,9 @@ export default function AdminPage() {
             <Card>
               <CardHeader>
                 <CardTitle>Formatos de Productos</CardTitle>
-                <CardDescription>Gestiona los formatos y unidades base</CardDescription>
+                <CardDescription>
+                  Gestiona los formatos y unidades base
+                </CardDescription>
               </CardHeader>
               <CardContent>
                 <Table>
@@ -809,44 +1013,62 @@ export default function AdminPage() {
                     {formats
                       .filter(
                         (f) =>
-                          f.sku?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                          f.sku
+                            ?.toLowerCase()
+                            .includes(searchTerm.toLowerCase()) ||
                           products
                             .find((p) => p.id === f.productId)
                             ?.nombre.toLowerCase()
-                            .includes(searchTerm.toLowerCase()),
+                            .includes(searchTerm.toLowerCase())
                       )
                       .map((format) => {
-                        const product = products.find((p) => p.id === format.productId)
+                        const product = products.find(
+                          (p) => p.id === format.productId
+                        );
                         return (
                           <TableRow key={format.id}>
                             <TableCell>{product?.nombre || "N/A"}</TableCell>
                             <TableCell>{format.sku || "N/A"}</TableCell>
                             <TableCell>
-                              <Badge variant="outline">{format.unidadBase}</Badge>
+                              <Badge variant="outline">
+                                {format.unidadBase}
+                              </Badge>
                             </TableCell>
                             <TableCell>{format.factorUnidadBase}</TableCell>
-                            <TableCell>${format.pricePerUnit?.toFixed(2) || "0.00"}</TableCell>
                             <TableCell>
-                              <Badge variant={format.activo ? "default" : "secondary"}>
+                              ${format.pricePerUnit?.toFixed(2) || "0.00"}
+                            </TableCell>
+                            <TableCell>
+                              <Badge
+                                variant={
+                                  format.activo ? "default" : "secondary"
+                                }
+                              >
                                 {format.activo ? "Activo" : "Inactivo"}
                               </Badge>
                             </TableCell>
                             <TableCell>
                               <div className="flex gap-1">
-                                <Button variant="ghost" size="sm" onClick={() => handleEdit("formato", format)}>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleEdit("formato", format)}
+                                >
                                   <Edit className="h-4 w-4" />
                                 </Button>
                                 <Button
                                   variant="ghost"
                                   size="sm"
-                                  onClick={() => handleToggleStatus("formato", format)}
+                                  onClick={() =>
+                                    handleToggleStatus("formato", format)
+                                  }
                                 >
                                   <Trash2 className="h-4 w-4" />
                                 </Button>
                               </div>
                             </TableCell>
                           </TableRow>
-                        )
+                        );
                       })}
                   </TableBody>
                 </Table>
@@ -858,7 +1080,9 @@ export default function AdminPage() {
             <Card>
               <CardHeader>
                 <CardTitle>Clientes</CardTitle>
-                <CardDescription>Gestiona la información de clientes</CardDescription>
+                <CardDescription>
+                  Gestiona la información de clientes
+                </CardDescription>
               </CardHeader>
               <CardContent>
                 <Table>
@@ -876,29 +1100,45 @@ export default function AdminPage() {
                     {clients
                       .filter(
                         (c) =>
-                          c.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          c.rif?.toLowerCase().includes(searchTerm.toLowerCase()),
+                          c.nombre
+                            .toLowerCase()
+                            .includes(searchTerm.toLowerCase()) ||
+                          c.rif
+                            ?.toLowerCase()
+                            .includes(searchTerm.toLowerCase())
                       )
                       .map((client) => (
                         <TableRow key={client.id}>
-                          <TableCell className="font-medium">{client.nombre}</TableCell>
+                          <TableCell className="font-medium">
+                            {client.nombre}
+                          </TableCell>
                           <TableCell>{client.rif || "N/A"}</TableCell>
                           <TableCell>{client.phone || "N/A"}</TableCell>
                           <TableCell>{client.email || "N/A"}</TableCell>
                           <TableCell>
-                            <Badge variant={client.isActive ? "default" : "secondary"}>
-                              {client.isActive ? "Activo" : "Inactivo"}
+                            <Badge
+                              variant={
+                                client.is_active ? "default" : "secondary"
+                              }
+                            >
+                              {client.is_active ? "Activo" : "Inactivo"}
                             </Badge>
                           </TableCell>
                           <TableCell>
                             <div className="flex gap-1">
-                              <Button variant="ghost" size="sm" onClick={() => handleEdit("cliente", client)}>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleEdit("cliente", client)}
+                              >
                                 <Edit className="h-4 w-4" />
                               </Button>
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                onClick={() => handleToggleStatus("cliente", client)}
+                                onClick={() =>
+                                  handleToggleStatus("cliente", client)
+                                }
                               >
                                 <Trash2 className="h-4 w-4" />
                               </Button>
@@ -916,7 +1156,9 @@ export default function AdminPage() {
             <Card>
               <CardHeader>
                 <CardTitle>Destinos</CardTitle>
-                <CardDescription>Gestiona los destinos de entrega</CardDescription>
+                <CardDescription>
+                  Gestiona los destinos de entrega
+                </CardDescription>
               </CardHeader>
               <CardContent>
                 <Table>
@@ -933,40 +1175,62 @@ export default function AdminPage() {
                     {destinations
                       .filter(
                         (d) =>
-                          d.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                          d.nombre
+                            .toLowerCase()
+                            .includes(searchTerm.toLowerCase()) ||
                           clients
                             .find((c) => c.id === d.clientId)
                             ?.nombre.toLowerCase()
-                            .includes(searchTerm.toLowerCase()),
+                            .includes(searchTerm.toLowerCase())
                       )
                       .map((destination) => {
-                        const client = clients.find((c) => c.id === destination.clientId)
+                        const client = clients.find(
+                          (c) => c.id === destination.clientId
+                        );
                         return (
                           <TableRow key={destination.id}>
                             <TableCell>{client?.nombre || "N/A"}</TableCell>
-                            <TableCell className="font-medium">{destination.nombre}</TableCell>
-                            <TableCell>{destination.direccion || "N/A"}</TableCell>
+                            <TableCell className="font-medium">
+                              {destination.nombre}
+                            </TableCell>
                             <TableCell>
-                              <Badge variant={destination.isActive ? "default" : "secondary"}>
-                                {destination.isActive ? "Activo" : "Inactivo"}
+                              {destination.direccion || "N/A"}
+                            </TableCell>
+                            <TableCell>
+                              <Badge
+                                variant={
+                                  destination.is_active
+                                    ? "default"
+                                    : "secondary"
+                                }
+                              >
+                                {destination.is_active ? "Activo" : "Inactivo"}
                               </Badge>
                             </TableCell>
                             <TableCell>
                               <div className="flex gap-1">
-                                <Button variant="ghost" size="sm" onClick={() => handleEdit("destino", destination)}>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() =>
+                                    handleEdit("destino", destination)
+                                  }
+                                >
                                   <Edit className="h-4 w-4" />
                                 </Button>
                                 <Button
                                   variant="ghost"
                                   size="sm"
-                                  onClick={() => handleToggleStatus("destino", destination)}
+                                  onClick={() =>
+                                    handleToggleStatus("destino", destination)
+                                  }
                                 >
                                   <Trash2 className="h-4 w-4" />
                                 </Button>
                               </div>
                             </TableCell>
                           </TableRow>
-                        )
+                        );
                       })}
                   </TableBody>
                 </Table>
@@ -996,26 +1260,49 @@ export default function AdminPage() {
                     {trucks
                       .filter(
                         (t) =>
-                          t.placa.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          t.brand?.toLowerCase().includes(searchTerm.toLowerCase()),
+                          t.placa
+                            .toLowerCase()
+                            .includes(searchTerm.toLowerCase()) ||
+                          (t.brand &&
+                            t.brand
+                              .toLowerCase()
+                              .includes(searchTerm.toLowerCase()))
                       )
                       .map((truck) => (
                         <TableRow key={truck.id}>
-                          <TableCell className="font-medium">{truck.placa}</TableCell>
+                          <TableCell className="font-medium">
+                            {truck.placa}
+                          </TableCell>
                           <TableCell>{truck.brand || "N/A"}</TableCell>
                           <TableCell>{truck.model || "N/A"}</TableCell>
-                          <TableCell>{truck.capacity ? `${truck.capacity} m³` : "N/A"}</TableCell>
                           <TableCell>
-                            <Badge variant={truck.isActive ? "default" : "secondary"}>
-                              {truck.isActive ? "Activo" : "Inactivo"}
+                            {truck.capacity ? `${truck.capacity} m³` : "N/A"}
+                          </TableCell>
+                          <TableCell>
+                            <Badge
+                              variant={
+                                truck.is_active ? "default" : "secondary"
+                              }
+                            >
+                              {truck.is_active ? "Activo" : "Inactivo"}
                             </Badge>
                           </TableCell>
                           <TableCell>
                             <div className="flex gap-1">
-                              <Button variant="ghost" size="sm" onClick={() => handleEdit("camion", truck)}>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleEdit("camion", truck)}
+                              >
                                 <Edit className="h-4 w-4" />
                               </Button>
-                              <Button variant="ghost" size="sm" onClick={() => handleToggleStatus("camion", truck)}>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() =>
+                                  handleToggleStatus("camion", truck)
+                                }
+                              >
                                 <Trash2 className="h-4 w-4" />
                               </Button>
                             </div>
@@ -1032,7 +1319,9 @@ export default function AdminPage() {
             <Card>
               <CardHeader>
                 <CardTitle>Choferes</CardTitle>
-                <CardDescription>Gestiona la información de conductores</CardDescription>
+                <CardDescription>
+                  Gestiona la información de conductores
+                </CardDescription>
               </CardHeader>
               <CardContent>
                 <Table>
@@ -1049,25 +1338,45 @@ export default function AdminPage() {
                     {drivers
                       .filter(
                         (d) =>
-                          d.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          d.docId?.toLowerCase().includes(searchTerm.toLowerCase()),
+                          d.nombre
+                            .toLowerCase()
+                            .includes(searchTerm.toLowerCase()) ||
+                          d.docId
+                            ?.toLowerCase()
+                            .includes(searchTerm.toLowerCase())
                       )
                       .map((driver) => (
                         <TableRow key={driver.id}>
-                          <TableCell className="font-medium">{driver.nombre}</TableCell>
+                          <TableCell className="font-medium">
+                            {driver.nombre}
+                          </TableCell>
                           <TableCell>{driver.docId || "N/A"}</TableCell>
                           <TableCell>{driver.phone || "N/A"}</TableCell>
                           <TableCell>
-                            <Badge variant={driver.isActive ? "default" : "secondary"}>
-                              {driver.isActive ? "Activo" : "Inactivo"}
+                            <Badge
+                              variant={
+                                driver.is_active ? "default" : "secondary"
+                              }
+                            >
+                              {driver.is_active ? "Activo" : "Inactivo"}
                             </Badge>
                           </TableCell>
                           <TableCell>
                             <div className="flex gap-1">
-                              <Button variant="ghost" size="sm" onClick={() => handleEdit("chofer", driver)}>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleEdit("chofer", driver)}
+                              >
                                 <Edit className="h-4 w-4" />
                               </Button>
-                              <Button variant="ghost" size="sm" onClick={() => handleToggleStatus("chofer", driver)}>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() =>
+                                  handleToggleStatus("chofer", driver)
+                                }
+                              >
                                 <Trash2 className="h-4 w-4" />
                               </Button>
                             </div>
@@ -1084,7 +1393,9 @@ export default function AdminPage() {
             <Card>
               <CardHeader>
                 <CardTitle>Usuarios del Sistema</CardTitle>
-                <CardDescription>Gestiona los usuarios y sus roles</CardDescription>
+                <CardDescription>
+                  Gestiona los usuarios y sus roles
+                </CardDescription>
               </CardHeader>
               <CardContent>
                 <Table>
@@ -1101,27 +1412,45 @@ export default function AdminPage() {
                     {users
                       .filter(
                         (u) =>
-                          u.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          u.email.toLowerCase().includes(searchTerm.toLowerCase()),
+                          u.name
+                            .toLowerCase()
+                            .includes(searchTerm.toLowerCase()) ||
+                          u.email
+                            .toLowerCase()
+                            .includes(searchTerm.toLowerCase())
                       )
                       .map((user) => (
                         <TableRow key={user.id}>
-                          <TableCell className="font-medium">{user.name}</TableCell>
+                          <TableCell className="font-medium">
+                            {user.name}
+                          </TableCell>
                           <TableCell>{user.email}</TableCell>
                           <TableCell>
                             <Badge variant="outline">{user.role}</Badge>
                           </TableCell>
                           <TableCell>
-                            <Badge variant={user.isActive ? "default" : "secondary"}>
-                              {user.isActive ? "Activo" : "Inactivo"}
+                            <Badge
+                              variant={user.is_active ? "default" : "secondary"}
+                            >
+                              {user.is_active ? "Activo" : "Inactivo"}
                             </Badge>
                           </TableCell>
                           <TableCell>
                             <div className="flex gap-1">
-                              <Button variant="ghost" size="sm" onClick={() => handleEdit("usuario", user)}>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleEdit("usuario", user)}
+                              >
                                 <Edit className="h-4 w-4" />
                               </Button>
-                              <Button variant="ghost" size="sm" onClick={() => handleToggleStatus("usuario", user)}>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() =>
+                                  handleToggleStatus("usuario", user)
+                                }
+                              >
                                 <Trash2 className="h-4 w-4" />
                               </Button>
                             </div>
@@ -1138,5 +1467,5 @@ export default function AdminPage() {
         {renderDialog()}
       </div>
     </AppLayout>
-  )
+  );
 }

@@ -26,7 +26,7 @@ export async function GET() {
       address: r.DIRECCION1 ?? null,
       phone: r.TELEFONO1 ?? null,
       email: r.E_MAIL ?? null,
-      isActive: (r.DESCATALOGADO ?? "F").toString().toUpperCase() !== "T",
+      is_active: (r.DESCATALOGADO ?? "F").toString().toUpperCase() !== "T",
     }));
 
     return NextResponse.json(out);
@@ -49,7 +49,9 @@ export async function POST(req: Request) {
     const email = (body?.email ?? "").toString().trim() || null;
 
     if (!nombre) {
-      return new NextResponse("El campo nombre es obligatorio", { status: 400 });
+      return new NextResponse("El campo nombre es obligatorio", {
+        status: 400,
+      });
     }
 
     // Generamos CODCLIENTE (MAX+1). Si prefieres exigirlo desde el front, quita este bloque.
@@ -137,7 +139,7 @@ export async function POST(req: Request) {
       address: r.DIRECCION1 ?? null,
       phone: r.TELEFONO1 ?? null,
       email: r.E_MAIL ?? null,
-      isActive: (r.DESCATALOGADO ?? "F").toString().toUpperCase() !== "T",
+      is_active: (r.DESCATALOGADO ?? "F").toString().toUpperCase() !== "T",
     };
 
     // Tu página espera el objeto completo:

@@ -1,5 +1,15 @@
 // Mock data for development and testing
-import type { Client, Product, Truck, Order, Delivery, Destination, ProductFormat, User, Driver } from "./types"
+import type {
+  Client,
+  Product,
+  Truck,
+  Order,
+  Delivery,
+  Destination,
+  ProductFormat,
+  User,
+  Driver,
+} from "./types";
 
 export const mockClients: Client[] = [
   {
@@ -9,7 +19,7 @@ export const mockClients: Client[] = [
     address: "Av. Construcción 123, Ciudad",
     phone: "555-0101",
     email: "contacto@abc.com",
-    isActive: true,
+    is_active: true,
     createdAt: new Date("2024-01-15"),
     updatedAt: new Date("2024-01-15"),
   },
@@ -20,7 +30,7 @@ export const mockClients: Client[] = [
     address: "Calle Norte 456, Ciudad",
     phone: "555-0202",
     email: "ventas@norte.com",
-    isActive: true,
+    is_active: true,
     createdAt: new Date("2024-01-20"),
     updatedAt: new Date("2024-01-20"),
   },
@@ -31,11 +41,11 @@ export const mockClients: Client[] = [
     address: "Blvd. Proyectos 789, Ciudad",
     phone: "555-0303",
     email: "info@obras.com",
-    isActive: true,
+    is_active: true,
     createdAt: new Date("2024-01-25"),
     updatedAt: new Date("2024-01-25"),
   },
-]
+];
 
 export const mockProducts: Product[] = [
   {
@@ -43,7 +53,7 @@ export const mockProducts: Product[] = [
     codigo: "ARE-001",
     nombre: "Arena",
     description: "Arena de río para construcción",
-    isActive: true,
+    is_active: true,
     createdAt: new Date("2024-01-10"),
     updatedAt: new Date("2024-01-10"),
   },
@@ -52,7 +62,7 @@ export const mockProducts: Product[] = [
     codigo: "GRA-001",
     nombre: "Grava",
     description: 'Grava triturada 3/4"',
-    isActive: true,
+    is_active: true,
     createdAt: new Date("2024-01-10"),
     updatedAt: new Date("2024-01-10"),
   },
@@ -61,7 +71,7 @@ export const mockProducts: Product[] = [
     codigo: "PIE-001",
     nombre: "Piedra",
     description: "Piedra braza para construcción",
-    isActive: true,
+    is_active: true,
     createdAt: new Date("2024-01-10"),
     updatedAt: new Date("2024-01-10"),
   },
@@ -70,11 +80,11 @@ export const mockProducts: Product[] = [
     codigo: "TEP-001",
     nombre: "Tepetate",
     description: "Tepetate para relleno",
-    isActive: true,
+    is_active: true,
     createdAt: new Date("2024-01-10"),
     updatedAt: new Date("2024-01-10"),
   },
-]
+];
 
 export const mockTrucks: Truck[] = [
   {
@@ -83,7 +93,7 @@ export const mockTrucks: Truck[] = [
     brand: "Kenworth",
     model: "T800",
     capacity: 15.0,
-    isActive: true,
+    is_active: true,
     createdAt: new Date("2024-01-05"),
     updatedAt: new Date("2024-01-05"),
   },
@@ -93,7 +103,7 @@ export const mockTrucks: Truck[] = [
     brand: "Freightliner",
     model: "Cascadia",
     capacity: 18.0,
-    isActive: true,
+    is_active: true,
     createdAt: new Date("2024-01-05"),
     updatedAt: new Date("2024-01-05"),
   },
@@ -103,7 +113,7 @@ export const mockTrucks: Truck[] = [
     brand: "Volvo",
     model: "VNL",
     capacity: 20.0,
-    isActive: true,
+    is_active: true,
     createdAt: new Date("2024-01-05"),
     updatedAt: new Date("2024-01-05"),
   },
@@ -113,11 +123,11 @@ export const mockTrucks: Truck[] = [
     brand: "Mack",
     model: "Anthem",
     capacity: 16.0,
-    isActive: true,
+    is_active: true,
     createdAt: new Date("2024-01-05"),
     updatedAt: new Date("2024-01-05"),
   },
-]
+];
 
 export const mockProductFormats: ProductFormat[] = [
   {
@@ -164,7 +174,7 @@ export const mockProductFormats: ProductFormat[] = [
     createdAt: new Date(),
     updatedAt: new Date(),
   },
-]
+];
 
 export const mockDestinations: Destination[] = [
   {
@@ -172,7 +182,7 @@ export const mockDestinations: Destination[] = [
     clientId: "1",
     nombre: "Obra Av. Norte",
     direccion: "Av. Norte, Caracas",
-    isActive: true,
+    is_active: true,
     createdAt: new Date(),
     updatedAt: new Date(),
   },
@@ -181,7 +191,7 @@ export const mockDestinations: Destination[] = [
     clientId: "1",
     nombre: "Proyecto Residencial",
     direccion: "Urb. Los Palos Grandes",
-    isActive: true,
+    is_active: true,
     createdAt: new Date(),
     updatedAt: new Date(),
   },
@@ -190,12 +200,11 @@ export const mockDestinations: Destination[] = [
     clientId: "2",
     nombre: "Puente Autopista",
     direccion: "Autopista Regional",
-    isActive: true,
+    is_active: true,
     createdAt: new Date(),
     updatedAt: new Date(),
   },
-]
-
+];
 
 export const mockUsers: User[] = [
   {
@@ -203,7 +212,7 @@ export const mockUsers: User[] = [
     email: "cajero@cantera.com",
     name: "María González",
     role: "CASHIER",
-    isActive: true,
+    is_active: true,
     createdAt: new Date(),
     updatedAt: new Date(),
   },
@@ -212,7 +221,7 @@ export const mockUsers: User[] = [
     email: "patio@cantera.com",
     name: "Juan Pérez",
     role: "YARD",
-    isActive: true,
+    is_active: true,
     createdAt: new Date(),
     updatedAt: new Date(),
   },
@@ -221,7 +230,7 @@ export const mockUsers: User[] = [
     email: "seguridad@cantera.com",
     name: "Carlos López",
     role: "SECURITY",
-    isActive: true,
+    is_active: true,
     createdAt: new Date(),
     updatedAt: new Date(),
   },
@@ -230,7 +239,7 @@ export const mockUsers: User[] = [
     email: "admin@cantera.com",
     name: "Ana Martínez",
     role: "ADMIN",
-    isActive: true,
+    is_active: true,
     createdAt: new Date(),
     updatedAt: new Date(),
   },
@@ -239,7 +248,7 @@ export const mockUsers: User[] = [
     email: "reportes@cantera.com",
     name: "Luis Rodríguez",
     role: "REPORTS",
-    isActive: true,
+    is_active: true,
     createdAt: new Date(),
     updatedAt: new Date(),
   },
@@ -270,7 +279,7 @@ export const mockOrders: Order[] = [
     createdAt: new Date("2024-01-30T10:30:00"),
     updatedAt: new Date("2024-01-30T11:00:00"),
   },
-]
+];
 
 export const mockDrivers: Driver[] = [
   {
@@ -278,7 +287,7 @@ export const mockDrivers: Driver[] = [
     nombre: "Juan Pérez",
     docId: "V-12345678",
     phone: "+58-414-1234567",
-    isActive: true,
+    is_active: true,
     createdAt: new Date(),
     updatedAt: new Date(),
   },
@@ -287,7 +296,7 @@ export const mockDrivers: Driver[] = [
     nombre: "Carlos Rodriguez",
     docId: "V-87654321",
     phone: "+58-412-7654321",
-    isActive: true,
+    is_active: true,
     createdAt: new Date(),
     updatedAt: new Date(),
   },
@@ -319,4 +328,4 @@ export const mockDeliveries: Delivery[] = [
     createdAt: new Date("2024-01-30T10:30:00"),
     updatedAt: new Date("2024-01-30T11:00:00"),
   },
-]
+];

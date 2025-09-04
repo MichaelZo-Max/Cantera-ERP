@@ -28,12 +28,15 @@ async function fetchCustomerById(id: number) {
     address: r.DIRECCION1 ?? null,
     phone: r.TELEFONO1 ?? null,
     email: r.E_MAIL ?? null,
-    isActive: (r.DESCATALOGADO ?? "F").toString().toUpperCase() !== "T",
+    is_active: (r.DESCATALOGADO ?? "F").toString().toUpperCase() !== "T",
   };
 }
 
 // ---------- PATCH: actualizar datos y/o cambiar estado (toggle) ----------
-export async function PATCH(req: Request, { params }: { params: { id: string } }) {
+export async function PATCH(
+  req: Request,
+  { params }: { params: { id: string } }
+) {
   try {
     const id = parseInt(params.id, 10);
     if (Number.isNaN(id)) {
@@ -43,20 +46,24 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     const body = await req.json().catch(() => ({}));
 
     // La página manda el mismo objeto Client + is_active cuando hace toggle:
-    // { ...customer, is_active: !isActive }
-    const nombre = body?.nombre !== undefined ? String(body.nombre).trim() : undefined;
+    // { ...customer, is_active: !is_active }
+    const nombre =
+      body?.nombre !== undefined ? String(body.nombre).trim() : undefined;
     const rif = body?.rif !== undefined ? String(body.rif).trim() : undefined;
-    const address = body?.address !== undefined ? String(body.address).trim() : undefined;
-    const phone = body?.phone !== undefined ? String(body.phone).trim() : undefined;
-    const email = body?.email !== undefined ? String(body.email).trim() : undefined;
+    const address =
+      body?.address !== undefined ? String(body.address).trim() : undefined;
+    const phone =
+      body?.phone !== undefined ? String(body.phone).trim() : undefined;
+    const email =
+      body?.email !== undefined ? String(body.email).trim() : undefined;
 
     // is_active (boolean) → DESCATALOGADO 'F'/'T'
     let descatalogadoValue: "F" | "T" | undefined = undefined;
     if (typeof body?.is_active === "boolean") {
       descatalogadoValue = body.is_active ? "F" : "T";
-    } else if (typeof body?.isActive === "boolean") {
-      // por si viene como isActive
-      descatalogadoValue = body.isActive ? "F" : "T";
+    } else if (typeof body?.is_active === "boolean") {
+      // por si viene como is_active
+      descatalogadoValue = body.is_active ? "F" : "T";
     }
 
     // Construimos UPDATE dinámico solo con lo que venga definido
@@ -121,7 +128,8 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     if (sets.length === 0) {
       // nada que actualizar → devolvemos el registro actual
       const current = await fetchCustomerById(id);
-      if (!current) return new NextResponse("Cliente no encontrado", { status: 404 });
+      if (!current)
+        return new NextResponse("Cliente no encontrado", { status: 404 });
       return NextResponse.json(current);
     }
 
@@ -153,7 +161,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
       address: r.DIRECCION1 ?? null,
       phone: r.TELEFONO1 ?? null,
       email: r.E_MAIL ?? null,
-      isActive: (r.DESCATALOGADO ?? "F").toString().toUpperCase() !== "T",
+      is_active: (r.DESCATALOGADO ?? "F").toString().toUpperCase() !== "T",
     };
 
     return NextResponse.json(updated);

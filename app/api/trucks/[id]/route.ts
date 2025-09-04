@@ -8,8 +8,14 @@ import { executeQuery, TYPES } from '@/lib/db';
  */
 export async function GET(request: Request, { params }: { params: { id: string } }) {
   try {
+    const id = parseInt(params.id, 10);
+    if (isNaN(id)) {
+        return new NextResponse('ID de camión inválido', { status: 400 });
+    }
+    
     const query = "SELECT * FROM RIP.APP_CAMIONES WHERE id = @id";
-    const result = await executeQuery(query, [{ name: 'id', type: TYPES.Int, value: params.id }]);
+    const result = await executeQuery(query, [{ name: 'id', type: TYPES.Int, value: id }]);
+    
     if (result.length === 0) {
       return new NextResponse('Camión no encontrado', { status: 404 });
     }
@@ -22,35 +28,58 @@ export async function GET(request: Request, { params }: { params: { id: string }
 
 /**
  * @route PATCH /api/trucks/[id]
- * @desc Actualizar un camión
+ * @desc Actualizar un camión de forma dinámica (solo los campos enviados)
  */
 export async function PATCH(request: Request, { params }: { params: { id: string } }) {
     try {
+        const id = parseInt(params.id, 10);
+        if (isNaN(id)) {
+            return new NextResponse('ID de camión inválido', { status: 400 });
+        }
+
         const body = await request.json();
-        const { placa, brand, model, capacity, driver_name, is_active } = body;
+        
+        const updates: string[] = [];
+        const queryParams: any[] = [{ name: 'id', type: TYPES.Int, value: id }];
+
+        // Construir la consulta dinámicamente
+        if (body.placa !== undefined) {
+            updates.push("placa = @placa");
+            queryParams.push({ name: 'placa', type: TYPES.NVarChar, value: body.placa });
+        }
+        if (body.brand !== undefined) {
+            updates.push("brand = @brand");
+            queryParams.push({ name: 'brand', type: TYPES.NVarChar, value: body.brand });
+        }
+        if (body.model !== undefined) {
+            updates.push("model = @model");
+            queryParams.push({ name: 'model', type: TYPES.NVarChar, value: body.model });
+        }
+        if (body.capacity !== undefined) {
+            updates.push("capacity = @capacity");
+            queryParams.push({ name: 'capacity', type: TYPES.Decimal, value: body.capacity });
+        }
+        if (body.driver_name !== undefined) {
+            updates.push("driver_name = @driver_name");
+            queryParams.push({ name: 'driver_name', type: TYPES.NVarChar, value: body.driver_name });
+        }
+        if (body.is_active !== undefined) {
+            updates.push("is_active = @is_active");
+            queryParams.push({ name: 'is_active', type: TYPES.Bit, value: body.is_active });
+        }
+
+        if (updates.length === 0) {
+            return new NextResponse('No hay campos para actualizar', { status: 400 });
+        }
+
+        updates.push("updated_at = GETDATE()");
 
         const query = `
             UPDATE RIP.APP_CAMIONES
-            SET 
-                placa = @placa, 
-                brand = @brand, 
-                model = @model, 
-                capacity = @capacity, 
-                driver_name = @driver_name,
-                is_active = @is_active,
-                updated_at = GETDATE()
+            SET ${updates.join(', ')}
             OUTPUT INSERTED.*
             WHERE id = @id;
         `;
-        const queryParams = [
-            { name: 'id', type: TYPES.Int, value: params.id },
-            { name: 'placa', type: TYPES.NVarChar, value: placa },
-            { name: 'brand', type: TYPES.NVarChar, value: brand },
-            { name: 'model', type: TYPES.NVarChar, value: model },
-            { name: 'capacity', type: TYPES.Decimal, value: capacity },
-            { name: 'driver_name', type: TYPES.NVarChar, value: driver_name },
-            { name: 'is_active', type: TYPES.Bit, value: is_active }
-        ];
 
         const result = await executeQuery(query, queryParams);
         if (result.length === 0) {
@@ -69,43 +98,20 @@ export async function PATCH(request: Request, { params }: { params: { id: string
  */
 export async function DELETE(request: Request, { params }: { params: { id: string } }) {
     try {
+        const id = parseInt(params.id, 10);
+        if (isNaN(id)) {
+            return new NextResponse('ID de camión inválido', { status: 400 });
+        }
+
         const query = `
             UPDATE RIP.APP_CAMIONES
             SET is_active = 0, updated_at = GETDATE()
             WHERE id = @id;
         `;
-        await executeQuery(query, [{ name: 'id', type: TYPES.Int, value: params.id }]);
+        await executeQuery(query, [{ name: 'id', type: TYPES.Int, value: id }]);
         return NextResponse.json({ message: 'Camión desactivado correctamente' });
     } catch (error) {
         console.error('[API_TRUCKS_DELETE]', error);
         return new NextResponse('Error al desactivar el camión', { status: 500 });
     }
-}
-
-// app/api/trucks/[id]/route.ts (añadir PUT)
-export async function PUT(request: Request, { params }: { params: { id: string } }) {
-  try {
-    const body = await request.json();
-    const { placa, brand, model, capacity, driver_name } = body;
-
-    const query = `
-      UPDATE RIP.APP_CAMIONES
-      SET placa = @placa, brand = @brand, model = @model,
-          capacity = @capacity, driver_name = @driver_name, updated_at = GETDATE()
-      WHERE id = @id;
-    `;
-    const p = [
-      { name: 'id', type: TYPES.Int, value: parseInt(params.id, 10) },
-      { name: 'placa', type: TYPES.NVarChar, value: placa },
-      { name: 'brand', type: TYPES.NVarChar, value: brand ?? null },
-      { name: 'model', type: TYPES.NVarChar, value: model ?? null },
-      { name: 'capacity', type: TYPES.Decimal, value: capacity ?? 0, options: { precision: 18, scale: 2 } },
-      { name: 'driver_name', type: TYPES.NVarChar, value: driver_name ?? null },
-    ];
-    await executeQuery(query, p);
-    return NextResponse.json({ message: 'Camión actualizado' });
-  } catch (error) {
-    console.error('[API_TRUCKS_PUT]', error);
-    return new NextResponse('Error al actualizar el camión', { status: 500 });
-  }
 }
