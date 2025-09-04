@@ -45,7 +45,7 @@ import { toast } from "sonner";
 
 export default function DestinationsPage() {
   const [destinations, setDestinations] = useState<Destination[]>([]);
-  const [clients, setClients] = useState<Client[]>([]);
+  const [clients, setClients] = useState<Client[]>([]); // Aún lo necesitamos para el formulario de creación/edición
   const [loading, setLoading] = useState(true);
   const [apiError, setApiError] = useState<string | null>(null);
 
@@ -63,6 +63,7 @@ export default function DestinationsPage() {
     const loadData = async () => {
       try {
         setLoading(true);
+        // Hacemos ambas llamadas en paralelo para eficiencia
         const [destRes, clientRes] = await Promise.all([
           fetch("/api/destinations", { cache: "no-store" }),
           fetch("/api/customers", { cache: "no-store" }),
@@ -72,7 +73,7 @@ export default function DestinationsPage() {
         if (!clientRes.ok) throw new Error(await clientRes.text());
 
         setDestinations(await destRes.json());
-        setClients(await clientRes.json());
+        setClients(await clientRes.json()); // Guardamos los clientes para el dropdown del modal
       } catch (e: any) {
         setApiError(e?.message ?? "Error al cargar los datos");
         toast.error("Error al cargar datos", { description: e.message });
@@ -84,11 +85,12 @@ export default function DestinationsPage() {
   }, []);
 
   const filteredDestinations = destinations.filter((dest) => {
-    const client = clients.find((c) => c.id === dest.clientId);
+    // ✨ CAMBIO: Ahora buscamos directamente en el objeto anidado.
+    const clientName = dest.client?.nombre?.toLowerCase() ?? "";
     return (
       dest.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      client?.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      dest.direccion?.toLowerCase().includes(searchTerm.toLowerCase())
+      clientName.includes(searchTerm.toLowerCase()) ||
+      (dest.direccion && dest.direccion.toLowerCase().includes(searchTerm.toLowerCase()))
     );
   });
 
@@ -122,7 +124,6 @@ export default function DestinationsPage() {
     
     const body = {
       ...formData,
-      customer_id: formData.clientId // Aseguramos el nombre correcto para la API
     };
 
     try {
@@ -179,6 +180,9 @@ export default function DestinationsPage() {
 
       if (!res.ok) throw new Error(await res.text());
       const updatedItem = await res.json();
+      
+      // Para mantener el nombre del cliente, lo copiamos del item original
+      updatedItem.client = destination.client;
       
       setDestinations(destinations.map(d => d.id === updatedItem.id ? updatedItem : d));
       toast.success(`Destino ${!isActive ? "activado" : "desactivado"} con éxito.`);
@@ -243,7 +247,6 @@ export default function DestinationsPage() {
             </div>
           ) : (
             filteredDestinations.map((destination) => {
-              const client = clients.find(c => c.id === destination.clientId);
               return (
                 <Card
                   key={destination.id}
@@ -257,7 +260,8 @@ export default function DestinationsPage() {
                         </CardTitle>
                         <p className="text-sm text-muted-foreground mt-1 flex items-center gap-2">
                           <Users className="h-4 w-4" />
-                          {client?.nombre || 'Cliente no encontrado'}
+                          {/* ✨ CORRECCIÓN: Se lee directamente del objeto */}
+                          {destination.client?.nombre || 'Cliente no encontrado'}
                         </p>
                       </div>
                       <Badge

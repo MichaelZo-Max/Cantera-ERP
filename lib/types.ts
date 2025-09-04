@@ -45,6 +45,9 @@ export interface Client {
 export interface Destination {
   id: string;
   clientId: string;
+  client?: {
+    nombre: string | null;
+  };
   nombre: string;
   direccion?: string;
   is_active: boolean;
