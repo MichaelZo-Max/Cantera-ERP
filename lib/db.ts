@@ -1,12 +1,17 @@
-// Archivo: lib/db.ts (versión corregida)
+// lib/db.ts
 import { Connection, Request, TYPES } from "tedious";
 
-// Quitamos la importación de 'ConnectionConfig' y 'ColumnValue' que ya no se exportan así.
+export type DBParam = {
+  name: string;
+  type: any; // antes: TediousType
+  value: any;
+  options?: { precision?: number; scale?: number; length?: number };
+};
 
-const config = { // <-- Eliminamos el tipo explícito :ConnectionConfig
+const config = {
   server: process.env.DB_SERVER || 'localhost',
   authentication: {
-    type: 'default' as const, // Añadimos 'as const' para mayor seguridad de tipo
+    type: 'default' as const,
     options: {
       userName: process.env.DB_USER || 'sa',
       password: process.env.DB_PASSWORD || '1234',
@@ -14,12 +19,12 @@ const config = { // <-- Eliminamos el tipo explícito :ConnectionConfig
   },
   options: {
     database: process.env.DB_DATABASE || 'CANTERA',
-    encrypt: true,
     trustServerCertificate: true,
+    encrypt: false,
   },
 };
 
-export async function executeQuery(query: string, params: { name: string, type: any, value: any }[] = []): Promise<any[]> {
+export async function executeQuery<T = any>(query: string, params: DBParam[] = []): Promise<T[]> {
   return new Promise((resolve, reject) => {
     const connection = new Connection(config);
 
@@ -30,7 +35,6 @@ export async function executeQuery(query: string, params: { name: string, type: 
       }
 
       const results: any[] = [];
-
       const request = new Request(query, (err) => {
         connection.close();
         if (err) {
@@ -40,17 +44,34 @@ export async function executeQuery(query: string, params: { name: string, type: 
         resolve(results);
       });
 
-      // Aquí cambiamos el tipo de 'columns' a 'any[]' para evitar el error.
-      // La lógica interna sigue siendo segura.
       request.on('row', (columns: any[]) => {
-        const row: { [key: string]: any } = {};
-        columns.forEach(column => {
-          row[column.metadata.colName] = column.value;
+        const row: Record<string, any> = {};
+        columns.forEach((c: any) => {
+          row[String(c.metadata.colName)] = c.value;
         });
         results.push(row);
       });
 
-      params.forEach(p => request.addParameter(p.name, p.type, p.value));
+      for (const p of params) {
+        if (p.type === TYPES.Decimal || p.type === TYPES.Numeric) {
+          request.addParameter(
+            p.name, p.type, p.value,
+            { precision: p.options?.precision ?? 18, scale: p.options?.scale ?? 2 }
+          );
+        } else if (p.type === TYPES.NVarChar || p.type === TYPES.VarChar) {
+          const len = p.options?.length ?? (
+            typeof p.value === 'string'
+              ? Math.min(4000, Math.max(1, p.value.length))
+              : 255
+          );
+          request.addParameter(
+            p.name, p.type, p.value,
+            { length: len }
+          );
+        } else {
+          request.addParameter(p.name, p.type, p.value);
+        }
+      }
 
       connection.execSql(request);
     });
@@ -59,5 +80,4 @@ export async function executeQuery(query: string, params: { name: string, type: 
   });
 }
 
-// Exportamos TYPES para poder usarlo en otros archivos (como el de login)
 export { TYPES };

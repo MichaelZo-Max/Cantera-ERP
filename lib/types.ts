@@ -1,7 +1,6 @@
 // lib/types.ts
 
-// Core enums and types for Cantera ERP system
-export type UnitBase = "M3" | "TON" | "BOLSA" | "UNIDAD"
+export type UnitBase = "M3" | "TON" | "SACO" | "UNIDAD";
 
 export type UserRole = "CASHIER" | "YARD" | "SECURITY" | "ADMIN" | "REPORTS"
 

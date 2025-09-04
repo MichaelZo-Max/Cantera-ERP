@@ -1,83 +1,164 @@
 // app/api/customers/[id]/route.ts
-import { NextResponse } from 'next/server';
-import { executeQuery, TYPES } from '@/lib/db';
+import { NextResponse } from "next/server";
+import { executeQuery, TYPES } from "@/lib/db";
 
-/**
- * @route   GET /api/customers/[id]
- * @desc    Obtener un cliente por ID
- */
-export async function GET(request: Request, { params }: { params: { id: string } }) {
-    try {
-        const query = "SELECT * FROM RIP.VW_APP_CLIENTES WHERE id = @id";
-        const result = await executeQuery(query, [{ name: 'id', type: TYPES.Int, value: params.id }]);
-        if (result.length === 0) {
-            return new NextResponse('Cliente no encontrado', { status: 404 });
-        }
-        return NextResponse.json(result[0]);
-    } catch (error) {
-        console.error('[API_CUSTOMERS_GET_BY_ID]', error);
-        return new NextResponse('Error al obtener el cliente', { status: 500 });
-    }
+// Utilidad para traer un cliente y mapearlo como lo espera el front
+async function fetchCustomerById(id: number) {
+  const rows = await executeQuery<any>(
+    `
+    SELECT
+      CODCLIENTE,
+      NOMBRECLIENTE,
+      NIF20,
+      DIRECCION1,
+      TELEFONO1,
+      E_MAIL,
+      DESCATALOGADO
+    FROM dbo.CLIENTES
+    WHERE CODCLIENTE = @id;
+  `,
+    [{ name: "id", type: TYPES.Int, value: id }]
+  );
+  const r = rows[0];
+  if (!r) return null;
+  return {
+    id: r.CODCLIENTE,
+    nombre: r.NOMBRECLIENTE ?? "",
+    rif: r.NIF20 ?? null,
+    address: r.DIRECCION1 ?? null,
+    phone: r.TELEFONO1 ?? null,
+    email: r.E_MAIL ?? null,
+    isActive: (r.DESCATALOGADO ?? "F").toString().toUpperCase() !== "T",
+  };
 }
 
-/**
- * @route   PATCH /api/customers/[id]
- * @desc    Actualizar un cliente
- */
-export async function PATCH(request: Request, { params }: { params: { id: string } }) {
-    try {
-        const body = await request.json();
-        const { nombre, rif, address, phone, email, is_active } = body;
-
-        const query = `
-            UPDATE dbo.CLIENTES
-            SET
-                NOMBRECLIENTE = @nombre,
-                NIF20 = @rif,
-                DIRECCION1 = @address,
-                TELEFONO1 = @phone,
-                E_MAIL = @email,
-                DESCATALOGADO = @is_active
-            OUTPUT INSERTED.CODCLIENTE as id, INSERTED.NOMBRECLIENTE as nombre, INSERTED.NIF20 as rif, INSERTED.DIRECCION1 as address, INSERTED.TELEFONO1 as phone, INSERTED.E_MAIL as email, IIF(INSERTED.DESCATALOGADO = 'F', 1, 0) as isActive
-            WHERE CODCLIENTE = @id;
-        `;
-        const queryParams = [
-            { name: 'id', type: TYPES.Int, value: params.id },
-            { name: 'nombre', type: TYPES.NVarChar, value: nombre },
-            { name: 'rif', type: TYPES.NVarChar, value: rif },
-            { name: 'address', type: TYPES.NVarChar, value: address },
-            { name: 'phone', type: TYPES.NVarChar, value: phone },
-            { name: 'email', type: TYPES.NVarChar, value: email },
-            { name: 'is_active', type: TYPES.Char, value: is_active ? 'F' : 'T' }
-        ];
-
-        const result = await executeQuery(query, queryParams);
-        if (result.length === 0) {
-            return new NextResponse('Cliente no encontrado para actualizar', { status: 404 });
-        }
-        return NextResponse.json(result[0]);
-    } catch (error) {
-        console.error('[API_CUSTOMERS_PATCH]', error);
-        return new NextResponse('Error al actualizar el cliente', { status: 500 });
+// ---------- PATCH: actualizar datos y/o cambiar estado (toggle) ----------
+export async function PATCH(req: Request, { params }: { params: { id: string } }) {
+  try {
+    const id = parseInt(params.id, 10);
+    if (Number.isNaN(id)) {
+      return new NextResponse("ID inválido", { status: 400 });
     }
-}
 
+    const body = await req.json().catch(() => ({}));
 
-/**
- * @route   DELETE /api/customers/[id]
- * @desc    Desactivar un cliente
- */
-export async function DELETE(request: Request, { params }: { params: { id: string } }) {
-    try {
-        const query = `
-            UPDATE dbo.CLIENTES
-            SET DESCATALOGADO = 'T'
-            WHERE CODCLIENTE = @id;
-        `;
-        await executeQuery(query, [{ name: 'id', type: TYPES.Int, value: params.id }]);
-        return NextResponse.json({ message: 'Cliente desactivado correctamente' });
-    } catch (error) {
-        console.error('[API_CUSTOMERS_DELETE]', error);
-        return new NextResponse('Error al desactivar el cliente', { status: 500 });
+    // La página manda el mismo objeto Client + is_active cuando hace toggle:
+    // { ...customer, is_active: !isActive }
+    const nombre = body?.nombre !== undefined ? String(body.nombre).trim() : undefined;
+    const rif = body?.rif !== undefined ? String(body.rif).trim() : undefined;
+    const address = body?.address !== undefined ? String(body.address).trim() : undefined;
+    const phone = body?.phone !== undefined ? String(body.phone).trim() : undefined;
+    const email = body?.email !== undefined ? String(body.email).trim() : undefined;
+
+    // is_active (boolean) → DESCATALOGADO 'F'/'T'
+    let descatalogadoValue: "F" | "T" | undefined = undefined;
+    if (typeof body?.is_active === "boolean") {
+      descatalogadoValue = body.is_active ? "F" : "T";
+    } else if (typeof body?.isActive === "boolean") {
+      // por si viene como isActive
+      descatalogadoValue = body.isActive ? "F" : "T";
     }
+
+    // Construimos UPDATE dinámico solo con lo que venga definido
+    const sets: string[] = [];
+    const paramsArr: any[] = [{ name: "id", type: TYPES.Int, value: id }];
+
+    if (nombre !== undefined) {
+      sets.push("NOMBRECLIENTE = @nombreCliente");
+      paramsArr.push({
+        name: "nombreCliente",
+        type: TYPES.NVarChar,
+        value: nombre || null,
+        options: { length: 200 },
+      });
+    }
+    if (rif !== undefined) {
+      sets.push("NIF20 = @nif20");
+      paramsArr.push({
+        name: "nif20",
+        type: TYPES.NVarChar,
+        value: rif || null,
+        options: { length: 20 },
+      });
+    }
+    if (address !== undefined) {
+      sets.push("DIRECCION1 = @direccion1");
+      paramsArr.push({
+        name: "direccion1",
+        type: TYPES.NVarChar,
+        value: address || null,
+        options: { length: 400 },
+      });
+    }
+    if (phone !== undefined) {
+      sets.push("TELEFONO1 = @telefono1");
+      paramsArr.push({
+        name: "telefono1",
+        type: TYPES.NVarChar,
+        value: phone || null,
+        options: { length: 50 },
+      });
+    }
+    if (email !== undefined) {
+      sets.push("E_MAIL = @e_mail");
+      paramsArr.push({
+        name: "e_mail",
+        type: TYPES.NVarChar,
+        value: email || null,
+        options: { length: 120 },
+      });
+    }
+    if (descatalogadoValue !== undefined) {
+      sets.push("DESCATALOGADO = @descatalogado");
+      paramsArr.push({
+        name: "descatalogado",
+        type: TYPES.NVarChar,
+        value: descatalogadoValue,
+        options: { length: 1 },
+      });
+    }
+
+    if (sets.length === 0) {
+      // nada que actualizar → devolvemos el registro actual
+      const current = await fetchCustomerById(id);
+      if (!current) return new NextResponse("Cliente no encontrado", { status: 404 });
+      return NextResponse.json(current);
+    }
+
+    const sql = `
+      UPDATE dbo.CLIENTES
+      SET ${sets.join(", ")}
+      WHERE CODCLIENTE = @id;
+
+      SELECT
+        CODCLIENTE,
+        NOMBRECLIENTE,
+        NIF20,
+        DIRECCION1,
+        TELEFONO1,
+        E_MAIL,
+        DESCATALOGADO
+      FROM dbo.CLIENTES
+      WHERE CODCLIENTE = @id;
+    `;
+
+    const rows = await executeQuery<any>(sql, paramsArr);
+    const r = rows[0];
+    if (!r) return new NextResponse("Cliente no encontrado", { status: 404 });
+
+    const updated = {
+      id: r.CODCLIENTE,
+      nombre: r.NOMBRECLIENTE ?? "",
+      rif: r.NIF20 ?? null,
+      address: r.DIRECCION1 ?? null,
+      phone: r.TELEFONO1 ?? null,
+      email: r.E_MAIL ?? null,
+      isActive: (r.DESCATALOGADO ?? "F").toString().toUpperCase() !== "T",
+    };
+
+    return NextResponse.json(updated);
+  } catch (e) {
+    console.error("[API_CUSTOMERS_PATCH]", e);
+    return new NextResponse("Error al actualizar cliente", { status: 500 });
+  }
 }

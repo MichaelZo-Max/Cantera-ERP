@@ -81,3 +81,31 @@ export async function DELETE(request: Request, { params }: { params: { id: strin
         return new NextResponse('Error al desactivar el camión', { status: 500 });
     }
 }
+
+// app/api/trucks/[id]/route.ts (añadir PUT)
+export async function PUT(request: Request, { params }: { params: { id: string } }) {
+  try {
+    const body = await request.json();
+    const { placa, brand, model, capacity, driver_name } = body;
+
+    const query = `
+      UPDATE RIP.APP_CAMIONES
+      SET placa = @placa, brand = @brand, model = @model,
+          capacity = @capacity, driver_name = @driver_name, updated_at = GETDATE()
+      WHERE id = @id;
+    `;
+    const p = [
+      { name: 'id', type: TYPES.Int, value: parseInt(params.id, 10) },
+      { name: 'placa', type: TYPES.NVarChar, value: placa },
+      { name: 'brand', type: TYPES.NVarChar, value: brand ?? null },
+      { name: 'model', type: TYPES.NVarChar, value: model ?? null },
+      { name: 'capacity', type: TYPES.Decimal, value: capacity ?? 0, options: { precision: 18, scale: 2 } },
+      { name: 'driver_name', type: TYPES.NVarChar, value: driver_name ?? null },
+    ];
+    await executeQuery(query, p);
+    return NextResponse.json({ message: 'Camión actualizado' });
+  } catch (error) {
+    console.error('[API_TRUCKS_PUT]', error);
+    return new NextResponse('Error al actualizar el camión', { status: 500 });
+  }
+}

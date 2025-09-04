@@ -11,43 +11,38 @@ import type { CreateOrderForm, Order } from '@/lib/types';
  */
 export async function GET() {
   try {
-    const query = `
+    const q = `
       SELECT
         p.id,
-        p.order_number AS orderNumber,
-        p.status AS estado,
-        p.notes,
-        p.created_at AS createdAt,
-        c.id AS clientId,
-        c.name AS clientName,
+        p.order_number,
+        p.status,
+        p.created_at,
+        c.name AS client_name,
+        d.name AS destino_name,
+        t.placa AS truck_placa,
         ISNULL(SUM(i.quantity * i.price_per_unit), 0) AS total
       FROM RIP.APP_PEDIDOS p
-      LEFT JOIN RIP.VW_APP_CLIENTES c ON p.customer_id = c.id
-      LEFT JOIN RIP.APP_PEDIDOS_ITEMS i ON p.id = i.order_id
-      GROUP BY p.id, p.order_number, p.status, p.notes, p.created_at, c.id, c.name
-      ORDER BY p.created_at DESC;
+      JOIN RIP.VW_APP_CLIENTES c ON c.id = p.customer_id
+      LEFT JOIN RIP.APP_DESTINOS d ON d.id = p.destination_id
+      JOIN RIP.APP_CAMIONES t ON t.id = p.truck_id
+      LEFT JOIN RIP.APP_PEDIDOS_ITEMS i ON i.order_id = p.id
+      GROUP BY p.id, p.order_number, p.status, p.created_at, c.name, d.name, t.placa
+      ORDER BY p.id DESC;
     `;
-
-    const ordersData = await executeQuery(query);
-
-    const populatedOrders: Order[] = ordersData.map((order) => ({
-      id: order.id.toString(),
-      orderNumber: order.orderNumber,
-      estado: order.estado,
-      notes: order.notes,
-      createdAt: order.createdAt,
-      total: parseFloat(order.total),
-      clientId: order.clientId?.toString(),
-      client: {
-        id: order.clientId?.toString(),
-        nombre: order.clientName,
-      },
-    }));
-
-    return NextResponse.json(populatedOrders);
-  } catch (error) {
-    console.error('[API_ORDERS_GET]', error);
-    return new NextResponse('Error al obtener los pedidos', { status: 500 });
+    const rows = await executeQuery(q);
+    return NextResponse.json(rows.map((r: any) => ({
+      id: r.id,
+      orderNumber: r.order_number,
+      estado: r.status,
+      createdAt: r.created_at,
+      total: Number(r.total),
+      client: { nombre: r.client_name },
+      destino: r.destino_name,
+      truck: { placa: r.truck_placa },
+    })));
+  } catch (e) {
+    console.error('[API_ORDERS_GET]', e);
+    return new NextResponse('Error al obtener pedidos', { status: 500 });
   }
 }
 
@@ -59,68 +54,76 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const body: CreateOrderForm = await request.json();
-    // CAMBIO: Se desestructura truckId en lugar de truck
-    const { clientId, items, pago, truckId } = body;
+    const { clientId, destinationId, items, pago, truckId } = body;
 
-    // CAMBIO: Se valida truckId
-    if (!clientId || !items || items.length === 0 || !pago || !truckId) {
+    if (!clientId || !truckId || !items?.length) {
       return new NextResponse("Faltan datos para crear la orden", { status: 400 });
     }
 
-    const orderNumber = generateOrderNumber();
+    // 1) Pedido: NO insertar order_number (es calculado). Usa OUTPUT para recuperar id y order_number.
     const orderQuery = `
-      INSERT INTO RIP.APP_PEDIDOS (order_number, customer_id, truck_id, status, notes, created_by)
-      OUTPUT INSERTED.id
-      VALUES (@orderNumber, @customerId, @truckId, 'PAGADA', @notes, @createdBy);
+      INSERT INTO RIP.APP_PEDIDOS (customer_id, truck_id, destination_id, status, notes, created_by)
+      OUTPUT INSERTED.id, INSERTED.order_number
+      VALUES (@customerId, @truckId, @destinationId, @status, @notes, @createdBy);
     `;
-    
-    // CAMBIO: Ya no se busca el camión, se usa el ID directamente.
     const orderParams = [
-      { name: 'orderNumber', type: TYPES.NVarChar, value: orderNumber },
       { name: 'customerId', type: TYPES.Int, value: parseInt(clientId, 10) },
       { name: 'truckId', type: TYPES.Int, value: parseInt(truckId, 10) },
-      { name: 'notes', type: TYPES.NVarChar, value: pago.ref || null },
-      { name: 'createdBy', type: TYPES.Int, value: 1 } // Temporal
+      { name: 'destinationId', type: TYPES.Int, value: destinationId ? parseInt(destinationId, 10) : null },
+      // Unifica estatus: usa 'CREADA' si así lo quieres en front (o mapea si en DB va 'PENDING')
+      { name: 'status', type: TYPES.NVarChar, value: 'CREADA' },
+      { name: 'notes', type: TYPES.NVarChar, value: pago?.ref ?? null },
+      { name: 'createdBy', type: TYPES.Int, value: 1 }, // TODO: tomar del usuario autenticado
     ];
-    
     const orderResult = await executeQuery(orderQuery, orderParams);
-    const newOrderId = orderResult[0].id;
+    const { id: newOrderId, order_number } = orderResult[0];
 
-    if (!newOrderId) {
-      throw new Error("No se pudo crear el pedido.");
-    }
-
+    // 2) Ítems: usa format_id y deriva product_id desde el formato
     for (const item of items) {
+      const formatId = parseInt(item.productFormatId, 10);
+
       const itemQuery = `
-        INSERT INTO RIP.APP_PEDIDOS_ITEMS (order_id, product_id, quantity, price_per_unit)
-        VALUES (@orderId, @productId, @quantity, @price);
+        INSERT INTO RIP.APP_PEDIDOS_ITEMS (order_id, product_id, format_id, quantity, price_per_unit)
+        SELECT @orderId, pf.product_id, @formatId, @quantity, pf.price_per_unit
+        FROM RIP.APP_PRODUCTOS_FORMATOS pf
+        WHERE pf.id = @formatId;
       `;
       const itemParams = [
         { name: 'orderId', type: TYPES.Int, value: newOrderId },
-        { name: 'productId', type: TYPES.Int, value: parseInt(item.productFormatId, 10) },
-        { name: 'quantity', type: TYPES.Decimal, value: item.cantidadBase },
-        { name: 'price', type: TYPES.Decimal, value: item.pricePerUnit },
+        { name: 'formatId', type: TYPES.Int, value: formatId },
+        { name: 'quantity', type: TYPES.Decimal, value: item.cantidadBase, options: { precision: 18, scale: 2 } },
       ];
       await executeQuery(itemQuery, itemParams);
     }
-    
+
+    // 3) Despacho inicial
     const deliveryQuery = `
-      INSERT INTO RIP.APP_DESPACHOS (order_id, status)
+      INSERT INTO RIP.APP_DESPACHOS (order_id, status, notes)
       OUTPUT INSERTED.id
-      VALUES (@orderId, 'ASIGNADA');
+      VALUES (@orderId, 'ASIGNADA', @notes);
     `;
-    const deliveryParams = [{ name: 'orderId', type: TYPES.Int, value: newOrderId }];
+    const deliveryParams = [
+      { name: 'orderId', type: TYPES.Int, value: newOrderId },
+      { name: 'notes', type: TYPES.NVarChar, value: pago?.ref ?? null },
+    ];
     const deliveryResult = await executeQuery(deliveryQuery, deliveryParams);
     const newDeliveryId = deliveryResult[0].id;
 
-    return NextResponse.json({ 
-        message: "Pedido y despacho creados exitosamente",
-        order: { id: newOrderId, orderNumber: orderNumber },
-        delivery: { id: newDeliveryId }
+    // 4) Total del pedido (opcional para la respuesta)
+    const totalQuery = `
+      SELECT SUM(quantity * price_per_unit) AS total
+      FROM RIP.APP_PEDIDOS_ITEMS WHERE order_id = @orderId;
+    `;
+    const total = (await executeQuery(totalQuery, [{ name: 'orderId', type: TYPES.Int, value: newOrderId }]))[0]?.total ?? 0;
+
+    return NextResponse.json({
+      message: "Pedido y despacho creados exitosamente",
+      order: { id: newOrderId, orderNumber: order_number, total },
+      delivery: { id: newDeliveryId, status: 'ASIGNADA' }
     }, { status: 201 });
 
   } catch (error) {
     console.error('[API_ORDERS_POST]', error);
-    return new NextResponse('Error interno del servidor al crear el pedido', { status: 500 });
+    return new NextResponse('Error al crear el pedido', { status: 500 });
   }
 }

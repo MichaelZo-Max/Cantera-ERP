@@ -1,37 +1,61 @@
+// app/api/deliveries/[id]/route.ts
 import { NextResponse } from 'next/server';
-import { mockDeliveries } from '@/lib/mock-data';
+import { executeQuery, TYPES } from '@/lib/db';
 
-/**
- * @route   PATCH /api/deliveries/[id]
- * @desc    Actualizar un despacho (para confirmar carga o salida)
- */
 export async function PATCH(request: Request, { params }: { params: { id: string } }) {
-    const index = mockDeliveries.findIndex((d) => d.id === params.id);
-    if (index === -1) {
-        return new NextResponse('Despacho no encontrado', { status: 404 });
-    }
-    
+  try {
+    const id = parseInt(params.id, 10);
+    if (Number.isNaN(id)) return new NextResponse('ID inválido', { status: 400 });
+
     const body = await request.json();
-    const { estado, loadedQuantity, notes } = body;
+    const { estado, loadedQuantity, notes } = body as {
+      estado: 'EN_CARGA' | 'CARGADA' | 'SALIDA_OK' | 'RECHAZADA',
+      loadedQuantity?: number,
+      notes?: string
+    };
 
-    const updatedDelivery = { ...mockDeliveries[index], updatedAt: new Date() };
+    let sql = '';
+    const p: any[] = [{ name: 'id', type: TYPES.Int, value: id }];
 
-    if (estado === 'CARGADA') {
-        updatedDelivery.estado = 'CARGADA';
-        updatedDelivery.loadedQuantity = loadedQuantity;
-        updatedDelivery.loadedAt = new Date();
-        updatedDelivery.loadedBy = 'user-patio-1'; // Simulado
+    if (estado === 'EN_CARGA') {
+      sql = `UPDATE RIP.APP_DESPACHOS
+             SET status='EN_CARGA', updated_at=GETDATE()
+             WHERE id=@id`;
+    } else if (estado === 'CARGADA') {
+      sql = `UPDATE RIP.APP_DESPACHOS
+             SET status='CARGADA',
+                 loaded_quantity=@qty,
+                 loaded_by=1,
+                 loaded_at=GETDATE(),
+                 notes=ISNULL(@notes, notes),
+                 updated_at=GETDATE()
+             WHERE id=@id`;
+      p.push({ name: 'qty', type: TYPES.Decimal, value: loadedQuantity ?? 0, options: { precision: 18, scale: 2 } });
+      p.push({ name: 'notes', type: TYPES.NVarChar, value: notes ?? null });
     } else if (estado === 'SALIDA_OK') {
-        updatedDelivery.estado = 'SALIDA_OK';
-        updatedDelivery.exitedAt = new Date();
-        updatedDelivery.exitedBy = 'user-seguridad-1'; // Simulado
+      sql = `UPDATE RIP.APP_DESPACHOS
+             SET status='SALIDA_OK',
+                 exited_by=1,
+                 exited_at=GETDATE(),
+                 notes=ISNULL(@notes, notes),
+                 updated_at=GETDATE()
+             WHERE id=@id`;
+      p.push({ name: 'notes', type: TYPES.NVarChar, value: notes ?? null });
+    } else if (estado === 'RECHAZADA') {
+      sql = `UPDATE RIP.APP_DESPACHOS
+             SET status='RECHAZADA',
+                 notes=ISNULL(@notes, notes),
+                 updated_at=GETDATE()
+             WHERE id=@id`;
+      p.push({ name: 'notes', type: TYPES.NVarChar, value: notes ?? null });
+    } else {
+      return new NextResponse('Estado inválido', { status: 400 });
     }
 
-    if(notes) {
-        updatedDelivery.notes = notes;
-    }
-
-    mockDeliveries[index] = updatedDelivery;
-
-    return NextResponse.json(updatedDelivery);
+    await executeQuery(sql, p);
+    return NextResponse.json({ id, estado });
+  } catch (e) {
+    console.error('[API_DELIVERIES_PATCH]', e);
+    return new NextResponse('Error al actualizar el despacho', { status: 500 });
+  }
 }
