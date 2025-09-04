@@ -56,3 +56,35 @@ export async function GET(request: Request) {
     return new NextResponse('Error al obtener los formatos del producto', { status: 500 });
   }
 }
+
+export async function POST(request: Request) {
+    try {
+        const body = await request.json();
+        const { product_id, sku, price_per_unit, unit_base, base_unit_factor } = body;
+
+        if (!product_id || !price_per_unit || !unit_base) {
+            return new NextResponse("Producto, precio y unidad base son requeridos", { status: 400 });
+        }
+
+        const query = `
+            INSERT INTO RIP.APP_PRODUCTOS_FORMATOS (product_id, sku, price_per_unit, unit_base, base_unit_factor)
+            OUTPUT INSERTED.*
+            VALUES (@product_id, @sku, @price, @unit_base, @factor);
+        `;
+
+        const params = [
+            { name: 'product_id', type: TYPES.Int, value: product_id },
+            { name: 'sku', type: TYPES.NVarChar, value: sku },
+            { name: 'price', type: TYPES.Decimal, value: price_per_unit },
+            { name: 'unit_base', type: TYPES.NVarChar, value: unit_base },
+            { name: 'factor', type: TYPES.Decimal, value: base_unit_factor ?? 1 },
+        ];
+        
+        const result = await executeQuery(query, params);
+        return NextResponse.json(result[0], { status: 201 });
+
+    } catch (error) {
+        console.error('[API_FORMATS_POST]', error);
+        return new NextResponse('Error al crear el formato', { status: 500 });
+    }
+}

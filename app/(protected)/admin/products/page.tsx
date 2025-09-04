@@ -1,7 +1,7 @@
 "use client";
 
 import type React from "react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { AppLayout } from "@/components/app-layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -25,9 +25,15 @@ import {
   DialogHeader,
   DialogTitle,
   DialogFooter,
-  DialogTrigger,
 } from "@/components/ui/dialog";
-import type { Product } from "@/lib/types";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import type { Product, ProductFormat, UnitBase } from "@/lib/types";
 import {
   Package,
   Plus,
@@ -37,8 +43,265 @@ import {
   CheckCircle,
   Sparkles,
   Save,
+  Layers,
 } from "lucide-react";
 import { toast } from "sonner";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+
+// --- Componente Anidado para el Modal de Formatos ---
+function FormatsDialog({
+  product,
+  open,
+  onOpenChange,
+  onFormatUpdate,
+}: {
+  product: Product | null;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onFormatUpdate: () => void;
+}) {
+  const [formats, setFormats] = useState<ProductFormat[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Estado para el formulario de crear/editar formato
+  const [showFormatForm, setShowFormatForm] = useState(false);
+  const [editingFormat, setEditingFormat] = useState<ProductFormat | null>(
+    null
+  );
+  const [formatData, setFormatData] = useState({
+    sku: "",
+    pricePerUnit: 0,
+    unitBase: "M3" as UnitBase,
+    baseUnitFactor: 1,
+  });
+
+  const fetchFormats = useCallback(async () => {
+    if (product) {
+      setLoading(true);
+      try {
+        const res = await fetch(`/api/product-formats?productId=${product.id}`);
+        if (!res.ok) throw new Error("No se pudieron cargar los formatos");
+        const data = await res.json();
+        setFormats(data);
+      } catch (error) {
+        toast.error("Error al cargar formatos.");
+      } finally {
+        setLoading(false);
+      }
+    }
+  }, [product]);
+
+  useEffect(() => {
+    if (open) {
+      fetchFormats();
+    }
+  }, [open, fetchFormats]);
+
+  const handleNewFormat = () => {
+    setEditingFormat(null);
+    setFormatData({
+      sku: "",
+      pricePerUnit: 0,
+      unitBase: "M3",
+      baseUnitFactor: 1,
+    });
+    setShowFormatForm(true);
+  };
+
+  const handleEditFormat = (format: ProductFormat) => {
+    setEditingFormat(format);
+    setFormatData({
+      sku: format.sku || "",
+      pricePerUnit: format.pricePerUnit || 0,
+      unitBase: format.unidadBase,
+      baseUnitFactor: format.factorUnidadBase,
+    });
+    setShowFormatForm(true);
+  };
+
+  const handleSaveFormat = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+
+    const url = editingFormat
+      ? `/api/product-formats/${editingFormat.id}`
+      : "/api/product-formats";
+    const method = editingFormat ? "PATCH" : "POST";
+
+    // ✨ CORRECCIÓN CLAVE: Transformar el payload para que coincida con la API
+    const payload = {
+      sku: formatData.sku,
+      price_per_unit: formatData.pricePerUnit,
+      unit_base: formatData.unitBase,
+      base_unit_factor: formatData.baseUnitFactor,
+      product_id: product?.id, // Solo necesario para crear
+      is_active: editingFormat ? editingFormat.activo : undefined, // Para editar
+    };
+
+    try {
+      const res = await fetch(url, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) throw new Error(await res.text());
+
+      toast.success(
+        `Formato ${editingFormat ? "actualizado" : "creado"} con éxito.`
+      );
+      setShowFormatForm(false);
+      fetchFormats();
+      onFormatUpdate();
+    } catch (error: any) {
+      toast.error("Error al guardar formato", { description: error.message });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  if (!product) return null;
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-3xl">
+        <DialogHeader>
+          <DialogTitle>Formatos de: {product.nombre}</DialogTitle>
+          <DialogDescription>
+            Gestiona las unidades de venta y precios para este producto.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="py-4">
+          {loading ? (
+            <p>Cargando formatos...</p>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>SKU/Descripción</TableHead>
+                  <TableHead>Unidad</TableHead>
+                  <TableHead>Precio</TableHead>
+                  <TableHead>Estado</TableHead>
+                  <TableHead className="text-right">Acciones</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {formats.map((format) => (
+                  <TableRow key={format.id}>
+                    <TableCell className="font-medium">{format.sku}</TableCell>
+                    <TableCell>{format.unidadBase}</TableCell>
+                    <TableCell>${format.pricePerUnit?.toFixed(2)}</TableCell>
+                    <TableCell>
+                      <Badge variant={format.activo ? "default" : "secondary"}>
+                        {format.activo ? "Activo" : "Inactivo"}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleEditFormat(format)}
+                      >
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            Cerrar
+          </Button>
+          <Button onClick={handleNewFormat}>
+            <Plus className="h-4 w-4 mr-2" />
+            Nuevo Formato
+          </Button>
+        </DialogFooter>
+
+        {/* --- Nested Dialog for Format Form --- */}
+        <Dialog open={showFormatForm} onOpenChange={setShowFormatForm}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>
+                {editingFormat ? "Editar Formato" : "Nuevo Formato"}
+              </DialogTitle>
+            </DialogHeader>
+            <form onSubmit={handleSaveFormat} className="space-y-4 pt-4">
+              <div className="space-y-2">
+                <Label htmlFor="sku">SKU / Descripción</Label>
+                <Input
+                  id="sku"
+                  value={formatData.sku}
+                  onChange={(e) =>
+                    setFormatData({ ...formatData, sku: e.target.value })
+                  }
+                  placeholder="Ej: Arena a Granel (m³)"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="unitBase">Unidad Base</Label>
+                  <Select
+                    value={formatData.unitBase}
+                    onValueChange={(v: UnitBase) =>
+                      setFormatData({ ...formatData, unitBase: v })
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="M3">M3</SelectItem>
+                      <SelectItem value="TON">Tonelada</SelectItem>
+                      <SelectItem value="SACO">Saco</SelectItem>
+                      <SelectItem value="UNIDAD">Unidad</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="pricePerUnit">Precio Unitario</Label>
+                  <Input
+                    id="pricePerUnit"
+                    type="number"
+                    value={formatData.pricePerUnit}
+                    onChange={(e) =>
+                      setFormatData({
+                        ...formatData,
+                        pricePerUnit: parseFloat(e.target.value) || 0,
+                      })
+                    }
+                  />
+                </div>
+              </div>
+              <DialogFooter>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setShowFormatForm(false)}
+                >
+                  Cancelar
+                </Button>
+                <Button type="submit" disabled={isSubmitting}>
+                  {isSubmitting ? "Guardando..." : "Guardar"}
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 export default function ProductsPage() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -46,7 +309,10 @@ export default function ProductsPage() {
   const [apiError, setApiError] = useState<string | null>(null);
 
   const [searchTerm, setSearchTerm] = useState("");
-  const [showDialog, setShowDialog] = useState(false);
+  const [showProductDialog, setShowProductDialog] = useState(false);
+  const [showFormatDialog, setShowFormatDialog] = useState(false);
+  const [selectedProductForFormats, setSelectedProductForFormats] =
+    useState<Product | null>(null);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [formData, setFormData] = useState({
     codigo: "",
@@ -55,39 +321,37 @@ export default function ProductsPage() {
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  const fetchProducts = async () => {
+    try {
+      setLoading(true);
+      const res = await fetch("/api/products", { cache: "no-store" });
+      if (!res.ok) throw new Error(await res.text());
+      setProducts(await res.json());
+    } catch (e: any) {
+      setApiError(e?.message ?? "Error al cargar los productos");
+      toast.error("Error al cargar productos", { description: e.message });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const loadProducts = async () => {
-      try {
-        setLoading(true);
-        const res = await fetch("/api/products", { cache: "no-store" });
-        if (!res.ok) throw new Error(await res.text());
-        setProducts(await res.json());
-      } catch (e: any) {
-        setApiError(e?.message ?? "Error al cargar los productos");
-        toast.error("Error al cargar productos", { description: e.message });
-      } finally {
-        setLoading(false);
-      }
-    };
-    loadProducts();
+    fetchProducts();
   }, []);
 
   const filteredProducts = products.filter(
     (product) =>
       product.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      product.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (product.description &&
+        product.description.toLowerCase().includes(searchTerm.toLowerCase())) ||
       product.codigo.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const handleNewProduct = () => {
     setEditingProduct(null);
-    setFormData({
-      codigo: "",
-      nombre: "",
-      description: "",
-    });
+    setFormData({ codigo: "", nombre: "", description: "" });
     setApiError(null);
-    setShowDialog(true);
+    setShowProductDialog(true);
   };
 
   const handleEditProduct = (product: Product) => {
@@ -98,7 +362,12 @@ export default function ProductsPage() {
       description: product.description || "",
     });
     setApiError(null);
-    setShowDialog(true);
+    setShowProductDialog(true);
+  };
+
+  const handleManageFormats = (product: Product) => {
+    setSelectedProductForFormats(product);
+    setShowFormatDialog(true);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -123,19 +392,11 @@ export default function ProductsPage() {
         throw new Error(errorText || "Error al guardar el producto");
       }
 
-      const savedProduct = await res.json();
-
-      if (editingProduct) {
-        setProducts(
-          products.map((p) => (p.id === savedProduct.id ? savedProduct : p))
-        );
-        toast.success("Producto actualizado exitosamente.");
-      } else {
-        setProducts((prevProducts) => [...prevProducts, savedProduct]);
-        toast.success("Producto creado exitosamente.");
-      }
-
-      setShowDialog(false);
+      await fetchProducts(); // Recarga toda la lista
+      toast.success(
+        editingProduct ? "Producto actualizado" : "Producto creado"
+      );
+      setShowProductDialog(false);
     } catch (err: any) {
       setApiError(err.message);
       toast.error("Error al guardar", { description: err.message });
@@ -145,41 +406,28 @@ export default function ProductsPage() {
   };
 
   const handleToggleStatus = async (product: Product) => {
-    const is_active = product.is_active;
     if (
       !confirm(
         `¿Estás seguro de que quieres ${
-          is_active ? "desactivar" : "activar"
+          product.is_active ? "desactivar" : "activar"
         } este producto?`
       )
-    ) {
+    )
       return;
-    }
-
-    const originalProducts = [...products];
-    setProducts(
-      products.map((p) =>
-        p.id === product.id ? { ...p, is_active: !is_active } : p
-      )
-    );
 
     try {
       const res = await fetch(`/api/products/${product.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ is_active: !is_active }), // Solo enviamos el cambio de estado
+        body: JSON.stringify({ is_active: !product.is_active }),
       });
-      if (!res.ok) {
-        const errorText = await res.text();
-        throw new Error(errorText);
-      }
+      if (!res.ok) throw new Error(await res.text());
 
+      await fetchProducts();
       toast.success(
-        `Producto ${!is_active ? "activado" : "desactivado"} exitosamente.`
+        `Producto ${!product.is_active ? "activado" : "desactivado"}.`
       );
     } catch (err: any) {
-      setProducts(originalProducts);
-      setApiError(err.message || "Error al cambiar el estado del producto");
       toast.error("Error al cambiar el estado", { description: err.message });
     }
   };
@@ -195,6 +443,7 @@ export default function ProductsPage() {
   return (
     <AppLayout title="Gestión de Productos">
       <div className="space-y-8 animate-fade-in">
+        {/* Header */}
         <div className="flex justify-between items-center">
           <div className="space-y-2">
             <div className="flex items-center space-x-3">
@@ -206,7 +455,7 @@ export default function ProductsPage() {
                   Productos
                 </h2>
                 <p className="text-muted-foreground">
-                  Gestiona el catálogo de productos con estilo
+                  Gestiona el catálogo de productos y sus formatos
                 </p>
               </div>
             </div>
@@ -221,6 +470,7 @@ export default function ProductsPage() {
           </GradientButton>
         </div>
 
+        {/* Search Bar */}
         <AnimatedCard hoverEffect="lift" className="glass">
           <CardContent className="pt-6">
             <div className="relative">
@@ -258,7 +508,7 @@ export default function ProductsPage() {
                 hoverEffect="lift"
                 animateIn
                 delay={index * 100}
-                className="glass overflow-hidden"
+                className="glass overflow-hidden flex flex-col"
               >
                 <CardHeader className="pb-3">
                   <div className="flex justify-between items-start">
@@ -278,18 +528,27 @@ export default function ProductsPage() {
                     </Badge>
                   </div>
                 </CardHeader>
-                <CardContent className="space-y-4">
+                <CardContent className="space-y-4 flex-grow flex flex-col">
                   {product.description && (
-                    <p className="text-sm text-muted-foreground line-clamp-3 leading-relaxed">
+                    <p className="text-sm text-muted-foreground line-clamp-3 leading-relaxed flex-grow">
                       {product.description}
                     </p>
                   )}
-                  <div className="flex space-x-2 pt-4 border-t">
+                  <div className="flex space-x-2 pt-4 border-t mt-auto">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleManageFormats(product)}
+                      className="flex items-center space-x-1 flex-1 transition-smooth hover:bg-accent/10"
+                    >
+                      <Layers className="h-3 w-3" />
+                      <span>Formatos</span>
+                    </Button>
                     <Button
                       variant="outline"
                       size="sm"
                       onClick={() => handleEditProduct(product)}
-                      className="flex items-center space-x-1 flex-1 transition-smooth hover:bg-primary/5"
+                      className="flex items-center space-x-1 transition-smooth hover:bg-primary/5"
                     >
                       <Edit className="h-3 w-3" />
                       <span>Editar</span>
@@ -305,9 +564,6 @@ export default function ProductsPage() {
                       ) : (
                         <CheckCircle className="h-3 w-3" />
                       )}
-                      <span>
-                        {product.is_active ? "Desactivar" : "Activar"}
-                      </span>
                     </Button>
                   </div>
                 </CardContent>
@@ -316,8 +572,8 @@ export default function ProductsPage() {
           )}
         </div>
 
-        {/* Create/Edit Dialog */}
-        <Dialog open={showDialog} onOpenChange={setShowDialog}>
+        {/* Product Create/Edit Dialog */}
+        <Dialog open={showProductDialog} onOpenChange={setShowProductDialog}>
           <DialogContent className="sm:max-w-xl">
             <DialogHeader>
               <DialogTitle className="text-2xl font-bold flex items-center gap-2">
@@ -383,7 +639,7 @@ export default function ProductsPage() {
                 <Button
                   type="button"
                   variant="outline"
-                  onClick={() => setShowDialog(false)}
+                  onClick={() => setShowProductDialog(false)}
                 >
                   Cancelar
                 </Button>
@@ -404,6 +660,14 @@ export default function ProductsPage() {
             </form>
           </DialogContent>
         </Dialog>
+
+        {/* Formats Management Dialog */}
+        <FormatsDialog
+          product={selectedProductForFormats}
+          open={showFormatDialog}
+          onOpenChange={setShowFormatDialog}
+          onFormatUpdate={fetchProducts}
+        />
       </div>
     </AppLayout>
   );
