@@ -1,3 +1,5 @@
+// app/(protected)/cashier/orders/page.tsx
+
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
@@ -188,7 +190,7 @@ export default function CashierOrderPage() {
     }
     setIsSubmitting(true);
     try {
-      const orderData: CreateOrderForm = {
+      const orderData = {
         clientId: selectedClient,
         destinationId: selectedDestination || undefined,
         items: orderItems.map((item) => ({
@@ -203,15 +205,27 @@ export default function CashierOrderPage() {
           ref: paymentReference,
         },
         truckId: selectedTruckId,
-        photoFile: truckPhoto || undefined,
       };
 
-      const body = { ...orderData, userId: user?.id };
+      const formData = new FormData();
+      formData.append('clientId', orderData.clientId);
+      if (orderData.destinationId) {
+        formData.append('destinationId', orderData.destinationId);
+      }
+      formData.append('items', JSON.stringify(orderData.items));
+      formData.append('pago', JSON.stringify(orderData.pago));
+      formData.append('truckId', orderData.truckId);
+      if (user?.id) {
+        formData.append('userId', user.id);
+      }
+      if (truckPhoto) {
+        formData.append('photoFile', truckPhoto);
+      }
+
 
       const res = await fetch("/api/orders", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
+        body: formData, // ¡No establezcas el header 'Content-Type'! El navegador lo hará por ti.
       });
       if (!res.ok) throw new Error(await res.text());
       const { order, delivery } = await res.json();

@@ -1,27 +1,18 @@
+// components/cards/delivery-card.tsx
 "use client"
 
-import { Truck, MapPin, Package, Clock, CheckCircle } from "lucide-react"
+import { Truck, MapPin, Package, Clock, CheckCircle, Camera } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import type { Delivery } from "@/lib/types"
+import Image from "next/image";
 
 interface DeliveryCardProps {
-  delivery: Delivery & {
-    order?: {
-      client?: { nombre: string }
-      destination?: { nombre: string }
-    }
-    truck?: { placa: string }
-    productFormat?: {
-      product?: { nombre: string }
-      sku?: string
-      unidadBase: string
-    }
-  }
-  onConfirmLoad?: (deliveryId: string) => void
-  onViewDetails?: (deliveryId: string) => void
-  showActions?: boolean
+  delivery: Delivery;
+  onConfirmLoad?: (deliveryId: string) => void;
+  onViewDetails?: (deliveryId: string) => void;
+  showActions?: boolean;
 }
 
 const STATUS_CONFIG = {
@@ -50,24 +41,24 @@ const STATUS_CONFIG = {
     color: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300",
     icon: Clock,
   },
-} as const
+} as const;
 
 export function DeliveryCard({ delivery, onConfirmLoad, onViewDetails, showActions = true }: DeliveryCardProps) {
-  const statusConfig = STATUS_CONFIG[delivery.estado]
-  const StatusIcon = statusConfig.icon
+  const statusConfig = STATUS_CONFIG[delivery.estado];
+  const StatusIcon = statusConfig.icon;
 
-  const canConfirmLoad = delivery.estado === "ASIGNADA" && onConfirmLoad
-  const canViewDetails = onViewDetails
+  const canConfirmLoad = delivery.estado === "ASIGNADA" && onConfirmLoad;
+  const canViewDetails = onViewDetails;
 
   const handleCardClick = () => {
     if (canConfirmLoad) {
-      onConfirmLoad(delivery.id)
+      onConfirmLoad(delivery.id);
     } else if (canViewDetails) {
-      onViewDetails(delivery.id)
+      onViewDetails(delivery.id);
     }
-  }
+  };
 
-  const isClickable = canConfirmLoad || canViewDetails
+  const isClickable = canConfirmLoad || canViewDetails;
 
   return (
     <Card
@@ -90,6 +81,24 @@ export function DeliveryCard({ delivery, onConfirmLoad, onViewDetails, showActio
       </CardHeader>
 
       <CardContent className="space-y-3">
+         {/* Foto del camión */}
+         {delivery.loadPhoto && (
+            <div className="relative h-40 w-full overflow-hidden rounded-md border group">
+                 <Image
+                    src={delivery.loadPhoto}
+                    alt={`Foto de carga para ${delivery.truck?.placa}`}
+                    layout="fill"
+                    objectFit="cover"
+                    className="transition-transform duration-300 group-hover:scale-105"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
+                <div className="absolute bottom-2 left-2 flex items-center gap-1 text-xs text-white bg-black/50 px-2 py-1 rounded">
+                    <Camera className="h-3 w-3" />
+                    <span>Foto de Caja</span>
+                </div>
+            </div>
+        )}
+
         {/* Cliente y Destino */}
         <div className="space-y-2">
           <div className="flex items-center gap-2 text-sm">
@@ -142,8 +151,8 @@ export function DeliveryCard({ delivery, onConfirmLoad, onViewDetails, showActio
           {canConfirmLoad && (
             <Button
               onClick={(e) => {
-                e.stopPropagation()
-                onConfirmLoad(delivery.id)
+                e.stopPropagation();
+                if(onConfirmLoad) onConfirmLoad(delivery.id);
               }}
               className="flex-1"
               size="sm"
@@ -157,8 +166,8 @@ export function DeliveryCard({ delivery, onConfirmLoad, onViewDetails, showActio
             <Button
               variant="outline"
               onClick={(e) => {
-                e.stopPropagation()
-                onViewDetails(delivery.id)
+                e.stopPropagation();
+                if(onViewDetails) onViewDetails(delivery.id);
               }}
               size="sm"
             >
