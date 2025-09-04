@@ -532,7 +532,7 @@ export default function AdminPage() {
                       <SelectContent>
                         <SelectItem value="M3">m³</SelectItem>
                         <SelectItem value="TON">toneladas</SelectItem>
-                        <SelectItem value="BOLSA">bolsas</SelectItem>
+                        <SelectItem value="SACO">sacos</SelectItem>
                         <SelectItem value="UNIDAD">unidades</SelectItem>
                       </SelectContent>
                     </Select>

@@ -20,6 +20,7 @@ import {
   Package,
   Users,
   FileText,
+  MapPin,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -81,6 +82,15 @@ function Dashboard() {
             href: "/admin/customers",
             color: "bg-primary",
           },
+          // AÑADIR ESTE BLOQUE
+          {
+            title: "Destinos",
+            description: "Gestionar direcciones de entrega",
+            icon: MapPin,
+            href: "/admin/destinations",
+            color: "bg-primary",
+          },
+          // FIN DEL BLOQUE A AÑADIR
           {
             title: "Productos",
             description: "Gestionar catálogo de productos",
@@ -99,7 +109,7 @@ function Dashboard() {
             title: "Configuración",
             description: "Configuración del sistema",
             icon: Settings,
-            href: "/admin/settings",
+            href: "/admin/settings", // Puedes cambiar esto a /admin/ si prefieres la página de pestañas
             color: "bg-primary",
           },
         ];
