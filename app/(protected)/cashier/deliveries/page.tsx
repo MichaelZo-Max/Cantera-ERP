@@ -64,8 +64,8 @@ export default function CashierDeliveriesPage() {
   const filteredDeliveries = deliveries.filter((delivery) => {
     const q = searchTerm.toLowerCase()
     const placa = delivery.truck?.placa?.toLowerCase() ?? ""
-    const cliente = delivery.order?.client?.nombre?.toLowerCase() ?? ""
-    const id = delivery.id?.toLowerCase() ?? ""
+    const cliente = delivery.client?.nombre?.toLowerCase() ?? ""
+    const id = String(delivery.id)?.toLowerCase() ?? ""
     return placa.includes(q) || cliente.includes(q) || id.includes(q)
   })
 
@@ -149,7 +149,7 @@ export default function CashierDeliveriesPage() {
                   <div className="space-y-2">
                     <div className="flex items-center gap-2 text-sm">
                       <div className="w-2 h-2 bg-primary rounded-full"></div>
-                      <span className="font-medium text-foreground">{delivery.order?.client?.nombre || "N/A"}</span>
+                      <span className="font-medium text-foreground">{delivery.client?.nombre || "N/A"}</span>
                     </div>
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
                       <MapPin className="h-3 w-3" />

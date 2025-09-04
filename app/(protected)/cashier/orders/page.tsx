@@ -1,5 +1,3 @@
-// app/(protected)/cashier/orders/page.tsx
-
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
@@ -42,8 +40,9 @@ import type {
   ProductFormat,
   ProductSelection,
   CreateOrderForm,
-  Truck as TruckType, // CORRECCIÓN: Se importa el tipo 'Truck' y se le da un alias
+  Truck as TruckType,
 } from "@/lib/types";
+import { useAuth } from "@/components/auth-provider";
 
 interface OrderItem {
   id: string;
@@ -56,6 +55,7 @@ interface OrderItem {
 }
 
 export default function CashierOrderPage() {
+  const { user } = useAuth();
   // selección
   const [selectedClient, setSelectedClient] = useState<string>("");
   const [selectedDestination, setSelectedDestination] = useState<string>("");
@@ -81,7 +81,7 @@ export default function CashierOrderPage() {
   // pago y camión
   const [paymentMethod, setPaymentMethod] = useState<string>("");
   const [paymentReference, setPaymentReference] = useState<string>("");
-  const [selectedTruckId, setSelectedTruckId] = useState<string | null>(null); // CORRECCIÓN: Se añade el estado para el TruckPicker
+  const [selectedTruckId, setSelectedTruckId] = useState<string | null>(null);
   const [truckPhoto, setTruckPhoto] = useState<File | null>(null);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -90,7 +90,6 @@ export default function CashierOrderPage() {
   useEffect(() => {
     const load = async () => {
       try {
-        // CORRECCIÓN: Se añade 'tRes' para la respuesta de los camiones
         const [cRes, pRes, tRes] = await Promise.all([
           fetch("/api/customers", { cache: "no-store" }),
           fetch("/api/products", { cache: "no-store" }),
@@ -207,10 +206,12 @@ export default function CashierOrderPage() {
         photoFile: truckPhoto || undefined,
       };
 
+      const body = { ...orderData, userId: user?.id };
+
       const res = await fetch("/api/orders", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(orderData),
+        body: JSON.stringify(body),
       });
       if (!res.ok) throw new Error(await res.text());
       const { order, delivery } = await res.json();

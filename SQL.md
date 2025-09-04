@@ -336,3 +336,14 @@ LEFT JOIN
 GO
 
 PRINT '¡Despliegue completado! El esquema, las tablas y las vistas han sido creados/actualizados.';
+
+-- 1. Añade la columna que falta a la tabla de ítems
+ALTER TABLE RIP.APP_PEDIDOS_ITEMS
+ADD format_id INT;
+GO
+
+-- 2. (Recomendado) Añade la relación (Foreign Key) para mantener la integridad
+ALTER TABLE RIP.APP_PEDIDOS_ITEMS
+ADD CONSTRAINT FK_APP_PEDIDOS_ITEMS_FORMATOS
+FOREIGN KEY (format_id) REFERENCES RIP.APP_PRODUCTOS_FORMATOS(id);
+GO

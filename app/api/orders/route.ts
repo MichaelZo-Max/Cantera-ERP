@@ -53,11 +53,15 @@ export async function GET() {
  */
 export async function POST(request: Request) {
   try {
-    const body: CreateOrderForm = await request.json();
-    const { clientId, destinationId, items, pago, truckId } = body;
+    const body: CreateOrderForm & { userId?: string } = await request.json();
+    const { clientId, destinationId, items, pago, truckId, userId } = body;
 
     if (!clientId || !truckId || !items?.length) {
       return new NextResponse("Faltan datos para crear la orden", { status: 400 });
+    }
+
+    if (!userId) {
+      return new NextResponse("Falta el ID del usuario autenticado", { status: 401 });
     }
 
     // 1) Pedido: NO insertar order_number (es calculado). Usa OUTPUT para recuperar id y order_number.
@@ -73,7 +77,7 @@ export async function POST(request: Request) {
       // Unifica estatus: usa 'CREADA' si así lo quieres en front (o mapea si en DB va 'PENDING')
       { name: 'status', type: TYPES.NVarChar, value: 'CREADA' },
       { name: 'notes', type: TYPES.NVarChar, value: pago?.ref ?? null },
-      { name: 'createdBy', type: TYPES.Int, value: 1 }, // TODO: tomar del usuario autenticado
+      { name: 'createdBy', type: TYPES.Int, value: parseInt(userId, 10) },
     ];
     const orderResult = await executeQuery(orderQuery, orderParams);
     const { id: newOrderId, order_number } = orderResult[0];

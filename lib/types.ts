@@ -136,6 +136,7 @@ export interface Delivery {
   truck?: Truck;
   driverId?: string;
   driver?: Driver;
+  client?: Client;
   productFormat?: ProductFormat;
   cantidadBase: number;
   loadedQuantity?: number;

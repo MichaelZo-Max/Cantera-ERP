@@ -2,7 +2,7 @@
 
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { Search, Package } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
@@ -45,31 +45,38 @@ export function ProductPicker({
   }, [value, onFormatChange]);
   
   // EFECTO CLAVE: Cargar formatos cuando cambia el producto seleccionado
-  useEffect(() => {
+  const fetchFormats = useCallback(async () => {
     if (selectedProduct) {
-      const fetchFormats = async () => {
-        setIsLoadingFormats(true);
-        try {
-          const res = await fetch(`/api/product-formats?productId=${selectedProduct.id}`);
-          if (!res.ok) throw new Error("No se pudieron cargar los formatos");
-          const data: ProductFormat[] = await res.json();
-          setAvailableFormats(data);
-          // Si solo hay un formato, lo seleccionamos automáticamente
-          if (data.length === 1) {
-            handleFormatSelect(data[0].id);
-          }
-        } catch (error) {
-          toast.error("Error al cargar formatos.");
-          setAvailableFormats([]);
-        } finally {
-          setIsLoadingFormats(false);
+      setIsLoadingFormats(true);
+      try {
+        const res = await fetch(`/api/product-formats?productId=${selectedProduct.id}`);
+        if (!res.ok) throw new Error("No se pudieron cargar los formatos");
+        const data: ProductFormat[] = await res.json();
+        setAvailableFormats(data);
+        
+        // *** INICIO DE LA CORRECCIÓN ***
+        // Si solo hay un formato, lo seleccionamos automáticamente usando los datos frescos
+        if (data.length === 1) {
+          const singleFormat = data[0];
+          onChange({ productId: selectedProduct.id, formatId: singleFormat.id });
+          onFormatChange(singleFormat);
         }
-      };
-      fetchFormats();
+        // *** FIN DE LA CORRECCIÓN ***
+
+      } catch (error) {
+        toast.error("Error al cargar formatos.");
+        setAvailableFormats([]);
+      } finally {
+        setIsLoadingFormats(false);
+      }
     } else {
       setAvailableFormats([]);
     }
-  }, [selectedProduct])
+  }, [selectedProduct, onChange, onFormatChange]);
+
+  useEffect(() => {
+    fetchFormats();
+  }, [fetchFormats])
 
   const handleProductSelect = (productCode: string) => {
     const product = products.find((p) => `${p.codigo} ${p.nombre}` === productCode)
