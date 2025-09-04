@@ -22,9 +22,16 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { AnimatedCard } from "@/components/ui/animated-card";
 import { GradientButton } from "@/components/ui/gradient-button";
-import type { Truck as TruckType } from "@/lib/types";
+import type { Truck as TruckType, Driver } from "@/lib/types";
 import {
   TruckIcon,
   Plus,
@@ -34,12 +41,14 @@ import {
   CheckCircle,
   Save,
   Sparkles,
+  UserCheck,
 } from "lucide-react";
 import { toast } from "sonner";
 import { LoadingSkeleton } from "@/components/ui/loading-skeleton";
 
 export default function TrucksPage() {
   const [trucks, setTrucks] = useState<TruckType[]>([]);
+  const [drivers, setDrivers] = useState<Driver[]>([]);
   const [loading, setLoading] = useState(true);
   const [apiError, setApiError] = useState<string | null>(null);
 
@@ -51,24 +60,32 @@ export default function TrucksPage() {
     brand: "",
     model: "",
     capacity: 0,
+    driverId: "",
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
-    const loadTrucks = async () => {
+    const loadData = async () => {
       try {
         setLoading(true);
-        const res = await fetch("/api/trucks", { cache: "no-store" });
-        if (!res.ok) throw new Error(await res.text());
-        setTrucks(await res.json());
+        const [trucksRes, driversRes] = await Promise.all([
+          fetch("/api/trucks", { cache: "no-store" }),
+          fetch("/api/drivers", { cache: "no-store" }),
+        ]);
+
+        if (!trucksRes.ok) throw new Error(await trucksRes.text());
+        if (!driversRes.ok) throw new Error(await driversRes.text());
+
+        setTrucks(await trucksRes.json());
+        setDrivers(await driversRes.json());
       } catch (e: any) {
-        setApiError(e?.message ?? "Error al cargar los camiones");
-        toast.error("Error al cargar camiones", { description: e.message });
+        setApiError(e?.message ?? "Error al cargar los datos");
+        toast.error("Error al cargar datos", { description: e.message });
       } finally {
         setLoading(false);
       }
     };
-    loadTrucks();
+    loadData();
   }, []);
 
   const filteredTrucks = trucks.filter(
@@ -77,7 +94,9 @@ export default function TrucksPage() {
       (truck.brand &&
         truck.brand.toLowerCase().includes(searchTerm.toLowerCase())) ||
       (truck.model &&
-        truck.model.toLowerCase().includes(searchTerm.toLowerCase()))
+        truck.model.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      (truck.driver?.nombre &&
+        truck.driver.nombre.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
   const handleNewTruck = () => {
@@ -87,6 +106,7 @@ export default function TrucksPage() {
       brand: "",
       model: "",
       capacity: 0,
+      driverId: "",
     });
     setApiError(null);
     setShowDialog(true);
@@ -99,6 +119,7 @@ export default function TrucksPage() {
       brand: truck.brand || "",
       model: truck.model || "",
       capacity: truck.capacity || 0,
+      driverId: truck.driverId || "",
     });
     setApiError(null);
     setShowDialog(true);
@@ -144,7 +165,7 @@ export default function TrucksPage() {
   };
 
   const handleToggleStatus = async (truck: TruckType) => {
-    const is_active = truck.is_active; // CORREGIDO
+    const is_active = truck.is_active;
     if (
       !confirm(
         `¿Estás seguro de que quieres ${
@@ -155,38 +176,25 @@ export default function TrucksPage() {
       return;
     }
 
-    const originalTrucks = [...trucks];
-    setTrucks(
-      trucks.map((t) =>
-        t.id === truck.id ? { ...t, is_active: !is_active } : t
-      )
-    ); // CORREGIDO
-
     try {
       const res = await fetch(`/api/trucks/${truck.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ is_active: !is_active }),
       });
-      if (!res.ok) {
-        const errorText = await res.text();
-        const updatedTruck = await res.json();
-        setTrucks(
-          trucks.map((t) => (t.id === updatedTruck.id ? updatedTruck : t))
-        ); // Sincroniza con la respuesta del servidor
-        throw new Error(errorText);
-      }
-
+      if (!res.ok) throw new Error(await res.text());
+      const updatedTruck = await res.json();
+      setTrucks(
+        trucks.map((t) => (t.id === updatedTruck.id ? updatedTruck : t))
+      );
       toast.success(
         `Camión ${!is_active ? "activado" : "desactivado"} exitosamente.`
       );
     } catch (err: any) {
-      setTrucks(originalTrucks);
-      setApiError(err.message || "Error al cambiar el estado del camión.");
       toast.error("Error al cambiar el estado", { description: err.message });
     }
   };
-
+  
   if (loading) {
     return (
       <AppLayout title="Gestión de Camiones">
@@ -210,7 +218,7 @@ export default function TrucksPage() {
                   Flota de Camiones
                 </h2>
                 <p className="text-muted-foreground">
-                  Administra los vehículos de transporte
+                  Administra los vehículos de transporte y sus choferes
                 </p>
               </div>
             </div>
@@ -231,7 +239,7 @@ export default function TrucksPage() {
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-5 w-5" />
               <Input
-                placeholder="Buscar por placas, marca o modelo..."
+                placeholder="Buscar por placas, marca, modelo o chofer..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-12 h-12 text-lg focus-ring"
@@ -249,9 +257,6 @@ export default function TrucksPage() {
                   <TruckIcon className="h-16 w-16 text-muted-foreground mx-auto mb-4 opacity-50" />
                   <p className="text-muted-foreground text-lg">
                     No se encontraron camiones
-                  </p>
-                  <p className="text-sm text-muted-foreground mt-2">
-                    Intenta con otros términos o registra un nuevo camión.
                   </p>
                 </CardContent>
               </AnimatedCard>
@@ -284,16 +289,26 @@ export default function TrucksPage() {
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  {truck.capacity && (
-                    <div className="bg-gradient-to-r from-primary/10 to-accent/10 border border-primary/20 p-4 rounded-xl">
-                      <p className="text-2xl font-bold bg-gradient-primary bg-clip-text text-transparent">
-                        {truck.capacity} m³
-                      </p>
-                      <p className="text-sm text-primary/80 font-medium">
-                        Capacidad
+                  <div className="flex justify-between">
+                    {truck.capacity && (
+                      <div className="bg-gradient-to-r from-primary/10 to-accent/10 border border-primary/20 p-3 rounded-xl flex-1">
+                        <p className="text-2xl font-bold bg-gradient-primary bg-clip-text text-transparent">
+                          {truck.capacity} m³
+                        </p>
+                        <p className="text-sm text-primary/80 font-medium">
+                          Capacidad
+                        </p>
+                      </div>
+                    )}
+                    <div className="bg-gradient-to-r from-secondary/10 to-accent/10 border border-secondary/20 p-3 rounded-xl flex-1 ml-2">
+                       <p className="text-lg font-bold bg-gradient-to-r from-secondary to-accent bg-clip-text text-transparent truncate">
+                          {truck.driver?.nombre || "Sin chofer"}
+                        </p>
+                      <p className="text-sm text-secondary/80 font-medium">
+                        Chofer
                       </p>
                     </div>
-                  )}
+                  </div>
                   <div className="flex space-x-2 pt-4 border-t">
                     <Button
                       variant="outline"
@@ -387,26 +402,52 @@ export default function TrucksPage() {
                   />
                 </div>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="capacity" className="font-semibold">
-                  Capacidad (m³)
-                </Label>
-                <Input
-                  id="capacity"
-                  type="number"
-                  step="0.1"
-                  min="0"
-                  value={formData.capacity || ""}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      capacity: Number.parseFloat(e.target.value) || 0,
-                    })
-                  }
-                  placeholder="15.0"
-                  className="focus-ring"
-                />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="capacity" className="font-semibold">
+                    Capacidad (m³)
+                  </Label>
+                  <Input
+                    id="capacity"
+                    type="number"
+                    step="0.1"
+                    min="0"
+                    value={formData.capacity || ""}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        capacity: Number.parseFloat(e.target.value) || 0,
+                      })
+                    }
+                    placeholder="15.0"
+                    className="focus-ring"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="driverId" className="font-semibold">
+                    Chofer Asignado
+                  </Label>
+                  <Select
+                    value={formData.driverId}
+                    onValueChange={(value) =>
+                      setFormData({ ...formData, driverId: value })
+                    }
+                  >
+                    <SelectTrigger className="focus-ring">
+                      <SelectValue placeholder="Seleccionar chofer..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {/* ✨ LA CORRECCIÓN ESTÁ AQUÍ: Se eliminó el <SelectItem value=""> */}
+                      {drivers.map((driver) => (
+                        <SelectItem key={driver.id} value={driver.id}>
+                          {driver.nombre}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
+
               {apiError && <p className="text-sm text-red-500">{apiError}</p>}
               <DialogFooter className="pt-4">
                 <Button

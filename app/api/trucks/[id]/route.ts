@@ -42,7 +42,6 @@ export async function PATCH(request: Request, { params }: { params: { id: string
         const updates: string[] = [];
         const queryParams: any[] = [{ name: 'id', type: TYPES.Int, value: id }];
 
-        // Construir la consulta dinámicamente
         if (body.placa !== undefined) {
             updates.push("placa = @placa");
             queryParams.push({ name: 'placa', type: TYPES.NVarChar, value: body.placa });
@@ -59,9 +58,9 @@ export async function PATCH(request: Request, { params }: { params: { id: string
             updates.push("capacity = @capacity");
             queryParams.push({ name: 'capacity', type: TYPES.Decimal, value: body.capacity });
         }
-        if (body.driver_name !== undefined) {
-            updates.push("driver_name = @driver_name");
-            queryParams.push({ name: 'driver_name', type: TYPES.NVarChar, value: body.driver_name });
+        if (body.driverId !== undefined) { // ✨ CORREGIDO: Usar driverId
+            updates.push("driver_id = @driverId");
+            queryParams.push({ name: 'driverId', type: TYPES.Int, value: body.driverId || null });
         }
         if (body.is_active !== undefined) {
             updates.push("is_active = @is_active");
@@ -86,7 +85,12 @@ export async function PATCH(request: Request, { params }: { params: { id: string
             return new NextResponse('Camión no encontrado para actualizar', { status: 404 });
         }
         return NextResponse.json(result[0]);
-    } catch (error) {
+    } catch (error: any) {
+        // ✨ CORRECCIÓN: Manejo específico para llaves duplicadas
+        if (error?.number === 2627 || error?.number === 2601) {
+            const duplicateValue = error.message.match(/\(([^)]+)\)/)?.[1];
+            return new NextResponse(`La placa '${duplicateValue}' ya existe.`, { status: 409 });
+        }
         console.error('[API_TRUCKS_PATCH]', error);
         return new NextResponse('Error al actualizar el camión', { status: 500 });
     }

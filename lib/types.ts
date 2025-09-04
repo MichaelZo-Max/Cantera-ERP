@@ -1,4 +1,5 @@
 // lib/types.ts
+// lib/types.ts
 
 export type UnitBase = "M3" | "TON" | "SACO" | "UNIDAD";
 
@@ -92,6 +93,8 @@ export interface Truck {
   id: string;
   placa: string;
   transporterId?: string;
+  driverId?: string; // Columna para el ID del chofer
+  driver?: Driver; // Objeto anidado con la info del chofer
   brand?: string;
   model?: string;
   capacity?: number;
@@ -177,6 +180,7 @@ export interface CreateOrderForm {
     ref?: string;
   };
   truckId: string; // <--- CAMBIO: de 'truck' a 'truckId'
+  driverId: string; // ✨ Añadido para el nuevo flujo
   photoFile?: File;
 }
 
