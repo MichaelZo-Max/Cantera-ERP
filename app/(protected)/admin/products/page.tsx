@@ -135,15 +135,14 @@ function FormatsDialog({
       ? `/api/product-formats/${editingFormat.id}`
       : "/api/product-formats";
     const method = editingFormat ? "PATCH" : "POST";
-
-    // ✨ CORRECCIÓN CLAVE: Transformar el payload para que coincida con la API
+    
     const payload = {
       sku: formatData.sku,
       price_per_unit: formatData.pricePerUnit,
       unit_base: formatData.unitBase,
       base_unit_factor: formatData.baseUnitFactor,
-      product_id: product?.id, // Solo necesario para crear
-      is_active: editingFormat ? editingFormat.activo : undefined, // Para editar
+      product_id: product?.id,
+      is_active: editingFormat ? editingFormat.activo : undefined,
     };
 
     try {
@@ -321,7 +320,7 @@ export default function ProductsPage() {
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const fetchProducts = async () => {
+  const fetchProducts = useCallback(async () => {
     try {
       setLoading(true);
       const res = await fetch("/api/products", { cache: "no-store" });
@@ -333,11 +332,11 @@ export default function ProductsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     fetchProducts();
-  }, []);
+  }, [fetchProducts]);
 
   const filteredProducts = products.filter(
     (product) =>
@@ -415,6 +414,13 @@ export default function ProductsPage() {
     )
       return;
 
+    const originalProducts = [...products];
+    setProducts(
+      products.map((p) =>
+        p.id === product.id ? { ...p, is_active: !product.is_active } : p
+      )
+    );
+
     try {
       const res = await fetch(`/api/products/${product.id}`, {
         method: "PATCH",
@@ -423,11 +429,11 @@ export default function ProductsPage() {
       });
       if (!res.ok) throw new Error(await res.text());
 
-      await fetchProducts();
       toast.success(
         `Producto ${!product.is_active ? "activado" : "desactivado"}.`
       );
     } catch (err: any) {
+      setProducts(originalProducts);
       toast.error("Error al cambiar el estado", { description: err.message });
     }
   };

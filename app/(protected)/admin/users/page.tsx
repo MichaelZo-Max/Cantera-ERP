@@ -163,21 +163,26 @@ export default function UsersPage() {
     ) {
       return;
     }
+    
+    const originalUsers = [...users];
+    setUsers(
+        users.map((u) => (u.id === user.id ? { ...u, is_active: !is_active } : u))
+    );
 
     try {
       const res = await fetch(`/api/users/${user.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        // Enviamos solo el cambio de estado para no afectar otros datos
         body: JSON.stringify({ ...user, is_active: !is_active }),
       });
+
       if (!res.ok) throw new Error(await res.text());
       
-      await loadUsers(); // Recargamos para obtener el estado actualizado
       toast.success(
         `Usuario ${!is_active ? "activado" : "desactivado"} exitosamente.`
       );
     } catch (err: any) {
+      setUsers(originalUsers);
       toast.error("Error al cambiar el estado", { description: err.message });
     }
   };

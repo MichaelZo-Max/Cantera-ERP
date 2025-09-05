@@ -167,7 +167,7 @@ export default function CustomersPage() {
       const res = await fetch(`/api/customers/${customer.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...customer, is_active: !is_active }),
+        body: JSON.stringify({ is_active: !is_active }),
       });
 
       if (!res.ok) {
@@ -180,7 +180,6 @@ export default function CustomersPage() {
       );
     } catch (err: any) {
       setCustomers(originalCustomers);
-      setError(err.message || "Error al cambiar el estado del cliente");
       toast.error("Error al cambiar el estado", { description: err.message });
     }
   };

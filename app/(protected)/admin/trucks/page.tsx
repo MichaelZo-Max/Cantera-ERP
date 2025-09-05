@@ -176,6 +176,13 @@ export default function TrucksPage() {
       return;
     }
 
+    const originalTrucks = [...trucks];
+    setTrucks(
+      trucks.map((t) =>
+        t.id === truck.id ? { ...t, is_active: !is_active } : t
+      )
+    );
+
     try {
       const res = await fetch(`/api/trucks/${truck.id}`, {
         method: "PATCH",
@@ -183,14 +190,12 @@ export default function TrucksPage() {
         body: JSON.stringify({ is_active: !is_active }),
       });
       if (!res.ok) throw new Error(await res.text());
-      const updatedTruck = await res.json();
-      setTrucks(
-        trucks.map((t) => (t.id === updatedTruck.id ? updatedTruck : t))
-      );
+      
       toast.success(
         `Camión ${!is_active ? "activado" : "desactivado"} exitosamente.`
       );
     } catch (err: any) {
+      setTrucks(originalTrucks);
       toast.error("Error al cambiar el estado", { description: err.message });
     }
   };

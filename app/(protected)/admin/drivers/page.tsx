@@ -38,6 +38,14 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { LoadingSkeleton } from "@/components/ui/loading-skeleton";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
 export default function DriversPage() {
   const [drivers, setDrivers] = useState<Driver[]>([]);
@@ -54,20 +62,21 @@ export default function DriversPage() {
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  const loadDrivers = async () => {
+    try {
+      setLoading(true);
+      const res = await fetch("/api/drivers", { cache: "no-store" });
+      if (!res.ok) throw new Error(await res.text());
+      setDrivers(await res.json());
+    } catch (e: any) {
+      setApiError(e?.message ?? "Error al cargar choferes");
+      toast.error("Error al cargar choferes", { description: e.message });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const loadDrivers = async () => {
-      try {
-        setLoading(true);
-        const res = await fetch("/api/drivers", { cache: "no-store" });
-        if (!res.ok) throw new Error(await res.text());
-        setDrivers(await res.json());
-      } catch (e: any) {
-        setApiError(e?.message ?? "Error al cargar choferes");
-        toast.error("Error al cargar choferes", { description: e.message });
-      } finally {
-        setLoading(false);
-      }
-    };
     loadDrivers();
   }, []);
 
@@ -122,19 +131,11 @@ export default function DriversPage() {
         throw new Error(errorText || "Error al guardar el chofer");
       }
 
-      const savedDriver = await res.json();
-
-      if (editingDriver) {
-        setDrivers(
-          drivers.map((d) => (d.id === savedDriver.id ? savedDriver : d))
-        );
-        toast.success("Chofer actualizado exitosamente.");
-      } else {
-        setDrivers((prev) => [...prev, savedDriver]);
-        toast.success("Chofer creado exitosamente.");
-      }
-
+      // Volvemos a cargar los datos para tener la lista completa y actualizada
+      await loadDrivers();
+      toast.success(`Chofer ${editingDriver ? "actualizado" : "creado"} exitosamente.`);
       setShowDialog(false);
+
     } catch (err: any) {
       setApiError(err.message);
       toast.error("Error al guardar", { description: err.message });
@@ -155,6 +156,13 @@ export default function DriversPage() {
       return;
     }
 
+    const originalDrivers = [...drivers];
+    setDrivers(
+      drivers.map((d) =>
+        d.id === driver.id ? { ...d, is_active: !is_active } : d
+      )
+    );
+
     try {
       const res = await fetch(`/api/drivers/${driver.id}`, {
         method: "PATCH",
@@ -164,18 +172,15 @@ export default function DriversPage() {
 
       if (!res.ok) throw new Error(await res.text());
       
-      const updatedDriver = await res.json();
-      setDrivers(
-        drivers.map((d) => (d.id === updatedDriver.id ? updatedDriver : d))
-      );
       toast.success(
         `Chofer ${!is_active ? "activado" : "desactivado"} exitosamente.`
       );
     } catch (err: any) {
+      setDrivers(originalDrivers);
       toast.error("Error al cambiar el estado", { description: err.message });
     }
   };
-
+  
   if (loading) {
     return (
       <AppLayout title="Gestión de Choferes">
@@ -371,13 +376,9 @@ export default function DriversPage() {
               </div>
               
               {apiError && <p className="text-sm text-red-500">{apiError}</p>}
-
+              
               <DialogFooter className="pt-4">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setShowDialog(false)}
-                >
+                <Button type="button" variant="outline" onClick={() => setShowDialog(false)}>
                   Cancelar
                 </Button>
                 <GradientButton
