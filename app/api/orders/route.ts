@@ -6,6 +6,51 @@ import path from 'path';
 import { writeFile, mkdir } from 'fs/promises';
 
 /**
+ * @route   GET /api/orders
+ * @desc    Obtener todas las órdenes para la lista del cajero.
+ */
+export async function GET() {
+  try {
+    const query = `
+      SELECT
+        p.id,
+        p.order_number,
+        p.status AS estado,
+        p.notes,
+        p.created_at,
+        c.id AS clientId,
+        c.name AS clientName,
+        (SELECT SUM(quantity * price_per_unit) FROM RIP.APP_PEDIDOS_ITEMS WHERE order_id = p.id) AS total
+      FROM RIP.APP_PEDIDOS p
+      JOIN RIP.VW_APP_CLIENTES c ON p.customer_id = c.id
+      ORDER BY p.created_at DESC;
+    `;
+
+    const ordersData = await executeQuery(query);
+
+    const orders = ordersData.map((order: any) => ({
+      id: order.id.toString(),
+      orderNumber: order.order_number,
+      clientId: order.clientId.toString(),
+      client: {
+        nombre: order.clientName,
+      },
+      estado: order.estado,
+      total: order.total,
+      notes: order.notes,
+      createdAt: order.created_at,
+      updatedAt: order.created_at,
+    }));
+
+    return NextResponse.json(orders);
+  } catch (error) {
+    console.error('[API_ORDERS_GET]', error);
+    return new NextResponse('Error al obtener las órdenes', { status: 500 });
+  }
+}
+
+
+/**
  * @route   POST /api/orders
  * @desc    Crear un nuevo pedido y su despacho inicial
  */

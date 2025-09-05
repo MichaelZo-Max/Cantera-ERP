@@ -4,12 +4,14 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import type { Order } from "@/lib/types";
 import { Search, Eye, FileText, Calendar, User } from "lucide-react";
 import Link from "next/link";
 import { PageHeader } from "@/components/page-header";
+import { AnimatedCard } from "@/components/ui/animated-card";
+import { EmptyState } from "@/components/ui/empty-state";
 
 export function OrdersListClientUI({ initialOrders }: { initialOrders: Order[] }) {
   const [searchTerm, setSearchTerm] = useState("");
@@ -22,31 +24,20 @@ export function OrdersListClientUI({ initialOrders }: { initialOrders: Order[] }
     return orderNumber.includes(q) || clientName.includes(q);
   });
 
-  const getStatusColor = (status: string) => {
+  const getStatusConfig = (status: string) => {
     switch (status) {
       case "CREADA":
-        return "bg-yellow-100 text-yellow-800 border-yellow-200 dark:bg-yellow-900/20 dark:text-yellow-300 dark:border-yellow-800";
+        return { label: "Creada", color: "bg-yellow-100 text-yellow-800 border-yellow-200 dark:bg-yellow-900/20 dark:text-yellow-300 dark:border-yellow-800" };
       case "PAGADA":
-        return "bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/20 dark:text-blue-300 dark:border-blue-800";
+        return { label: "Pagada", color: "bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/20 dark:text-blue-300 dark:border-blue-800" };
       case "EN_DESPACHO":
-        return "bg-green-100 text-green-800 border-green-200 dark:bg-green-900/20 dark:text-green-300 dark:border-green-800";
+        return { label: "En Despacho", color: "bg-green-100 text-green-800 border-green-200 dark:bg-green-900/20 dark:text-green-300 dark:border-green-800" };
       case "CERRADA":
-        return "bg-muted text-muted-foreground border-border";
+        return { label: "Cerrada", color: "bg-muted text-muted-foreground border-border" };
       case "CANCELADA":
-        return "bg-red-100 text-red-800 border-red-200 dark:bg-red-900/20 dark:text-red-300 dark:border-red-800";
+        return { label: "Cancelada", color: "bg-red-100 text-red-800 border-red-200 dark:bg-red-900/20 dark:text-red-300 dark:border-red-800" };
       default:
-        return "bg-muted text-muted-foreground border-border";
-    }
-  };
-
-  const getStatusText = (status: string) => {
-    switch (status) {
-      case "CREADA": return "Creada";
-      case "PAGADA": return "Pagada";
-      case "EN_DESPACHO": return "En Despacho";
-      case "CERRADA": return "Cerrada";
-      case "CANCELADA": return "Cancelada";
-      default: return status;
+        return { label: status, color: "bg-muted text-muted-foreground border-border" };
     }
   };
 
@@ -65,7 +56,7 @@ export function OrdersListClientUI({ initialOrders }: { initialOrders: Order[] }
         }
       />
 
-      <Card>
+      <AnimatedCard>
         <CardContent className="pt-6">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
@@ -73,65 +64,70 @@ export function OrdersListClientUI({ initialOrders }: { initialOrders: Order[] }
               placeholder="Buscar por número de pedido o cliente…"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10"
+              className="pl-10 h-11"
             />
           </div>
         </CardContent>
-      </Card>
+      </AnimatedCard>
 
-      <div className="space-y-4">
-        {filteredOrders.length === 0 ? (
-          <Card>
-            <CardContent className="pt-6 text-center">
-              <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-              <p className="text-muted-foreground">No se encontraron pedidos</p>
-            </CardContent>
-          </Card>
-        ) : (
-          filteredOrders.map((order) => {
+      {filteredOrders.length === 0 ? (
+        <EmptyState
+          icon={<FileText className="h-12 w-12" />}
+          title="No se encontraron pedidos"
+          description={searchTerm ? "Intenta con otros términos de búsqueda." : "Crea un nuevo pedido para comenzar."}
+        />
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+          {filteredOrders.map((order, index) => {
             const createdAt = new Date(order.createdAt as unknown as string);
+            const statusConfig = getStatusConfig(order.estado);
             return (
-              <Card key={order.id} className="hover:shadow-md transition-shadow">
-                <CardHeader className="pb-3">
+              <AnimatedCard
+                key={order.id}
+                hoverEffect="lift"
+                animateIn
+                delay={index * 50}
+                className="flex flex-col"
+              >
+                <CardHeader>
                   <div className="flex justify-between items-start">
                     <div>
-                      <CardTitle className="text-lg">{order.orderNumber}</CardTitle>
-                      <CardDescription className="flex items-center space-x-2 mt-1">
-                        <Calendar className="h-4 w-4" />
-                        <span>{createdAt.toLocaleDateString("es-MX")}</span>
-                        <span>{createdAt.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" })}</span>
-                      </CardDescription>
+                      <CardTitle className="text-lg font-bold bg-gradient-to-r from-foreground to-muted-foreground bg-clip-text text-transparent">
+                        {order.orderNumber}
+                      </CardTitle>
                     </div>
-                    <Badge className={getStatusColor(order.estado)}>{getStatusText(order.estado)}</Badge>
+                    <Badge className={statusConfig.color}>{statusConfig.label}</Badge>
                   </div>
                 </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                    <div className="flex items-center space-x-2">
-                      <User className="h-4 w-4 text-muted-foreground" />
-                      <div>
-                        <p className="text-sm font-medium">{order.client?.nombre}</p>
-                        <p className="text-xs text-muted-foreground">Cliente</p>
-                      </div>
-                    </div>
+                <CardContent className="space-y-3 flex-grow">
+                  <div className="flex items-center space-x-2">
+                    <User className="h-4 w-4 text-muted-foreground" />
+                    <span className="font-medium">{order.client?.nombre}</span>
                   </div>
-                  <div className="flex justify-between items-center pt-4 border-t">
-                    <div><p className="text-lg font-bold text-foreground">${Number(order.total ?? 0).toFixed(2)}</p></div>
-                    <Button variant="outline" size="sm" className="flex items-center space-x-2 bg-transparent">
-                      <Eye className="h-4 w-4" /><span>Ver Detalles</span>
-                    </Button>
+                  <div className="flex items-center space-x-2 text-sm text-muted-foreground">
+                    <Calendar className="h-4 w-4" />
+                    <span>{createdAt.toLocaleDateString("es-VE", {
+                      year: 'numeric', month: 'long', day: 'numeric'
+                    })}</span>
                   </div>
                   {order.notes && (
-                    <div className="mt-4 p-3 bg-muted rounded-lg">
-                      <p className="text-sm text-muted-foreground"><span className="font-medium">Notas:</span> {order.notes}</p>
+                    <div className="mt-2 p-2 bg-muted/30 rounded-md text-xs text-muted-foreground">
+                      <strong>Notas:</strong> {order.notes}
                     </div>
                   )}
                 </CardContent>
-              </Card>
+                <CardFooter className="pt-4 border-t flex justify-between items-center">
+                  <p className="text-xl font-bold text-foreground">${Number(order.total ?? 0).toFixed(2)}</p>
+                  <Button variant="outline" size="sm" className="flex items-center space-x-2 bg-transparent">
+                    <Eye className="h-4 w-4" />
+                    <span>Ver Detalles</span>
+                  </Button>
+                </CardFooter>
+              </AnimatedCard>
             );
-          })
-        )}
-      </div>
+          })}
+        </div>
+      )}
     </div>
   );
 }
