@@ -26,8 +26,10 @@ import {
 } from "lucide-react"
 import { toast } from "sonner"
 import type { Delivery, DispatchGuide } from "@/lib/types"
+import { useAuth } from "@/components/auth-provider"
 
 export default function SecurityExitsPage() {
+  const { user } = useAuth()
   const [allDeliveries, setAllDeliveries] = useState<Delivery[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -94,14 +96,21 @@ export default function SecurityExitsPage() {
     setShowExitModal(false);
 
     try {
+      const formData = new FormData();
+      formData.append('estado', 'SALIDA_OK');
+      formData.append('notes', exitNotes);
+      if (user?.id) {
+        formData.append('userId', user.id);
+      }
+      if (exitPhoto) {
+        formData.append('photoFile', exitPhoto);
+      }
+
       const res = await fetch(`/api/deliveries/${selectedDelivery.id}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-            estado: 'SALIDA_OK',
-            notes: exitNotes,
-        }),
+        body: formData,
       });
+
       if (!res.ok) throw new Error(await res.text());
       
       const guideNumber = `GD-${new Date().getFullYear()}-${String(Date.now()).slice(-6)}`

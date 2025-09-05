@@ -13,7 +13,8 @@ export async function GET() {
         d.loaded_at,
         d.exited_at,
         d.notes,
-        d.load_photo_url, -- AÑADIR ESTA LÍNEA
+        d.load_photo_url, 
+        d.exit_photo_url,
         p.order_number,
         c.name  AS client_name,
         t.placa AS truck_placa,
@@ -45,7 +46,8 @@ export async function GET() {
       loadedAt: r.loaded_at ? new Date(r.loaded_at) : null,
       exitedAt: r.exited_at ? new Date(r.exited_at) : null,
       notes: r.notes ?? null,
-      loadPhoto: r.load_photo_url ?? null, // AÑADIR ESTA LÍNEA
+      loadPhoto: r.load_photo_url ?? null, 
+      exitPhoto: r.exit_photo_url ?? null,
       order: { id: r.order_id, orderNumber: r.order_number, client: { nombre: r.client_name } },
       client: { nombre: r.client_name },
       truck: { placa: r.truck_placa },
