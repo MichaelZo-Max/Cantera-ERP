@@ -21,7 +21,7 @@ import {
   Users,
   FileText,
   MapPin,
-  UserCheck, // Importamos el ícono que faltaba
+  UserCheck,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -104,20 +104,18 @@ function Dashboard() {
             href: "/admin/trucks",
             color: "bg-primary",
           },
-          // BLOQUE AÑADIDO
           {
             title: "Choferes",
             description: "Gestionar el personal de conducción",
             icon: UserCheck,
-            href: "/admin/drivers", // Asegúrate que esta sea la ruta correcta
+            href: "/admin/drivers",
             color: "bg-primary",
           },
-          // FIN DEL BLOQUE AÑADIDO
           {
-            title: "Configuración",
-            description: "Configuración del sistema",
-            icon: Settings,
-            href: "/admin/settings", // Puedes cambiar esto a /admin/ si prefieres la página de pestañas
+            title: "Usuarios",
+            description: "Gestionar usuarios y permisos del sistema",
+            icon: Shield,
+            href: "/admin/users",
             color: "bg-primary",
           },
         ];

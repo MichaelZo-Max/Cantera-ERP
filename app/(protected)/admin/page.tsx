@@ -1,7 +1,7 @@
 "use client";
 
 import type React from "react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { AppLayout } from "@/components/app-layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -175,6 +175,7 @@ export default function AdminPage() {
     email: "",
     name: "",
     role: "CASHIER" as User["role"],
+    password: ""
   });
 
   const handleNew = (type: string) => {
@@ -193,7 +194,7 @@ export default function AdminPage() {
     setDestinationForm({ clientId: "", nombre: "", direccion: "" });
     setTruckForm({ placa: "", brand: "", model: "", capacity: 0 });
     setDriverForm({ nombre: "", docId: "", phone: "" });
-    setUserForm({ email: "", name: "", role: "CASHIER" });
+    setUserForm({ email: "", name: "", role: "CASHIER", password: "" });
     setShowDialog(true);
   };
 
@@ -251,6 +252,7 @@ export default function AdminPage() {
           email: item.email,
           name: item.name,
           role: item.role,
+          password: ""
         });
         break;
     }
@@ -286,8 +288,8 @@ export default function AdminPage() {
         body = driverForm;
         break;
       case "usuario":
-        body = { ...userForm, password: "123456" };
-        break; // Default password for new users
+        body = { ...userForm, password: userForm.password || "123456" }; // Default password for new users
+        break;
     }
 
     try {
@@ -833,6 +835,20 @@ export default function AdminPage() {
                     </SelectContent>
                   </Select>
                 </div>
+                {!editingItem && (
+                  <div className="space-y-2">
+                    <Label>Contraseña *</Label>
+                    <Input
+                      type="password"
+                      value={userForm.password}
+                      onChange={(e) =>
+                        setUserForm({ ...userForm, password: e.target.value })
+                      }
+                      placeholder="Contraseña"
+                      required
+                    />
+                  </div>
+                )}
               </>
             )}
           </div>

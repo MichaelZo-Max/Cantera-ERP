@@ -29,7 +29,6 @@ const LABELS: Record<string, { label: string; icon?: React.ReactNode }> = {
   customers: { label: "Clientes", icon: <Users className="h-3.5 w-3.5" aria-hidden="true" /> },
   products: { label: "Productos", icon: <Box className="h-3.5 w-3.5" aria-hidden="true" /> },
   trucks: { label: "Camiones", icon: <Truck className="h-3.5 w-3.5" aria-hidden="true" /> },
-  settings: { label: "Configuración", icon: <Settings className="h-3.5 w-3.5" aria-hidden="true" /> },
   reports: { label: "Reportes", icon: <BarChart3 className="h-3.5 w-3.5" aria-hidden="true" /> },
 }
 
