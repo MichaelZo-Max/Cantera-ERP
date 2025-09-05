@@ -13,7 +13,7 @@ import { QuantityInput } from "@/components/forms/quantity-input"
 import { PhotoInput } from "@/components/forms/photo-input"
 import { toast } from "sonner"
 import type { Delivery } from "@/lib/types"
-import { CheckCircle, AlertTriangle, Camera, Package } from "lucide-react"
+import { CheckCircle, AlertTriangle, Camera, Package, Eye, X } from "lucide-react"
 
 export default function YardDeliveriesPage() {
   const [deliveries, setDeliveries] = useState<Delivery[]>([])
@@ -26,6 +26,8 @@ export default function YardDeliveriesPage() {
   const [loadPhoto, setLoadPhoto] = useState<File | null>(null)
   const [notes, setNotes] = useState<string>("")
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [showImagePreview, setShowImagePreview] = useState(false)
+  const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null)
 
   useEffect(() => {
     const loadDeliveries = async () => {
@@ -66,7 +68,7 @@ export default function YardDeliveriesPage() {
 
     setIsSubmitting(true)
     
-    // Actualización optimista
+    // Optimistic update
     const originalDeliveries = deliveries;
     const updatedDeliveries = deliveries.map((d) =>
       d.id === selectedDelivery.id
@@ -99,14 +101,14 @@ export default function YardDeliveriesPage() {
         description: `Viaje para ${selectedDelivery.truck?.placa} actualizado.`,
       })
     } catch (error) {
-      // Revertir en caso de error
+      // Revert on error
       setDeliveries(originalDeliveries)
       toast.error("Error al confirmar la carga", {
         description: "Por favor, inténtalo de nuevo.",
       })
     } finally {
       setIsSubmitting(false)
-      // Limpiar formulario
+      // Reset form
       setSelectedDelivery(null)
       setLoadPhoto(null)
       setNotes("")
@@ -116,6 +118,12 @@ export default function YardDeliveriesPage() {
   const handleCloseModal = () => {
     setShowConfirmModal(false)
     setSelectedDelivery(null)
+    setPreviewImageUrl(null);
+  }
+
+  const openImagePreview = (imageUrl: string) => {
+    setPreviewImageUrl(imageUrl)
+    setShowImagePreview(true)
   }
 
   const tolerance = selectedDelivery ? selectedDelivery.cantidadBase * 0.05 : 0
@@ -237,6 +245,42 @@ export default function YardDeliveriesPage() {
                     </div>
                   </div>
                 </div>
+                
+                <div className="flex flex-col gap-4">
+                  <div className="border p-4 rounded-lg">
+                    <h4 className="font-medium mb-2 flex items-center gap-2 text-sm">
+                      <Eye className="h-4 w-4" />
+                      Foto de Camión (Cajero)
+                    </h4>
+                    {selectedDelivery.loadPhoto ? (
+                      <div className="relative w-full h-48 rounded-lg overflow-hidden group">
+                        <img
+                          src={selectedDelivery.loadPhoto || "/placeholder.svg"}
+                          alt="Foto de carga del cajero"
+                          className="w-full h-full object-cover"
+                        />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity"
+                          onClick={() => openImagePreview(selectedDelivery.loadPhoto!)}
+                        >
+                          <Eye className="h-8 w-8 text-white" />
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-6 text-center h-48 flex flex-col items-center justify-center">
+                        <Camera className="h-8 w-8 text-muted-foreground mb-2" />
+                        <p className="text-sm text-muted-foreground">Sin foto de cajero</p>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="border p-4 rounded-lg">
+                    <PhotoInput onSelect={setLoadPhoto} required={true} label="Foto de la carga (obligatoria)" />
+                  </div>
+                </div>
 
                 <div className="space-y-3">
                   <QuantityInput
@@ -260,10 +304,6 @@ export default function YardDeliveriesPage() {
                       </p>
                     )}
                   </div>
-                </div>
-
-                <div className="space-y-2">
-                  <PhotoInput onSelect={setLoadPhoto} required={true} label="Foto de la carga (obligatoria)" />
                 </div>
 
                 <div className="space-y-1">
@@ -299,6 +339,18 @@ export default function YardDeliveriesPage() {
             )}
           </DialogContent>
         </Dialog>
+        
+        <Dialog open={showImagePreview} onOpenChange={setShowImagePreview}>
+            <DialogContent className="max-w-3xl p-0">
+                <DialogHeader>
+                    <DialogTitle className="sr-only">Vista Previa de la Imagen</DialogTitle>
+                </DialogHeader>
+                {previewImageUrl && (
+                <img src={previewImageUrl} alt="Vista previa" className="w-full h-auto max-h-[90vh] object-contain" />
+                )}
+            </DialogContent>
+        </Dialog>
+
       </div>
     </AppLayout>
   )
