@@ -34,11 +34,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     let sql = '';
     const p: any[] = [{ name: 'id', type: TYPES.Int, value: id }];
 
-    if (estado === 'EN_CARGA') {
-      sql = `UPDATE RIP.APP_DESPACHOS
-             SET status='EN_CARGA', updated_at=GETDATE()
-             WHERE id=@id`;
-    } else if (estado === 'CARGADA') {
+    if (estado === 'CARGADA') {
         if (!userId) return new NextResponse('ID de usuario requerido', { status: 400 });
         sql = `UPDATE RIP.APP_DESPACHOS
                SET status='CARGADA',
