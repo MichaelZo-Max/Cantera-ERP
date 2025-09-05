@@ -41,7 +41,6 @@ import {
   Edit,
   Trash2,
   CheckCircle,
-  Sparkles,
   Save,
   Layers,
 } from "lucide-react";
@@ -291,7 +290,7 @@ export function ProductsClientUI({ initialProducts }: { initialProducts: Product
             </div>
           </div>
           <GradientButton onClick={handleNewProduct} className="flex items-center space-x-2 animate-pulse-glow">
-            <Plus className="h-4 w-4" /><span>Nuevo Producto</span><Sparkles className="h-4 w-4 ml-1" />
+            <Plus className="h-4 w-4" /><span>Nuevo Producto</span>
           </GradientButton>
         </div>
 
@@ -348,7 +347,7 @@ export function ProductsClientUI({ initialProducts }: { initialProducts: Product
         <Dialog open={showProductDialog} onOpenChange={setShowProductDialog}>
           <DialogContent className="sm:max-w-xl">
             <DialogHeader>
-              <DialogTitle className="text-2xl font-bold flex items-center gap-2"><Sparkles className="h-5 w-5 text-primary" />{editingProduct ? "Editar Producto" : "Nuevo Producto"}</DialogTitle>
+              <DialogTitle className="text-2xl font-bold flex items-center gap-2">{editingProduct ? "Editar Producto" : "Nuevo Producto"}</DialogTitle>
               <DialogDescription>{editingProduct ? "Actualiza la información del producto." : "Completa los datos del nuevo producto."}</DialogDescription>
             </DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-6 pt-4">

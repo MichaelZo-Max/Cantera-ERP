@@ -40,7 +40,6 @@ import {
   Trash2,
   CheckCircle,
   Save,
-  Sparkles,
 } from "lucide-react";
 import { toast } from "sonner";
 import { LoadingSkeleton } from "@/components/ui/loading-skeleton";
@@ -173,7 +172,7 @@ export function UsersClientUI({ initialUsers }: { initialUsers: User[] }) {
           </div>
         </div>
         <GradientButton onClick={handleNewUser} className="flex items-center space-x-2 animate-pulse-glow">
-          <Plus className="h-4 w-4" /><span>Nuevo Usuario</span><Sparkles className="h-4 w-4 ml-1" />
+          <Plus className="h-4 w-4" /><span>Nuevo Usuario</span>
         </GradientButton>
       </div>
 

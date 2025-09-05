@@ -32,7 +32,6 @@ import {
   Trash2,
   CheckCircle,
   Save,
-  Sparkles,
   Phone,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -176,7 +175,6 @@ export function DriversClientUI({ initialDrivers }: { initialDrivers: Driver[] }
           >
             <Plus className="h-4 w-4" />
             <span>Nuevo Chofer</span>
-            <Sparkles className="h-4 w-4 ml-1" />
           </GradientButton>
         </div>
 
