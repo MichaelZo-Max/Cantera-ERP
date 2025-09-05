@@ -3,7 +3,7 @@ import { STATUS_COLORS, STATUS_LABELS } from "@/lib/constants"
 import type { Order, Delivery } from "@/lib/types"
 
 interface StatusBadgeProps {
-  status: Order["status"] | Delivery["status"]
+  status: Order["estado"] | Delivery["estado"]
   className?: string
 }
 

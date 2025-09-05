@@ -20,19 +20,19 @@ interface QuantityInputProps {
   step?: number
 }
 
-const UNIT_LABELS = {
+const UNIT_LABELS: Record<UnitBase, string> = {
   M3: "m³",
   TON: "toneladas",
-  BOLSA: "bolsas",
+  SACO: "sacos",
   UNIDAD: "unidades",
-} as const
+}
 
-const UNIT_HELPERS = {
+const UNIT_HELPERS: Record<UnitBase, string> = {
   M3: "Volumen en metros cúbicos",
   TON: "Peso en toneladas",
-  BOLSA: "Cantidad en bolsas",
+  SACO: "Cantidad en sacos",
   UNIDAD: "Cantidad en unidades",
-} as const
+}
 
 export function QuantityInput({
   unitBase,
