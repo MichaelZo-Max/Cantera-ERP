@@ -40,6 +40,8 @@ export default function SecurityExitsPage() {
   const [exitPhoto, setExitPhoto] = useState<File | null>(null)
   const [exitNotes, setExitNotes] = useState<string>("")
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [showImagePreview, setShowImagePreview] = useState(false)
+  const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null)
 
   useEffect(() => {
     const loadData = async () => {
@@ -134,6 +136,12 @@ export default function SecurityExitsPage() {
   const handleCloseModal = () => {
     setShowExitModal(false)
     setSelectedDelivery(null)
+    setPreviewImageUrl(null)
+  }
+
+  const openImagePreview = (imageUrl: string) => {
+    setPreviewImageUrl(imageUrl)
+    setShowImagePreview(true)
   }
 
   if (loading) {
@@ -344,13 +352,21 @@ export default function SecurityExitsPage() {
                       Foto del Patio
                     </h4>
                     {selectedDelivery.loadPhoto ? (
-                      <div className="border rounded-lg overflow-hidden">
+                      <div className="relative w-full h-48 rounded-lg overflow-hidden group border">
                         <img
                           src={selectedDelivery.loadPhoto || "/placeholder.svg"}
                           alt="Foto de carga del patio"
-                          className="w-full h-48 object-cover"
+                          className="w-full h-full object-cover"
                         />
-                        <div className="p-2 bg-muted text-sm text-muted-foreground text-center">Carga verificada</div>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity"
+                          onClick={() => openImagePreview(selectedDelivery.loadPhoto!)}
+                        >
+                          <Eye className="h-8 w-8 text-white" />
+                        </Button>
                       </div>
                     ) : (
                       <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-6 text-center h-48 flex flex-col items-center justify-center">
@@ -416,6 +432,18 @@ export default function SecurityExitsPage() {
             )}
           </DialogContent>
         </Dialog>
+        
+        <Dialog open={showImagePreview} onOpenChange={setShowImagePreview}>
+            <DialogContent className="max-w-3xl p-0">
+                <DialogHeader>
+                    <DialogTitle className="sr-only">Vista Previa de la Imagen</DialogTitle>
+                </DialogHeader>
+                {previewImageUrl && (
+                <img src={previewImageUrl} alt="Vista previa" className="w-full h-auto max-h-[90vh] object-contain" />
+                )}
+            </DialogContent>
+        </Dialog>
+
       </div>
     </AppLayout>
   )
