@@ -14,8 +14,10 @@ import { PhotoInput } from "@/components/forms/photo-input"
 import { toast } from "sonner"
 import type { Delivery } from "@/lib/types"
 import { CheckCircle, AlertTriangle, Camera, Package, Eye, X } from "lucide-react"
+import { useAuth } from "@/components/auth-provider"
 
 export default function YardDeliveriesPage() {
+  const { user } = useAuth();
   const [deliveries, setDeliveries] = useState<Delivery[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -68,7 +70,6 @@ export default function YardDeliveriesPage() {
 
     setIsSubmitting(true)
     
-    // Optimistic update
     const originalDeliveries = deliveries;
     const updatedDeliveries = deliveries.map((d) =>
       d.id === selectedDelivery.id
@@ -85,14 +86,21 @@ export default function YardDeliveriesPage() {
     setShowConfirmModal(false)
 
     try {
+      // ✨ Create a FormData object to send the file and other data
+      const formData = new FormData();
+      formData.append('estado', 'CARGADA');
+      formData.append('loadedQuantity', loadedQuantity.toString());
+      formData.append('notes', notes);
+      if (user?.id) {
+        formData.append('userId', user.id);
+      }
+      if (loadPhoto) {
+        formData.append('photoFile', loadPhoto);
+      }
+      
       const res = await fetch(`/api/deliveries/${selectedDelivery.id}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-            estado: 'CARGADA',
-            loadedQuantity,
-            notes,
-        }),
+        body: formData, // ✨ Send FormData instead of JSON
       });
 
       if (!res.ok) throw new Error(await res.text());
@@ -101,14 +109,12 @@ export default function YardDeliveriesPage() {
         description: `Viaje para ${selectedDelivery.truck?.placa} actualizado.`,
       })
     } catch (error) {
-      // Revert on error
       setDeliveries(originalDeliveries)
       toast.error("Error al confirmar la carga", {
         description: "Por favor, inténtalo de nuevo.",
       })
     } finally {
       setIsSubmitting(false)
-      // Reset form
       setSelectedDelivery(null)
       setLoadPhoto(null)
       setNotes("")
