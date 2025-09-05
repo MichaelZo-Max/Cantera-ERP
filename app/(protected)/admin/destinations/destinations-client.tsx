@@ -308,7 +308,7 @@ export function DestinationsClientUI({
                 </SelectTrigger>
                 <SelectContent>
                   {clients.map((client) => (
-                    <SelectItem key={client.id} value={client.id}>
+                    <SelectItem key={client.id} value={String(client.id)}>
                       {client.nombre}
                     </SelectItem>
                   ))}

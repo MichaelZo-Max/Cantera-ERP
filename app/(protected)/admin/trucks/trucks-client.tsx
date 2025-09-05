@@ -6,12 +6,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
@@ -178,31 +173,31 @@ export function TrucksClientUI({
 
   return (
     <div className="space-y-8 animate-fade-in">
-        {/* Header con el botón para abrir el modal */}
-        <div className="flex justify-between items-center">
-          <div className="space-y-2">
-            <div className="flex items-center space-x-3">
-              <div className="p-2 bg-gradient-primary rounded-lg">
-                <TruckIcon className="h-6 w-6 text-white" />
-              </div>
-              <div>
-                <h2 className="text-3xl font-bold bg-gradient-to-r from-foreground to-muted-foreground bg-clip-text text-transparent">
-                  Flota de Camiones
-                </h2>
-                <p className="text-muted-foreground">
-                  Administra los vehículos de transporte y sus choferes
-                </p>
-              </div>
+      {/* Header con el botón para abrir el modal */}
+      <div className="flex justify-between items-center">
+        <div className="space-y-2">
+          <div className="flex items-center space-x-3">
+            <div className="p-2 bg-gradient-primary rounded-lg">
+              <TruckIcon className="h-6 w-6 text-white" />
+            </div>
+            <div>
+              <h2 className="text-3xl font-bold bg-gradient-to-r from-foreground to-muted-foreground bg-clip-text text-transparent">
+                Flota de Camiones
+              </h2>
+              <p className="text-muted-foreground">
+                Administra los vehículos de transporte y sus choferes
+              </p>
             </div>
           </div>
-          <GradientButton
-            onClick={handleNewTruck}
-            className="flex items-center space-x-2 animate-pulse-glow"
-          >
-            <Plus className="h-4 w-4" />
-            <span>Nuevo Camión</span>
-          </GradientButton>
         </div>
+        <GradientButton
+          onClick={handleNewTruck}
+          className="flex items-center space-x-2 animate-pulse-glow"
+        >
+          <Plus className="h-4 w-4" />
+          <span>Nuevo Camión</span>
+        </GradientButton>
+      </div>
 
       {/* Search Bar */}
       <AnimatedCard hoverEffect="lift" className="glass">
@@ -221,94 +216,94 @@ export function TrucksClientUI({
 
       {/* Trucks Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredTrucks.length === 0 ? (
-            <div className="col-span-full">
-              <AnimatedCard className="glass">
-                <CardContent className="pt-12 pb-12 text-center">
-                  <TruckIcon className="h-16 w-16 text-muted-foreground mx-auto mb-4 opacity-50" />
-                  <p className="text-muted-foreground text-lg">
-                    No se encontraron camiones
-                  </p>
-                </CardContent>
-              </AnimatedCard>
-            </div>
-          ) : (
-            filteredTrucks.map((truck, index) => (
-              <AnimatedCard
-                key={truck.id}
-                hoverEffect="lift"
-                animateIn
-                delay={index * 100}
-                className="glass overflow-hidden"
-              >
-                <CardHeader className="pb-3">
-                  <div className="flex justify-between items-start">
-                    <div className="flex-1">
-                      <CardTitle className="text-xl font-bold bg-gradient-to-r from-foreground to-muted-foreground bg-clip-text text-transparent">
-                        {truck.placa}
-                      </CardTitle>
-                      <p className="text-sm text-muted-foreground mt-1 font-medium">
-                        {truck.brand} {truck.model}
+        {filteredTrucks.length === 0 ? (
+          <div className="col-span-full">
+            <AnimatedCard className="glass">
+              <CardContent className="pt-12 pb-12 text-center">
+                <TruckIcon className="h-16 w-16 text-muted-foreground mx-auto mb-4 opacity-50" />
+                <p className="text-muted-foreground text-lg">
+                  No se encontraron camiones
+                </p>
+              </CardContent>
+            </AnimatedCard>
+          </div>
+        ) : (
+          filteredTrucks.map((truck, index) => (
+            <AnimatedCard
+              key={truck.id}
+              hoverEffect="lift"
+              animateIn
+              delay={index * 100}
+              className="glass overflow-hidden"
+            >
+              <CardHeader className="pb-3">
+                <div className="flex justify-between items-start">
+                  <div className="flex-1">
+                    <CardTitle className="text-xl font-bold bg-gradient-to-r from-foreground to-muted-foreground bg-clip-text text-transparent">
+                      {truck.placa}
+                    </CardTitle>
+                    <p className="text-sm text-muted-foreground mt-1 font-medium">
+                      {truck.brand} {truck.model}
+                    </p>
+                  </div>
+                  <Badge
+                    variant={truck.is_active ? "default" : "secondary"}
+                    className={truck.is_active ? "bg-gradient-primary" : ""}
+                  >
+                    {truck.is_active ? "Activo" : "Inactivo"}
+                  </Badge>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex justify-between">
+                  {truck.capacity && (
+                    <div className="bg-gradient-to-r from-primary/10 to-accent/10 border border-primary/20 p-3 rounded-xl flex-1">
+                      <p className="text-2xl font-bold bg-gradient-primary bg-clip-text text-transparent">
+                        {truck.capacity} m³
+                      </p>
+                      <p className="text-sm text-primary/80 font-medium">
+                        Capacidad
                       </p>
                     </div>
-                    <Badge
-                      variant={truck.is_active ? "default" : "secondary"}
-                      className={truck.is_active ? "bg-gradient-primary" : ""}
-                    >
-                      {truck.is_active ? "Activo" : "Inactivo"}
-                    </Badge>
+                  )}
+                  <div className="bg-gradient-to-r from-secondary/10 to-accent/10 border border-secondary/20 p-3 rounded-xl flex-1 ml-2">
+                    <p className="text-lg font-bold bg-gradient-to-r from-secondary to-accent bg-clip-text text-transparent truncate">
+                      {truck.driver?.nombre || "Sin chofer"}
+                    </p>
+                    <p className="text-sm text-secondary/80 font-medium">
+                      Chofer
+                    </p>
                   </div>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="flex justify-between">
-                    {truck.capacity && (
-                      <div className="bg-gradient-to-r from-primary/10 to-accent/10 border border-primary/20 p-3 rounded-xl flex-1">
-                        <p className="text-2xl font-bold bg-gradient-primary bg-clip-text text-transparent">
-                          {truck.capacity} m³
-                        </p>
-                        <p className="text-sm text-primary/80 font-medium">
-                          Capacidad
-                        </p>
-                      </div>
+                </div>
+                <div className="flex space-x-2 pt-4 border-t">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleEditTruck(truck)}
+                    className="flex items-center space-x-1 flex-1 transition-smooth hover:bg-primary/5"
+                  >
+                    <Edit className="h-3 w-3" />
+                    <span>Editar</span>
+                  </Button>
+                  <Button
+                    variant={truck.is_active ? "destructive" : "default"}
+                    size="sm"
+                    onClick={() => handleToggleStatus(truck)}
+                    className="flex items-center space-x-1 transition-smooth"
+                  >
+                    {truck.is_active ? (
+                      <Trash2 className="h-3 w-3" />
+                    ) : (
+                      <CheckCircle className="h-3 w-3" />
                     )}
-                    <div className="bg-gradient-to-r from-secondary/10 to-accent/10 border border-secondary/20 p-3 rounded-xl flex-1 ml-2">
-                       <p className="text-lg font-bold bg-gradient-to-r from-secondary to-accent bg-clip-text text-transparent truncate">
-                          {truck.driver?.nombre || "Sin chofer"}
-                        </p>
-                      <p className="text-sm text-secondary/80 font-medium">
-                        Chofer
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex space-x-2 pt-4 border-t">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleEditTruck(truck)}
-                      className="flex items-center space-x-1 flex-1 transition-smooth hover:bg-primary/5"
-                    >
-                      <Edit className="h-3 w-3" />
-                      <span>Editar</span>
-                    </Button>
-                    <Button
-                      variant={truck.is_active ? "destructive" : "default"}
-                      size="sm"
-                      onClick={() => handleToggleStatus(truck)}
-                      className="flex items-center space-x-1 transition-smooth"
-                    >
-                      {truck.is_active ? (
-                        <Trash2 className="h-3 w-3" />
-                      ) : (
-                        <CheckCircle className="h-3 w-3" />
-                      )}
-                      <span>{truck.is_active ? "Desactivar" : "Activar"}</span>
-                    </Button>
-                  </div>
-                </CardContent>
-              </AnimatedCard>
-            ))
-          )}
-        </div>
+                    <span>{truck.is_active ? "Desactivar" : "Activar"}</span>
+                  </Button>
+                </div>
+              </CardContent>
+            </AnimatedCard>
+          ))
+        )}
+      </div>
 
       {/* Create/Edit Dialog */}
       <Dialog open={showDialog} onOpenChange={setShowDialog}>
@@ -409,7 +404,7 @@ export function TrucksClientUI({
                   </SelectTrigger>
                   <SelectContent>
                     {drivers.map((driver) => (
-                      <SelectItem key={driver.id} value={driver.id}>
+                      <SelectItem key={driver.id} value={String(driver.id)}>
                         {driver.nombre}
                       </SelectItem>
                     ))}
