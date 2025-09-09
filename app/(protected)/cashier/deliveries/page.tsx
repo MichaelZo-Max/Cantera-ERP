@@ -3,11 +3,12 @@ import { AppLayout } from "@/components/app-layout";
 import type { Delivery } from "@/lib/types";
 import { CashierDeliveriesClientUI } from "./deliveries-client"; // Importamos el nuevo componente
 
-// Función para obtener los datos en el servidor
 async function getDeliveries(): Promise<{ deliveries: Delivery[] }> {
   try {
     const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
-    const res = await fetch(`${baseUrl}/api/deliveries`, { cache: "no-store" });
+    const res = await fetch(`${baseUrl}/api/deliveries`, {
+      next: { tags: ["deliveries"] },
+    });
 
     if (!res.ok) {
       throw new Error("Error al cargar los despachos");

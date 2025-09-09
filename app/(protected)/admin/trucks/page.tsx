@@ -6,13 +6,13 @@ import { TrucksClientUI } from "./trucks-client"; // Importamos el nuevo compone
 // Función para cargar los datos en el servidor
 async function getTrucksAndDrivers(): Promise<{ trucks: TruckType[]; drivers: Driver[] }> {
   try {
-    // Estas llamadas ahora se hacen en el servidor, son mucho más rápidas y seguras.
-    // Asegúrate de que tu URL de API sea absoluta si es necesario.
     const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
 
     const [trucksRes, driversRes] = await Promise.all([
-      fetch(`${baseUrl}/api/trucks`, { cache: "no-store" }),
-      fetch(`${baseUrl}/api/drivers`, { cache: "no-store" }),
+      // ANTES: fetch(`${baseUrl}/api/trucks`, { cache: "no-store" }),
+      fetch(`${baseUrl}/api/trucks`, { next: { tags: ['trucks'] } }),
+      // ANTES: fetch(`${baseUrl}/api/drivers`, { cache: "no-store" }),
+      fetch(`${baseUrl}/api/drivers`, { next: { tags: ['drivers'] } }),
     ]);
 
     if (!trucksRes.ok) throw new Error('Error al cargar camiones');

@@ -4,25 +4,30 @@ import { CashierOrderClientUI } from "./cashier-order-client"; // Importamos el 
 import type { Client, Product, Truck as TruckType } from "@/lib/types";
 
 // Función para cargar los datos necesarios en el servidor
-async function getOrderCatalogs(): Promise<{ clients: Client[]; products: Product[]; trucks: TruckType[] }> {
+async function getOrderCatalogs(): Promise<{
+  clients: Client[];
+  products: Product[];
+  trucks: TruckType[];
+}> {
   try {
     const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
-    
-    // Hacemos las llamadas a la API en paralelo para optimizar el tiempo de carga
+
     const [cRes, pRes, tRes] = await Promise.all([
-      fetch(`${baseUrl}/api/customers`, { cache: "no-store" }),
-      fetch(`${baseUrl}/api/products`, { cache: "no-store" }),
-      fetch(`${baseUrl}/api/trucks`, { cache: "no-store" }),
+      fetch(`${baseUrl}/api/customers`, { next: { tags: ["customers"] } }), // DESPUÉS
+      // ANTES: fetch(`${baseUrl}/api/products`, { cache: "no-store" }),
+      fetch(`${baseUrl}/api/products`, { next: { tags: ["products"] } }), // DESPUÉS
+      // ANTES: fetch(`${baseUrl}/api/trucks`, { cache: "no-store" }),
+      fetch(`${baseUrl}/api/trucks`, { next: { tags: ["trucks"] } }), // DESPUÉS
     ]);
 
-    if (!cRes.ok) throw new Error('Error al cargar clientes');
-    if (!pRes.ok) throw new Error('Error al cargar productos');
-    if (!tRes.ok) throw new Error('Error al cargar camiones');
+    if (!cRes.ok) throw new Error("Error al cargar clientes");
+    if (!pRes.ok) throw new Error("Error al cargar productos");
+    if (!tRes.ok) throw new Error("Error al cargar camiones");
 
     const clients = await cRes.json();
     const products = await pRes.json();
     const trucks = await tRes.json();
-    
+
     return { clients, products, trucks };
   } catch (error) {
     console.error("Error cargando catálogos en el servidor:", error);
@@ -38,7 +43,7 @@ export default async function CashierOrderPage() {
   return (
     <AppLayout title="Comanda y Pago">
       {/* Pasamos los datos iniciales al componente de cliente */}
-      <CashierOrderClientUI 
+      <CashierOrderClientUI
         initialClients={clients}
         initialProducts={products}
         initialTrucks={trucks}

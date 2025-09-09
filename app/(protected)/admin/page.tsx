@@ -513,7 +513,7 @@ export default function AdminPage() {
                     <SelectContent>
                       {products.map((product) => (
                         <SelectItem key={product.id} value={product.id}>
-                          {product.nombre} ({product.codigo})
+                          {product.nombre} ({product.refProveedor})
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -957,14 +957,14 @@ export default function AdminPage() {
                           p.nombre
                             .toLowerCase()
                             .includes(searchTerm.toLowerCase()) ||
-                          p.codigo
+                          p.refProveedor
                             .toLowerCase()
                             .includes(searchTerm.toLowerCase())
                       )
                       .map((product) => (
                         <TableRow key={product.id}>
                           <TableCell className="font-medium">
-                            {product.codigo}
+                            {product.refProveedor}
                           </TableCell>
                           <TableCell>{product.nombre}</TableCell>
                           <TableCell>

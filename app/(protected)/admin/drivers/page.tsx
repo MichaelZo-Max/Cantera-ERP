@@ -7,10 +7,9 @@ import { DriversClientUI } from "./drivers-client"; // Importamos el componente 
 async function getDrivers(): Promise<{ drivers: Driver[] }> {
   try {
     const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
-    const res = await fetch(`${baseUrl}/api/drivers`, { cache: "no-store" });
-
+    const res = await fetch(`${baseUrl}/api/drivers`, { next: { tags: ['drivers'] } });
     if (!res.ok) {
-      throw new Error("Error al cargar los choferes");
+      throw new Error("Failed to fetch drivers");
     }
 
     const drivers = await res.json();

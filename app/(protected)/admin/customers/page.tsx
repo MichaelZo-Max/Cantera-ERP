@@ -7,10 +7,11 @@ import { CustomersClientUI } from "./customers-client"; // Importamos el nuevo c
 async function getCustomers(): Promise<{ customers: Client[] }> {
   try {
     const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
-    const res = await fetch(`${baseUrl}/api/customers`, { cache: "no-store" });
-
+    const res = await fetch(`${baseUrl}/api/customers`, {
+      next: { tags: ["customers"] },
+    });
     if (!res.ok) {
-      throw new Error("Error al cargar los clientes");
+      throw new Error("Failed to fetch customers");
     }
 
     const customers = await res.json();

@@ -4,22 +4,26 @@ import type { Destination, Client } from "@/lib/types";
 import { DestinationsClientUI } from "./destinations-client"; // Importamos el nuevo componente
 
 // Función para obtener los datos en el servidor
-async function getDestinationsAndClients(): Promise<{ destinations: Destination[]; clients: Client[] }> {
+async function getDestinationsAndClients(): Promise<{
+  destinations: Destination[];
+  clients: Client[];
+}> {
   try {
     const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
-    
-    // Hacemos ambas llamadas en paralelo para mayor eficiencia
+
     const [destRes, clientRes] = await Promise.all([
-      fetch(`${baseUrl}/api/destinations`, { cache: "no-store" }),
-      fetch(`${baseUrl}/api/customers`, { cache: "no-store" }),
+      fetch(`${baseUrl}/api/destinations`, {
+        next: { tags: ["destinations"] },
+      }),
+      fetch(`${baseUrl}/api/customers`, { next: { tags: ["customers"] } }),
     ]);
 
-    if (!destRes.ok) throw new Error('Error al cargar destinos');
-    if (!clientRes.ok) throw new Error('Error al cargar clientes');
+    if (!destRes.ok) throw new Error("Error al cargar destinos");
+    if (!clientRes.ok) throw new Error("Error al cargar clientes");
 
     const destinations = await destRes.json();
     const clients = await clientRes.json();
-    
+
     return { destinations, clients };
   } catch (error) {
     console.error("Error cargando datos en el servidor:", error);
@@ -38,9 +42,9 @@ export default async function DestinationsPage() {
       {/* Renderizamos el componente de cliente y le pasamos los datos iniciales.
         La lista de destinos ya viene pre-renderizada desde el servidor.
       */}
-      <DestinationsClientUI 
-        initialDestinations={destinations} 
-        initialClients={clients} 
+      <DestinationsClientUI
+        initialDestinations={destinations}
+        initialClients={clients}
       />
     </AppLayout>
   );

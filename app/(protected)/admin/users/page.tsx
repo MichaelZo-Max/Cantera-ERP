@@ -7,10 +7,9 @@ import { UsersClientUI } from "./users-client"; // Importamos el componente de c
 async function getUsers(): Promise<{ users: User[] }> {
   try {
     const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
-    const res = await fetch(`${baseUrl}/api/users`, { cache: "no-store" });
-
+    const res = await fetch(`${baseUrl}/api/users`, { next: { tags: ['users'] } });
     if (!res.ok) {
-      throw new Error("Error al cargar los usuarios");
+      throw new Error("Failed to fetch users");
     }
 
     const users = await res.json();
