@@ -38,6 +38,8 @@ import {
   Save,
 } from "lucide-react";
 import { toast } from "sonner";
+import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
+import { useConfirmation } from "@/hooks/use-confirmation";
 
 export function CustomersClientUI({
   initialCustomers,
@@ -57,6 +59,9 @@ export function CustomersClientUI({
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
+
+  const { isOpen, options, confirm, handleConfirm, handleCancel } = useConfirmation();
+
 
   const filteredCustomers = customers.filter(
     (customer) =>
@@ -130,41 +135,53 @@ export function CustomersClientUI({
     }
   };
 
-  const handleToggleStatus = async (customer: Client) => {
+  const handleToggleStatus = (customer: Client) => {
     const is_active = customer.is_active;
-    if (
-      !confirm(
-        `¿Estás seguro de que quieres ${
-          is_active ? "desactivar" : "activar"
-        } este cliente?`
-      )
-    ) {
-      return;
-    }
-
-    try {
-      const res = await fetch(`/api/customers/${customer.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ is_active: !is_active }),
-      });
-      if (!res.ok) throw new Error(await res.text());
-      const updatedCustomer = await res.json();
-      setCustomers(
-        customers.map((c) =>
-          c.id === updatedCustomer.id ? updatedCustomer : c
-        )
-      );
-      toast.success(
-        `Cliente ${!is_active ? "activado" : "desactivado"} exitosamente.`
-      );
-    } catch (err: any) {
-      toast.error("Error al cambiar el estado", { description: err.message });
-    }
+    confirm(
+      {
+        title: `¿Estás seguro?`,
+        description: `Esta acción ${
+          is_active ? "desactivará" : "activará"
+        } al cliente "${customer.nombre}".`,
+        confirmText: is_active ? "Desactivar" : "Activar",
+        variant: is_active ? "destructive" : "default",
+      },
+      async () => {
+        try {
+          const res = await fetch(`/api/customers/${customer.id}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ is_active: !is_active }),
+          });
+          if (!res.ok) throw new Error(await res.text());
+          const updatedCustomer = await res.json();
+          setCustomers(
+            customers.map((c) =>
+              c.id === updatedCustomer.id ? updatedCustomer : c
+            )
+          );
+          toast.success(
+            `Cliente ${!is_active ? "activado" : "desactivado"} exitosamente.`
+          );
+        } catch (err: any) {
+          toast.error("Error al cambiar el estado", { description: err.message });
+        }
+      }
+    );
   };
 
   return (
     <div className="space-y-8 animate-fade-in">
+       <ConfirmationDialog
+        open={isOpen}
+        onOpenChange={handleCancel}
+        title={options?.title || ""}
+        description={options?.description || ""}
+        onConfirm={handleConfirm}
+        confirmText={options?.confirmText}
+        cancelText={options?.cancelText}
+        variant={options?.variant}
+      />
       {/* Header */}
       <div className="flex justify-between items-center">
         <div className="space-y-2">

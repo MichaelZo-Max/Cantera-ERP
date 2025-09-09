@@ -37,6 +37,8 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { LoadingSkeleton } from "@/components/ui/loading-skeleton";
+import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
+import { useConfirmation } from "@/hooks/use-confirmation";
 
 // El componente ahora recibe los datos iniciales como props
 export function TrucksClientUI({
@@ -62,6 +64,7 @@ export function TrucksClientUI({
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
+  const { isOpen, options, confirm, handleConfirm, handleCancel } = useConfirmation();
 
   // La lógica de filtrado y los manejadores de eventos se mantienen aquí
   const filteredTrucks = trucks.filter(
@@ -140,39 +143,50 @@ export function TrucksClientUI({
     }
   };
 
-  const handleToggleStatus = async (truck: TruckType) => {
+  const handleToggleStatus = (truck: TruckType) => {
     const is_active = truck.is_active;
-    if (
-      !confirm(
-        `¿Estás seguro de que quieres ${
-          is_active ? "desactivar" : "activar"
-        } este camión?`
-      )
-    ) {
-      return;
-    }
-
-    try {
-      const res = await fetch(`/api/trucks/${truck.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ is_active: !is_active }),
-      });
-      if (!res.ok) throw new Error(await res.text());
-      const updatedTruck = await res.json();
-      setTrucks(
-        trucks.map((t) => (t.id === updatedTruck.id ? updatedTruck : t))
-      );
-      toast.success(
-        `Camión ${!is_active ? "activado" : "desactivado"} exitosamente.`
-      );
-    } catch (err: any) {
-      toast.error("Error al cambiar el estado", { description: err.message });
-    }
+    confirm({
+        title: `¿Estás seguro?`,
+        description: `Esta acción ${
+          is_active ? "desactivará" : "activará"
+        } el camión con placas "${truck.placa}".`,
+        confirmText: is_active ? "Desactivar" : "Activar",
+        variant: is_active ? "destructive" : "default",
+      },
+      async () => {
+        try {
+          const res = await fetch(`/api/trucks/${truck.id}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ is_active: !is_active }),
+          });
+          if (!res.ok) throw new Error(await res.text());
+          const updatedTruck = await res.json();
+          setTrucks(
+            trucks.map((t) => (t.id === updatedTruck.id ? updatedTruck : t))
+          );
+          toast.success(
+            `Camión ${!is_active ? "activado" : "desactivado"} exitosamente.`
+          );
+        } catch (err: any) {
+          toast.error("Error al cambiar el estado", { description: err.message });
+        }
+      }
+    );
   };
 
   return (
     <div className="space-y-8 animate-fade-in">
+        <ConfirmationDialog
+        open={isOpen}
+        onOpenChange={handleCancel}
+        title={options?.title || ""}
+        description={options?.description || ""}
+        onConfirm={handleConfirm}
+        confirmText={options?.confirmText}
+        cancelText={options?.cancelText}
+        variant={options?.variant}
+      />
       {/* Header con el botón para abrir el modal */}
       <div className="flex justify-between items-center">
         <div className="space-y-2">

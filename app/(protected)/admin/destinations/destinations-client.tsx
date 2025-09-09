@@ -36,6 +36,12 @@ import {
   Users,
 } from "lucide-react";
 import { toast } from "sonner";
+import { AnimatedCard } from "@/components/ui/animated-card";
+import { GradientButton } from "@/components/ui/gradient-button";
+import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
+import { useConfirmation } from "@/hooks/use-confirmation";
+import { LoadingSkeleton } from "@/components/ui/loading-skeleton";
+
 
 // El componente ahora recibe los datos iniciales como props
 export function DestinationsClientUI({
@@ -60,6 +66,8 @@ export function DestinationsClientUI({
     direccion: "",
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const { isOpen, options, confirm, handleConfirm, handleCancel } = useConfirmation();
 
   const filteredDestinations = destinations.filter((dest) => {
     const clientName = dest.client?.nombre?.toLowerCase() ?? "";
@@ -114,6 +122,13 @@ export function DestinationsClientUI({
       }
 
       const savedDestination = await res.json();
+      
+      // Adjuntar la información del cliente al nuevo objeto para mostrarlo correctamente
+      const client = clients.find(c => c.id === savedDestination.clientId);
+      if(client) {
+          savedDestination.client = client;
+      }
+
 
       if (editingDestination) {
         setDestinations(
@@ -136,60 +151,81 @@ export function DestinationsClientUI({
     }
   };
 
-  const handleToggleStatus = async (destination: Destination) => {
+  const handleToggleStatus = (destination: Destination) => {
     const isActive = destination.is_active;
-    if (
-      !confirm(
-        `¿Estás seguro de que quieres ${
-          isActive ? "desactivar" : "activar"
-        } este destino?`
-      )
-    ) {
-      return;
-    }
+    confirm({
+      title: `¿Estás seguro?`,
+      description: `Esta acción ${
+        isActive ? "desactivará" : "activará"
+      } el destino "${destination.nombre}".`,
+      confirmText: isActive ? "Desactivar" : "Activar",
+      variant: isActive ? "destructive" : "default",
+    },
+    async () => {
+        try {
+            const res = await fetch(`/api/destinations/${destination.id}`, {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ is_active: !isActive }),
+            });
+      
+            if (!res.ok) throw new Error(await res.text());
+            
+            // Actualizar el estado localmente para reflejar el cambio
+            setDestinations(destinations.map(d => 
+                d.id === destination.id 
+                    ? { ...d, is_active: !isActive } 
+                    : d
+            ));
 
-    try {
-      const res = await fetch(`/api/destinations/${destination.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ is_active: !isActive }),
-      });
+            toast.success(
+              `Destino ${!isActive ? "activado" : "desactivado"} con éxito.`
+            );
+          } catch (err: any) {
+            toast.error("Error al cambiar el estado", { description: err.message });
+          }
+    });
 
-      if (!res.ok) throw new Error(await res.text());
-      const updatedItem = await res.json();
-
-      updatedItem.client = destination.client;
-
-      setDestinations(
-        destinations.map((d) => (d.id === updatedItem.id ? updatedItem : d))
-      );
-      toast.success(
-        `Destino ${!isActive ? "activado" : "desactivado"} con éxito.`
-      );
-    } catch (err: any) {
-      toast.error("Error al cambiar el estado", { description: err.message });
-    }
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8 animate-fade-in">
+        <ConfirmationDialog
+        open={isOpen}
+        onOpenChange={handleCancel}
+        title={options?.title || ""}
+        description={options?.description || ""}
+        onConfirm={handleConfirm}
+        confirmText={options?.confirmText}
+        cancelText={options?.cancelText}
+        variant={options?.variant}
+      />
       <div className="flex justify-between items-center">
-        <div>
-          <h2 className="text-2xl font-bold text-foreground">Destinos</h2>
-          <p className="text-muted-foreground">
-            Gestiona las direcciones de entrega de los clientes
-          </p>
+        <div className="space-y-2">
+            <div className="flex items-center space-x-3">
+                <div className="p-2 bg-gradient-primary rounded-lg">
+                    <MapPin className="h-6 w-6 text-white" />
+                </div>
+                <div>
+                    <h2 className="text-3xl font-bold bg-gradient-to-r from-foreground to-muted-foreground bg-clip-text text-transparent">
+                        Destinos
+                    </h2>
+                    <p className="text-muted-foreground">
+                        Gestiona las direcciones de entrega de los clientes
+                    </p>
+                </div>
+            </div>
         </div>
-        <Button
+        <GradientButton
           onClick={handleNewDestination}
-          className="flex items-center space-x-2"
+          className="flex items-center space-x-2 animate-pulse-glow"
         >
           <Plus className="h-4 w-4" />
           <span>Nuevo Destino</span>
-        </Button>
+        </GradientButton>
       </div>
 
-      <Card>
+      <AnimatedCard hoverEffect="lift" className="glass">
         <CardContent className="pt-6">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
@@ -201,25 +237,28 @@ export function DestinationsClientUI({
             />
           </div>
         </CardContent>
-      </Card>
+      </AnimatedCard>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {filteredDestinations.length === 0 ? (
           <div className="col-span-full">
-            <Card>
+            <AnimatedCard className="glass">
               <CardContent className="pt-6 text-center">
                 <MapPin className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
                 <p className="text-muted-foreground">
                   No se encontraron destinos
                 </p>
               </CardContent>
-            </Card>
+            </AnimatedCard>
           </div>
         ) : (
-          filteredDestinations.map((destination) => (
-            <Card
+          filteredDestinations.map((destination, index) => (
+            <AnimatedCard
               key={destination.id}
-              className="hover:shadow-md transition-shadow"
+              hoverEffect="lift"
+              animateIn
+              delay={index * 100}
+              className="glass overflow-hidden"
             >
               <CardHeader className="pb-3">
                 <div className="flex justify-between items-start">
@@ -275,7 +314,7 @@ export function DestinationsClientUI({
                   </Button>
                 </div>
               </CardContent>
-            </Card>
+            </AnimatedCard>
           ))
         )}
       </div>
@@ -350,19 +389,24 @@ export function DestinationsClientUI({
               >
                 Cancelar
               </Button>
-              <Button
+              <GradientButton
                 type="submit"
                 disabled={
                   isSubmitting || !formData.clientId || !formData.nombre
                 }
               >
-                <Save className="h-4 w-4 mr-2" />
-                {isSubmitting
-                  ? "Guardando..."
-                  : editingDestination
-                  ? "Guardar Cambios"
-                  : "Crear Destino"}
-              </Button>
+                 {isSubmitting ? (
+                  <>
+                    <LoadingSkeleton className="w-4 h-4 mr-2" />
+                    Guardando...
+                  </>
+                ) : (
+                  <>
+                    <Save className="h-4 w-4 mr-2" />
+                    {editingDestination ? "Guardar Cambios" : "Crear Destino"}
+                  </>
+                )}
+              </GradientButton>
             </DialogFooter>
           </form>
         </DialogContent>

@@ -36,6 +36,8 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { LoadingSkeleton } from "@/components/ui/loading-skeleton";
+import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
+import { useConfirmation } from "@/hooks/use-confirmation";
 
 // El componente recibe los datos iniciales como props
 export function DriversClientUI({ initialDrivers }: { initialDrivers: Driver[] }) {
@@ -50,6 +52,8 @@ export function DriversClientUI({ initialDrivers }: { initialDrivers: Driver[] }
     phone: "",
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const { isOpen, options, confirm, handleConfirm, handleCancel } = useConfirmation();
 
   const filteredDrivers = drivers.filter(
     (driver) =>
@@ -117,41 +121,53 @@ export function DriversClientUI({ initialDrivers }: { initialDrivers: Driver[] }
     }
   };
 
-  const handleToggleStatus = async (driver: Driver) => {
+  const handleToggleStatus = (driver: Driver) => {
     const is_active = driver.is_active;
-    if (
-      !confirm(
-        `¿Estás seguro de que quieres ${
-          is_active ? "desactivar" : "activar"
-        } este chofer?`
-      )
-    ) {
-      return;
-    }
-
-    try {
-      const res = await fetch(`/api/drivers/${driver.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ is_active: !is_active }),
-      });
-
-      if (!res.ok) throw new Error(await res.text());
-      
-      const updatedDriver = await res.json();
-      setDrivers(
-        drivers.map((d) => (d.id === updatedDriver.id ? updatedDriver : d))
+    confirm(
+        {
+          title: `¿Estás seguro?`,
+          description: `Esta acción ${
+            is_active ? "desactivará" : "activará"
+          } al chofer "${driver.nombre}".`,
+          confirmText: is_active ? "Desactivar" : "Activar",
+          variant: is_active ? "destructive" : "default",
+        },
+        async () => {
+            try {
+                const res = await fetch(`/api/drivers/${driver.id}`, {
+                  method: "PATCH",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ is_active: !is_active }),
+                });
+          
+                if (!res.ok) throw new Error(await res.text());
+                
+                const updatedDriver = await res.json();
+                setDrivers(
+                  drivers.map((d) => (d.id === updatedDriver.id ? updatedDriver : d))
+                );
+                toast.success(
+                  `Chofer ${!is_active ? "activado" : "desactivado"} exitosamente.`
+                );
+              } catch (err: any) {
+                toast.error("Error al cambiar el estado", { description: err.message });
+              }
+        }
       );
-      toast.success(
-        `Chofer ${!is_active ? "activado" : "desactivado"} exitosamente.`
-      );
-    } catch (err: any) {
-      toast.error("Error al cambiar el estado", { description: err.message });
-    }
   };
 
   return (
     <div className="space-y-8 animate-fade-in">
+        <ConfirmationDialog
+        open={isOpen}
+        onOpenChange={handleCancel}
+        title={options?.title || ""}
+        description={options?.description || ""}
+        onConfirm={handleConfirm}
+        confirmText={options?.confirmText}
+        cancelText={options?.cancelText}
+        variant={options?.variant}
+      />
         {/* Header */}
         <div className="flex justify-between items-center">
           <div className="space-y-2">

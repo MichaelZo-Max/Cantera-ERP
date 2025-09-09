@@ -53,6 +53,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
+import { useConfirmation } from "@/hooks/use-confirmation";
 
 // --- Componente Anidado para el Modal de Formatos ---
 function FormatsDialog({
@@ -205,6 +207,7 @@ export function ProductsClientUI({ initialProducts }: { initialProducts: Product
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [formData, setFormData] = useState({ refProveedor: "", nombre: "", description: "" });
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const { isOpen, options, confirm, handleConfirm, handleCancel } = useConfirmation();
 
   const fetchProductsAndProviders = useCallback(async () => {
     try {
@@ -278,21 +281,38 @@ export function ProductsClientUI({ initialProducts }: { initialProducts: Product
     }
   };
 
-  const handleToggleStatus = async (product: Product) => {
-    if (!confirm(`¿Estás seguro de que quieres ${product.is_active ? "desactivar" : "activar"} este producto?`)) return;
-
-    try {
-      const res = await fetch(`/api/products/${product.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ is_active: !product.is_active }) });
-      if (!res.ok) throw new Error(await res.text());
-      await fetchProductsAndProviders();
-      toast.success(`Producto ${!product.is_active ? "activado" : "desactivado"}.`);
-    } catch (err: any) {
-      toast.error("Error al cambiar el estado", { description: err.message });
-    }
+  const handleToggleStatus = (product: Product) => {
+    confirm({
+        title: `¿Estás seguro?`,
+        description: `Esta acción ${product.is_active ? "desactivará" : "activará"} el producto "${product.nombre}".`,
+        confirmText: product.is_active ? "Desactivar" : "Activar",
+        variant: product.is_active ? "destructive" : "default",
+      },
+      async () => {
+        try {
+          const res = await fetch(`/api/products/${product.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ is_active: !product.is_active }) });
+          if (!res.ok) throw new Error(await res.text());
+          await fetchProductsAndProviders();
+          toast.success(`Producto ${!product.is_active ? "activado" : "desactivado"}.`);
+        } catch (err: any) {
+          toast.error("Error al cambiar el estado", { description: err.message });
+        }
+      }
+    );
   };
 
   return (
     <div className="space-y-8 animate-fade-in">
+        <ConfirmationDialog
+        open={isOpen}
+        onOpenChange={handleCancel}
+        title={options?.title || ""}
+        description={options?.description || ""}
+        onConfirm={handleConfirm}
+        confirmText={options?.confirmText}
+        cancelText={options?.cancelText}
+        variant={options?.variant}
+      />
         {/* Header */}
         <div className="flex justify-between items-center">
           <div className="space-y-2">
@@ -347,8 +367,8 @@ export function ProductsClientUI({ initialProducts }: { initialProducts: Product
                   <div className="flex space-x-2 pt-4 border-t mt-auto">
                     <Button variant="outline" size="sm" onClick={() => handleManageFormats(product)} className="flex items-center space-x-1 flex-1 transition-smooth hover:bg-accent/10"><Layers className="h-3 w-3" /><span>Formatos</span></Button>
                     <Button variant="outline" size="sm" onClick={() => handleEditProduct(product)} className="flex items-center space-x-1 transition-smooth hover:bg-primary/5"><Edit className="h-3 w-3" /><span>Editar</span></Button>
-                    <Button variant={product.is_active ? "destructive" : "default"} size="sm" onClick={() => handleToggleStatus(product)} className="flex items-center space-x-1 transition-smooth">
-                      {product.is_active ? <Trash2 className="h-3 w-3" /> : <CheckCircle className="h-3 w-3" />}
+                    <Button variant="ghost" size="icon" onClick={() => handleToggleStatus(product)} className="transition-smooth">
+                      {product.is_active ? <Trash2 className="h-4 w-4 text-destructive" /> : <CheckCircle className="h-4 w-4 text-green-500" />}
                     </Button>
                   </div>
                 </CardContent>

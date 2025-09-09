@@ -29,6 +29,7 @@ export interface User {
   is_active: boolean;
   createdAt: Date;
   updatedAt: Date;
+  image?: string | null;
 }
 
 export interface Client {
