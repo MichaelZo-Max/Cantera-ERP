@@ -28,7 +28,6 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { QuantityInput } from "@/components/forms/quantity-input";
-import { TruckPicker } from "@/components/forms/truck-picker";
 import { PhotoInput } from "@/components/forms/photo-input";
 import { Plus, Trash2, Calculator, CreditCard, Truck, Package } from "lucide-react";
 import { toast } from "sonner";
@@ -305,7 +304,31 @@ export function CashierOrderClientUI({
                 <div className="space-y-2"><Label>Método de pago *</Label><Select value={paymentMethod} onValueChange={setPaymentMethod}><SelectTrigger><SelectValue placeholder="Seleccionar método..." /></SelectTrigger><SelectContent><SelectItem value="efectivo">Efectivo</SelectItem><SelectItem value="transferencia">Transferencia</SelectItem><SelectItem value="cheque">Cheque</SelectItem><SelectItem value="credito">Crédito</SelectItem></SelectContent></Select></div>
                 <div className="space-y-2"><Label>Referencia</Label><Input value={paymentReference} onChange={(e) => setPaymentReference(e.target.value)} placeholder="Número de referencia..." /></div>
               </div>
-              <div className="space-y-4 border-t pt-4"><h4 className="font-medium flex items-center gap-2"><Truck className="h-4 w-4" />Asociar Camión *</h4><TruckPicker value={selectedTruckId} onChange={setSelectedTruckId} trucks={trucks} /><PhotoInput onSelect={setTruckPhoto} label="Foto del camión (opcional)" capture={true} /></div>
+              <div className="space-y-4 border-t pt-4">
+                <h4 className="font-medium flex items-center gap-2"><Truck className="h-4 w-4" />Asociar Camión *</h4>
+                <Select value={selectedTruckId || ""} onValueChange={setSelectedTruckId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Seleccionar camión..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {trucks.map((truck) => (
+                      <SelectItem key={truck.id} value={truck.id}>
+                        <div className="flex items-center justify-between w-full">
+                          <div className="flex items-center gap-2">
+                            <Truck className="h-4 w-4" />
+                            <div>
+                              <div className="font-medium font-mono">{truck.placa}</div>
+                              <div className="text-sm text-muted-foreground">{truck.brand} {truck.model}</div>
+                            </div>
+                          </div>
+                          {truck.capacity && <Badge variant="outline">{truck.capacity} m³</Badge>}
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <PhotoInput onSelect={setTruckPhoto} label="Foto del camión (opcional)" capture={true} />
+              </div>
             </CardContent>
           </Card>
         </div>
