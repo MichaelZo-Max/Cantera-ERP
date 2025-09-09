@@ -23,70 +23,67 @@ import {
 } from "@/components/ui/dialog";
 import { AnimatedCard } from "@/components/ui/animated-card";
 import { GradientButton } from "@/components/ui/gradient-button";
-import { LoadingSkeleton } from "@/components/ui/loading-skeleton";
-import type { Client } from "@/lib/types";
+import type { Client as ClientType } from "@/lib/types";
 import {
   Users,
   Plus,
   Search,
   Edit,
   Trash2,
-  Phone,
-  Mail,
-  MapPin,
   CheckCircle,
   Save,
+  Phone,
+  Mail,
+  MapPin, // Icono para la dirección
 } from "lucide-react";
 import { toast } from "sonner";
+import { LoadingSkeleton } from "@/components/ui/loading-skeleton";
 import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
 import { useConfirmation } from "@/hooks/use-confirmation";
+import { EmptyState } from "@/components/ui/empty-state";
 
 export function CustomersClientUI({
   initialCustomers,
 }: {
-  initialCustomers: Client[];
+  initialCustomers: ClientType[];
 }) {
-  const [customers, setCustomers] = useState<Client[]>(initialCustomers);
+  const [customers, setCustomers] = useState<ClientType[]>(initialCustomers);
   const [searchTerm, setSearchTerm] = useState("");
   const [showDialog, setShowDialog] = useState(false);
-  const [editingCustomer, setEditingCustomer] = useState<Client | null>(null);
+  const [editingCustomer, setEditingCustomer] = useState<ClientType | null>(null);
   const [formData, setFormData] = useState({
     nombre: "",
     rif: "",
     address: "",
-    phone: "",
     email: "",
+    phone: "",
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
 
   const { isOpen, options, confirm, handleConfirm, handleCancel } = useConfirmation();
 
-
   const filteredCustomers = customers.filter(
     (customer) =>
       customer.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (customer.rif &&
-        customer.rif.toLowerCase().includes(searchTerm.toLowerCase())) ||
-      (customer.email &&
-        customer.email.toLowerCase().includes(searchTerm.toLowerCase()))
+      (customer.rif && customer.rif.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
   const handleNewCustomer = () => {
     setEditingCustomer(null);
-    setFormData({ nombre: "", rif: "", address: "", phone: "", email: "" });
+    setFormData({ nombre: "", rif: "", address: "", email: "", phone: "" });
     setApiError(null);
     setShowDialog(true);
   };
 
-  const handleEditCustomer = (customer: Client) => {
+  const handleEditCustomer = (customer: ClientType) => {
     setEditingCustomer(customer);
     setFormData({
       nombre: customer.nombre,
       rif: customer.rif || "",
       address: customer.address || "",
-      phone: customer.phone || "",
       email: customer.email || "",
+      phone: customer.phone || "",
     });
     setApiError(null);
     setShowDialog(true);
@@ -98,9 +95,7 @@ export function CustomersClientUI({
     setApiError(null);
 
     const method = editingCustomer ? "PATCH" : "POST";
-    const url = editingCustomer
-      ? `/api/customers/${editingCustomer.id}`
-      : "/api/customers";
+    const url = editingCustomer ? `/api/customers/${editingCustomer.id}` : "/api/customers";
 
     try {
       const res = await fetch(url, {
@@ -135,7 +130,7 @@ export function CustomersClientUI({
     }
   };
 
-  const handleToggleStatus = (customer: Client) => {
+  const handleToggleStatus = (customer: ClientType) => {
     const is_active = customer.is_active;
     confirm(
       {
@@ -172,39 +167,25 @@ export function CustomersClientUI({
 
   return (
     <div className="space-y-8 animate-fade-in">
-       <ConfirmationDialog
-        open={isOpen}
-        onOpenChange={handleCancel}
-        title={options?.title || ""}
-        description={options?.description || ""}
-        onConfirm={handleConfirm}
-        confirmText={options?.confirmText}
-        cancelText={options?.cancelText}
+      <ConfirmationDialog
+        open={isOpen} onOpenChange={handleCancel} title={options?.title || ""}
+        description={options?.description || ""} onConfirm={handleConfirm}
+        confirmText={options?.confirmText} cancelText={options?.cancelText}
         variant={options?.variant}
       />
       {/* Header */}
       <div className="flex justify-between items-center">
         <div className="space-y-2">
           <div className="flex items-center space-x-3">
-            <div className="p-2 bg-gradient-primary rounded-lg">
-              <Users className="h-6 w-6 text-white" />
-            </div>
+            <div className="p-2 bg-gradient-primary rounded-lg"><Users className="h-6 w-6 text-white" /></div>
             <div>
-              <h2 className="text-3xl font-bold bg-gradient-to-r from-foreground to-muted-foreground bg-clip-text text-transparent">
-                Clientes
-              </h2>
-              <p className="text-muted-foreground">
-                Administra el catálogo de clientes
-              </p>
+              <h2 className="text-3xl font-bold bg-gradient-to-r from-foreground to-muted-foreground bg-clip-text text-transparent">Clientes</h2>
+              <p className="text-muted-foreground">Administra tu cartera de clientes</p>
             </div>
           </div>
         </div>
-        <GradientButton
-          onClick={handleNewCustomer}
-          className="flex items-center space-x-2 animate-pulse-glow"
-        >
-          <Plus className="h-4 w-4" />
-          <span>Nuevo Cliente</span>
+        <GradientButton onClick={handleNewCustomer} className="flex items-center space-x-2 animate-pulse-glow">
+          <Plus className="h-4 w-4" /><span>Nuevo Cliente</span>
         </GradientButton>
       </div>
 
@@ -214,7 +195,7 @@ export function CustomersClientUI({
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-5 w-5" />
             <Input
-              placeholder="Buscar por nombre, RFC o correo..."
+              placeholder="Buscar por nombre o RIF..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-12 h-12 text-lg focus-ring"
@@ -227,89 +208,46 @@ export function CustomersClientUI({
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {filteredCustomers.length === 0 ? (
           <div className="col-span-full">
-            <AnimatedCard className="glass">
-              <CardContent className="pt-12 pb-12 text-center">
-                <Users className="h-16 w-16 text-muted-foreground mx-auto mb-4 opacity-50" />
-                <p className="text-muted-foreground text-lg">
-                  No se encontraron clientes
-                </p>
+            <Card className="glass">
+              <CardContent className="pt-6">
+                <EmptyState
+                  icon={<Users className="h-12 w-12" />}
+                  title="No hay clientes registrados"
+                  description="Comienza a construir tu cartera de clientes añadiendo el primero."
+                  action={
+                    <GradientButton onClick={handleNewCustomer} className="flex items-center space-x-2 mt-4">
+                      <Plus className="h-4 w-4" /><span>Añadir Primer Cliente</span>
+                    </GradientButton>
+                  }
+                />
               </CardContent>
-            </AnimatedCard>
+            </Card>
           </div>
         ) : (
           filteredCustomers.map((customer, index) => (
-            <AnimatedCard
-              key={customer.id}
-              hoverEffect="lift"
-              animateIn
-              delay={index * 100}
-              className="glass overflow-hidden"
-            >
+            <AnimatedCard key={customer.id} hoverEffect="lift" animateIn delay={index * 100} className="glass overflow-hidden">
               <CardHeader className="pb-3">
                 <div className="flex justify-between items-start">
                   <div className="flex-1">
-                    <CardTitle className="text-xl font-bold bg-gradient-to-r from-foreground to-muted-foreground bg-clip-text text-transparent">
-                      {customer.nombre}
-                    </CardTitle>
-                    <p className="text-sm text-muted-foreground mt-1 font-medium">
-                      {customer.rif || "Sin RFC"}
-                    </p>
+                    <CardTitle className="text-xl font-bold bg-gradient-to-r from-foreground to-muted-foreground bg-clip-text text-transparent">{customer.nombre}</CardTitle>
+                    <p className="text-sm text-muted-foreground mt-1 font-medium">{customer.rif || "Sin RIF"}</p>
                   </div>
-                  <Badge
-                    variant={customer.is_active ? "default" : "secondary"}
-                    className={
-                      customer.is_active ? "bg-gradient-primary" : ""
-                    }
-                  >
+                  <Badge variant={customer.is_active ? "default" : "secondary"} className={customer.is_active ? "bg-gradient-primary" : ""}>
                     {customer.is_active ? "Activo" : "Inactivo"}
                   </Badge>
                 </div>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  {customer.address && (
-                    <div className="flex items-start space-x-2 text-sm text-muted-foreground">
-                      <MapPin className="h-4 w-4 mt-0.5 flex-shrink-0" />
-                      <span className="line-clamp-2">{customer.address}</span>
-                    </div>
-                  )}
-                  {customer.phone && (
-                    <div className="flex items-center space-x-2 text-sm text-muted-foreground">
-                      <Phone className="h-4 w-4" />
-                      <span>{customer.phone}</span>
-                    </div>
-                  )}
-                  {customer.email && (
-                    <div className="flex items-center space-x-2 text-sm text-muted-foreground">
-                      <Mail className="h-4 w-4" />
-                      <span className="truncate">{customer.email}</span>
-                    </div>
-                  )}
+                <div className="space-y-2 text-sm text-muted-foreground">
+                  {customer.phone && (<div className="flex items-center space-x-2"><Phone className="h-4 w-4" /><span>{customer.phone}</span></div>)}
+                  {customer.email && (<div className="flex items-center space-x-2"><Mail className="h-4 w-4" /><span className="truncate">{customer.email}</span></div>)}
+                  {customer.address && (<div className="flex items-center space-x-2"><MapPin className="h-4 w-4" /><span>{customer.address}</span></div>)}
                 </div>
                 <div className="flex space-x-2 pt-4 border-t">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleEditCustomer(customer)}
-                    className="flex items-center space-x-1 flex-1 transition-smooth hover:bg-primary/5"
-                  >
-                    <Edit className="h-3 w-3" />
-                    <span>Editar</span>
-                  </Button>
-                  <Button
-                    variant={customer.is_active ? "destructive" : "default"}
-                    size="sm"
-                    onClick={() => handleToggleStatus(customer)}
-                    className="flex items-center space-x-1 transition-smooth"
-                  >
-                    {customer.is_active ? (
-                      <Trash2 className="h-3 w-3" />
-                    ) : (
-                      <CheckCircle className="h-3 w-3" />
-                    )}
-                    <span>
-                      {customer.is_active ? "Desactivar" : "Activar"}
-                    </span>
+                  <Button variant="outline" size="sm" onClick={() => handleEditCustomer(customer)} className="flex items-center space-x-1 flex-1 transition-smooth hover:bg-primary/5"><Edit className="h-3 w-3" /><span>Editar</span></Button>
+                  <Button variant={customer.is_active ? "destructive" : "default"} size="sm" onClick={() => handleToggleStatus(customer)} className="flex items-center space-x-1 transition-smooth">
+                    {customer.is_active ? <Trash2 className="h-3 w-3" /> : <CheckCircle className="h-3 w-3" />}
+                    <span>{customer.is_active ? "Desactivar" : "Activar"}</span>
                   </Button>
                 </div>
               </CardContent>
@@ -320,120 +258,26 @@ export function CustomersClientUI({
 
       {/* Create/Edit Dialog */}
       <Dialog open={showDialog} onOpenChange={setShowDialog}>
-        <DialogContent className="sm:max-w-xl">
+        <DialogContent className="sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle className="text-2xl font-bold flex items-center gap-2">
-              <Users className="h-5 w-5 text-primary" />
-              {editingCustomer ? "Editar Cliente" : "Nuevo Cliente"}
-            </DialogTitle>
-            <DialogDescription>
-              {editingCustomer
-                ? "Actualiza la información del cliente."
-                : "Completa los datos del nuevo cliente."}
-            </DialogDescription>
+            <DialogTitle className="text-2xl font-bold flex items-center gap-2"><Users className="h-5 w-5 text-primary" />{editingCustomer ? "Editar Cliente" : "Nuevo Cliente"}</DialogTitle>
+            <DialogDescription>{editingCustomer ? "Actualiza la información del cliente." : "Completa los datos del nuevo cliente."}</DialogDescription>
           </DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-6 pt-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="nombre" className="font-semibold">
-                  Nombre / Razón Social *
-                </Label>
-                <Input
-                  id="nombre"
-                  value={formData.nombre}
-                  onChange={(e) =>
-                    setFormData({ ...formData, nombre: e.target.value })
-                  }
-                  placeholder="Ej: Constructora Central"
-                  required
-                  className="focus-ring"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="rif" className="font-semibold">
-                  RFC / RIF
-                </Label>
-                <Input
-                  id="rif"
-                  value={formData.rif}
-                  onChange={(e) =>
-                    setFormData({ ...formData, rif: e.target.value })
-                  }
-                  placeholder="Ej: J-12345678-9"
-                  className="focus-ring"
-                />
-              </div>
+              <div className="space-y-2"><Label htmlFor="nombre" className="font-semibold">Nombre / Razón Social *</Label><Input id="nombre" value={formData.nombre} onChange={(e) => setFormData({ ...formData, nombre: e.target.value })} placeholder="Ej: Constructora XYZ C.A." required className="focus-ring"/></div>
+              <div className="space-y-2"><Label htmlFor="rif" className="font-semibold">RIF / C.I.</Label><Input id="rif" value={formData.rif} onChange={(e) => setFormData({ ...formData, rif: e.target.value.toUpperCase() })} placeholder="Ej: J-12345678-9" className="focus-ring"/></div>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="address" className="font-semibold">
-                Dirección
-              </Label>
-              <Input
-                id="address"
-                value={formData.address}
-                onChange={(e) =>
-                  setFormData({ ...formData, address: e.target.value })
-                }
-                placeholder="Dirección fiscal completa"
-                className="focus-ring"
-              />
-            </div>
+            <div className="space-y-2"><Label htmlFor="address" className="font-semibold">Dirección Fiscal</Label><Input id="address" value={formData.address} onChange={(e) => setFormData({ ...formData, address: e.target.value })} placeholder="Dirección completa" className="focus-ring"/></div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="phone" className="font-semibold">
-                  Teléfono
-                </Label>
-                <Input
-                  id="phone"
-                  value={formData.phone}
-                  onChange={(e) =>
-                    setFormData({ ...formData, phone: e.target.value })
-                  }
-                  placeholder="Ej: 0414-1234567"
-                  className="focus-ring"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="email" className="font-semibold">
-                  Correo Electrónico
-                </Label>
-                <Input
-                  id="email"
-                  type="email"
-                  value={formData.email}
-                  onChange={(e) =>
-                    setFormData({ ...formData, email: e.target.value })
-                  }
-                  placeholder="Ej: contacto@empresa.com"
-                  className="focus-ring"
-                />
-              </div>
+              <div className="space-y-2"><Label htmlFor="email" className="font-semibold">Email</Label><Input id="email" type="email" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} placeholder="contacto@email.com" className="focus-ring"/></div>
+              <div className="space-y-2"><Label htmlFor="phone" className="font-semibold">Teléfono</Label><Input id="phone" value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} placeholder="0414-1234567" className="focus-ring"/></div>
             </div>
-
             {apiError && <p className="text-sm text-red-500">{apiError}</p>}
             <DialogFooter className="pt-4">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setShowDialog(false)}
-              >
-                Cancelar
-              </Button>
-              <GradientButton
-                type="submit"
-                disabled={isSubmitting || !formData.nombre}
-              >
-                {isSubmitting ? (
-                  <>
-                    <LoadingSkeleton className="w-4 h-4 mr-2" />
-                    Guardando...
-                  </>
-                ) : (
-                  <>
-                    <Save className="h-4 w-4 mr-2" />
-                    {editingCustomer ? "Guardar Cambios" : "Crear Cliente"}
-                  </>
-                )}
+              <Button type="button" variant="outline" onClick={() => setShowDialog(false)}>Cancelar</Button>
+              <GradientButton type="submit" disabled={isSubmitting || !formData.nombre}>
+                {isSubmitting ? (<><LoadingSkeleton className="w-4 h-4 mr-2" />Guardando...</>) : (<><Save className="h-4 w-4 mr-2" />{editingCustomer ? "Guardar Cambios" : "Crear Cliente"}</>)}
               </GradientButton>
             </DialogFooter>
           </form>

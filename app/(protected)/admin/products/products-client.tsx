@@ -55,6 +55,7 @@ import {
 } from "@/components/ui/table";
 import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
 import { useConfirmation } from "@/hooks/use-confirmation";
+import { EmptyState } from "@/components/ui/empty-state"; // Importamos el componente
 
 // --- Componente Anidado para el Modal de Formatos ---
 function FormatsDialog({
@@ -343,13 +344,24 @@ export function ProductsClientUI({ initialProducts }: { initialProducts: Product
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredProducts.length === 0 ? (
             <div className="col-span-full">
-              <AnimatedCard className="glass">
-                <CardContent className="pt-12 pb-12 text-center">
-                  <Package className="h-16 w-16 text-muted-foreground mx-auto mb-4 opacity-50" />
-                  <p className="text-muted-foreground text-lg">No se encontraron productos</p>
-                  <p className="text-sm text-muted-foreground mt-2">Intenta con otros términos de búsqueda o crea uno nuevo.</p>
+              <Card className="glass">
+                <CardContent className="pt-6">
+                  <EmptyState
+                    icon={<Package className="h-12 w-12" />}
+                    title="No hay productos registrados"
+                    description="Crea tu primer producto para empezar a gestionar tu inventario."
+                    action={
+                      <GradientButton
+                        onClick={handleNewProduct}
+                        className="flex items-center space-x-2 mt-4"
+                      >
+                        <Plus className="h-4 w-4" />
+                        <span>Añadir Primer Producto</span>
+                      </GradientButton>
+                    }
+                  />
                 </CardContent>
-              </AnimatedCard>
+              </Card>
             </div>
           ) : (
             filteredProducts.map((product, index) => (

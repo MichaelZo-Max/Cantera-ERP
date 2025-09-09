@@ -39,6 +39,7 @@ import { toast } from "sonner";
 import { LoadingSkeleton } from "@/components/ui/loading-skeleton";
 import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
 import { useConfirmation } from "@/hooks/use-confirmation";
+import { EmptyState } from "@/components/ui/empty-state";
 
 // El componente ahora recibe los datos iniciales como props
 export function TrucksClientUI({
@@ -232,14 +233,24 @@ export function TrucksClientUI({
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {filteredTrucks.length === 0 ? (
           <div className="col-span-full">
-            <AnimatedCard className="glass">
-              <CardContent className="pt-12 pb-12 text-center">
-                <TruckIcon className="h-16 w-16 text-muted-foreground mx-auto mb-4 opacity-50" />
-                <p className="text-muted-foreground text-lg">
-                  No se encontraron camiones
-                </p>
+            <Card className="glass">
+              <CardContent className="pt-6">
+                <EmptyState
+                  icon={<TruckIcon className="h-12 w-12" />}
+                  title="No hay camiones registrados"
+                  description="Comienza a gestionar tu flota añadiendo el primer camión."
+                  action={
+                    <GradientButton
+                      onClick={handleNewTruck}
+                      className="flex items-center space-x-2 mt-4"
+                    >
+                      <Plus className="h-4 w-4" />
+                      <span>Añadir Primer Camión</span>
+                    </GradientButton>
+                  }
+                />
               </CardContent>
-            </AnimatedCard>
+            </Card>
           </div>
         ) : (
           filteredTrucks.map((truck, index) => (

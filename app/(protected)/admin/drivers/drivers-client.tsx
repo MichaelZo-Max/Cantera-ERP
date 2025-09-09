@@ -38,6 +38,7 @@ import { toast } from "sonner";
 import { LoadingSkeleton } from "@/components/ui/loading-skeleton";
 import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
 import { useConfirmation } from "@/hooks/use-confirmation";
+import { EmptyState } from "@/components/ui/empty-state"; // Importamos el componente
 
 // El componente recibe los datos iniciales como props
 export function DriversClientUI({ initialDrivers }: { initialDrivers: Driver[] }) {
@@ -213,17 +214,24 @@ export function DriversClientUI({ initialDrivers }: { initialDrivers: Driver[] }
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredDrivers.length === 0 ? (
             <div className="col-span-full">
-              <AnimatedCard className="glass">
-                <CardContent className="pt-12 pb-12 text-center">
-                  <UserCheck className="h-16 w-16 text-muted-foreground mx-auto mb-4 opacity-50" />
-                  <p className="text-muted-foreground text-lg">
-                    No se encontraron choferes
-                  </p>
-                  <p className="text-sm text-muted-foreground mt-2">
-                    Intenta con otros términos o registra uno nuevo.
-                  </p>
+              <Card className="glass">
+                <CardContent className="pt-6">
+                  <EmptyState
+                    icon={<UserCheck className="h-12 w-12" />}
+                    title="No hay choferes registrados"
+                    description="Añade tu primer chofer para asignarlo a los camiones de la flota."
+                    action={
+                      <GradientButton
+                        onClick={handleNewDriver}
+                        className="flex items-center space-x-2 mt-4"
+                      >
+                        <Plus className="h-4 w-4" />
+                        <span>Añadir Primer Chofer</span>
+                      </GradientButton>
+                    }
+                  />
                 </CardContent>
-              </AnimatedCard>
+              </Card>
             </div>
           ) : (
             filteredDrivers.map((driver, index) => (

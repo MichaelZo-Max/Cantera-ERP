@@ -6,7 +6,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
@@ -41,6 +41,7 @@ import { toast } from "sonner";
 import { LoadingSkeleton } from "@/components/ui/loading-skeleton";
 import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
 import { useConfirmation } from "@/hooks/use-confirmation";
+import { EmptyState } from "@/components/ui/empty-state"; // Única adición a tu código original
 
 export function UsersClientUI({ initialUsers }: { initialUsers: User[] }) {
   const [users, setUsers] = useState<User[]>(initialUsers);
@@ -133,7 +134,7 @@ export function UsersClientUI({ initialUsers }: { initialUsers: User[] }) {
 
   const handleToggleStatus = (user: User) => {
     const is_active = user.is_active;
-     confirm({
+      confirm({
         title: `¿Estás seguro?`,
         description: `Esta acción ${
           is_active ? "desactivará" : "activará"
@@ -218,14 +219,24 @@ export function UsersClientUI({ initialUsers }: { initialUsers: User[] }) {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {filteredUsers.length === 0 ? (
           <div className="col-span-full">
-            <AnimatedCard className="glass">
-              <CardContent className="pt-12 pb-12 text-center">
-                <Users className="h-16 w-16 text-muted-foreground mx-auto mb-4 opacity-50" />
-                <p className="text-muted-foreground text-lg">
-                  No se encontraron usuarios
-                </p>
+            <Card className="glass">
+              <CardContent className="pt-6">
+                <EmptyState
+                  icon={<Users className="h-12 w-12" />}
+                  title="No hay usuarios registrados"
+                  description="Gestiona los accesos al sistema creando el primer usuario."
+                  action={
+                    <GradientButton
+                      onClick={handleNewUser}
+                      className="flex items-center space-x-2 mt-4"
+                    >
+                      <Plus className="h-4 w-4" />
+                      <span>Crear Primer Usuario</span>
+                    </GradientButton>
+                  }
+                />
               </CardContent>
-            </AnimatedCard>
+            </Card>
           </div>
         ) : (
           filteredUsers.map((user, index) => (
