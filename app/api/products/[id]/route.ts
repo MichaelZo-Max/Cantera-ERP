@@ -19,7 +19,7 @@ async function getProductById(id: number) {
   return {
     id: r.CODARTICULO.toString(),
     nombre: r.DESCRIPCION ?? "",
-    codigo: r.REFPROVEEDOR ?? "",
+    refProveedor: r.REFPROVEEDOR ?? "",
     description: r.DESCRIPCION ?? "",
     is_active: String(r.DESCATALOGADO ?? "F").toUpperCase() !== "T",
     createdAt: r.FECHAMODIFICADO ?? new Date(),
@@ -63,13 +63,19 @@ export async function PATCH(
     const sets: string[] = [];
     const paramsArr: any[] = [{ name: "id", type: TYPES.Int, value: id }];
 
-    // Mapeo directo de los campos del formulario del frontend
     if (body.nombre !== undefined) {
       sets.push("DESCRIPCION = @nombre");
       paramsArr.push({
         name: "nombre",
         type: TYPES.NVarChar,
         value: body.nombre,
+      });
+    } else if (body.description !== undefined) {
+      sets.push("DESCRIPCION = @description");
+      paramsArr.push({
+        name: "description",
+        type: TYPES.NVarChar,
+        value: body.description,
       });
     }
     if (body.codigo !== undefined) {

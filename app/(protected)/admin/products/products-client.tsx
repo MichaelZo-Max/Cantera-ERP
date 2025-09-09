@@ -242,7 +242,7 @@ export function ProductsClientUI({ initialProducts }: { initialProducts: Product
   const handleEditProduct = (product: Product) => {
     setEditingProduct(product);
     setFormData({ 
-        refProveedor: String(product.refProveedor || ''), 
+        refProveedor: String(product.refProveedor || ''),
         nombre: product.nombre, 
         description: product.description || "" 
     });
@@ -265,7 +265,9 @@ export function ProductsClientUI({ initialProducts }: { initialProducts: Product
     try {
       const res = await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(formData) });
       if (!res.ok) throw new Error(await res.text() || "Error al guardar el producto");
-      await fetchProductsAndProviders();
+      
+      fetchProductsAndProviders();
+
       toast.success(editingProduct ? "Producto actualizado" : "Producto creado");
       setShowProductDialog(false);
     } catch (err: any) {
@@ -336,7 +338,6 @@ export function ProductsClientUI({ initialProducts }: { initialProducts: Product
                   <div className="flex justify-between items-start">
                     <div className="flex-1">
                       <CardTitle className="text-xl font-bold bg-gradient-to-r from-foreground to-muted-foreground bg-clip-text text-transparent">{product.nombre}</CardTitle>
-                      {/* Se elimina la línea del código del producto */}
                     </div>
                     <Badge variant={product.is_active ? "default" : "secondary"} className={product.is_active ? "bg-gradient-primary" : ""}>{product.is_active ? "Activo" : "Inactivo"}</Badge>
                   </div>

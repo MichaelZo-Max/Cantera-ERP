@@ -77,6 +77,7 @@ export async function POST(req: Request) {
     let id = pickFirst<number>(body, ["id", "codArticulo", "codarticulo"]);
     const nombre = (pickFirst<string>(body, ["nombre", "descripcion"]) ?? "").toString().trim();
     const refProveedor = pickFirst<string>(body, ["refProveedor"]);
+    const description = pickFirst<string>(body, ["description"]);
     let is_active: boolean | undefined = pickFirst<boolean>(body, ["is_active"]);
 
     if (!nombre) {
@@ -98,19 +99,20 @@ export async function POST(req: Request) {
         DESCATALOGADO, FECHAMODIFICADO
       )
       VALUES (
-        @id, @descripcion, @refProveedor,
+        @id, @nombre, @refProveedor,
         @descatalogado, GETDATE()
       );
 
       SELECT
         A.CODARTICULO, A.DESCRIPCION, A.REFPROVEEDOR,
+        A.DESCRIPCION as description,
         A.DESCATALOGADO, A.FECHAMODIFICADO
       FROM dbo.ARTICULOS A
       WHERE A.CODARTICULO = @id
     `;
     const params = [
       { name: "id", type: TYPES.Int, value: id },
-      { name: "descripcion", type: TYPES.NVarChar, value: nombre, options: { length: 250 } },
+      { name: "nombre", type: TYPES.NVarChar, value: description || nombre, options: { length: 250 } },
       { name: "refProveedor", type: TYPES.NVarChar, value: refProveedor ?? null, options: { length: 100 } },
       { name: "descatalogado", type: TYPES.NVarChar, value: descatalogadoTF, options: { length: 1 } },
     ];
@@ -122,6 +124,7 @@ export async function POST(req: Request) {
       {
         id: r.CODARTICULO.toString(),
         nombre: r.DESCRIPCION ?? "",
+        description: r.description ?? "",
         refProveedor: r.REFPROVEEDOR ?? null,
         is_active: String(r.DESCATALOGADO ?? "F").toUpperCase() !== "T",
         createdAt: r.FECHAMODIFICADO ?? new Date(),
