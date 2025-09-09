@@ -50,7 +50,7 @@ export const mockClients: Client[] = [
 export const mockProducts: Product[] = [
   {
     id: "1",
-    codigo: "ARE-001",
+    refProveedor: "ARE-001",
     nombre: "Arena",
     description: "Arena de río para construcción",
     is_active: true,
@@ -59,7 +59,7 @@ export const mockProducts: Product[] = [
   },
   {
     id: "2",
-    codigo: "GRA-001",
+    refProveedor: "GRA-001",
     nombre: "Grava",
     description: 'Grava triturada 3/4"',
     is_active: true,
@@ -68,7 +68,7 @@ export const mockProducts: Product[] = [
   },
   {
     id: "3",
-    codigo: "PIE-001",
+    refProveedor: "PIE-001",
     nombre: "Piedra",
     description: "Piedra braza para construcción",
     is_active: true,
@@ -77,7 +77,7 @@ export const mockProducts: Product[] = [
   },
   {
     id: "4",
-    codigo: "TEP-001",
+    refProveedor: "TEP-001",
     nombre: "Tepetate",
     description: "Tepetate para relleno",
     is_active: true,
