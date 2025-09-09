@@ -12,10 +12,8 @@ async function getDestinationsAndClients(): Promise<{
     const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
 
     const [destRes, clientRes] = await Promise.all([
-      fetch(`${baseUrl}/api/destinations`, {
-        next: { tags: ["destinations"] },
-      }),
-      fetch(`${baseUrl}/api/customers`, { next: { tags: ["customers"] } }),
+      fetch(`${baseUrl}/api/destinations`, { cache: "no-store" }),
+      fetch(`${baseUrl}/api/customers`, { cache: "no-store" }),
     ]);
 
     if (!destRes.ok) throw new Error("Error al cargar destinos");

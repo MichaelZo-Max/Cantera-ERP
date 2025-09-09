@@ -9,10 +9,8 @@ async function getTrucksAndDrivers(): Promise<{ trucks: TruckType[]; drivers: Dr
     const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
 
     const [trucksRes, driversRes] = await Promise.all([
-      // ANTES: fetch(`${baseUrl}/api/trucks`, { cache: "no-store" }),
-      fetch(`${baseUrl}/api/trucks`, { next: { tags: ['trucks'] } }),
-      // ANTES: fetch(`${baseUrl}/api/drivers`, { cache: "no-store" }),
-      fetch(`${baseUrl}/api/drivers`, { next: { tags: ['drivers'] } }),
+      fetch(`${baseUrl}/api/trucks`, { cache: "no-store" }),
+      fetch(`${baseUrl}/api/drivers`, { cache: "no-store" }),
     ]);
 
     if (!trucksRes.ok) throw new Error('Error al cargar camiones');

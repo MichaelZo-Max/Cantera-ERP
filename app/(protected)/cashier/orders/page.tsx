@@ -13,11 +13,11 @@ async function getOrderCatalogs(): Promise<{
     const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
 
     const [cRes, pRes, tRes] = await Promise.all([
-      fetch(`${baseUrl}/api/customers`, { next: { tags: ["customers"] } }), // DESPUÉS
+      fetch(`${baseUrl}/api/customers`, { cache: "no-store" }), // DESPUÉS
       // ANTES: fetch(`${baseUrl}/api/products`, { cache: "no-store" }),
-      fetch(`${baseUrl}/api/products`, { next: { tags: ["products"] } }), // DESPUÉS
+      fetch(`${baseUrl}/api/products`, { cache: "no-store" }), // DESPUÉS
       // ANTES: fetch(`${baseUrl}/api/trucks`, { cache: "no-store" }),
-      fetch(`${baseUrl}/api/trucks`, { next: { tags: ["trucks"] } }), // DESPUÉS
+      fetch(`${baseUrl}/api/trucks`, { cache: "no-store" }), // DESPUÉS
     ]);
 
     if (!cRes.ok) throw new Error("Error al cargar clientes");

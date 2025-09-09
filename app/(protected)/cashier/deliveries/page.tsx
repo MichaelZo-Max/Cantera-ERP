@@ -6,9 +6,7 @@ import { CashierDeliveriesClientUI } from "./deliveries-client"; // Importamos e
 async function getDeliveries(): Promise<{ deliveries: Delivery[] }> {
   try {
     const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
-    const res = await fetch(`${baseUrl}/api/deliveries`, {
-      next: { tags: ["deliveries"] },
-    });
+    const res = await fetch(`${baseUrl}/api/deliveries`, { cache: "no-store" });
 
     if (!res.ok) {
       throw new Error("Error al cargar los despachos");
