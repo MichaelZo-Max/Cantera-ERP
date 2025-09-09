@@ -2,6 +2,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import { useRouter } from "next/navigation"; // Importado para la redirección
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import {
@@ -62,6 +63,7 @@ export function CashierOrderClientUI({
   initialTrucks: TruckType[];
 }) {
   const { user } = useAuth();
+  const router = useRouter(); // Hook para manejar la navegación
   const [selectedClient, setSelectedClient] = useState<string>("");
   const [selectedDestination, setSelectedDestination] = useState<string>("");
 
@@ -177,7 +179,8 @@ export function CashierOrderClientUI({
       if (!res.ok) throw new Error(await res.text());
       const { order, delivery } = await res.json();
       toast.success(`Orden ${order?.orderNumber ?? ""} creada`, { description: delivery ? `Despacho ${delivery.id} asignado` : undefined });
-
+      router.push("/");
+      
       setSelectedClient("");
       setSelectedDestination("");
       setOrderItems([]);
