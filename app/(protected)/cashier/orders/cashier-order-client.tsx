@@ -1,7 +1,7 @@
 // app/(protected)/cashier/orders/cashier-order-client.tsx
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import {
@@ -27,11 +27,10 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { ProductPicker } from "@/components/forms/product-picker";
 import { QuantityInput } from "@/components/forms/quantity-input";
 import { TruckPicker } from "@/components/forms/truck-picker";
 import { PhotoInput } from "@/components/forms/photo-input";
-import { Plus, Trash2, Calculator, CreditCard, Truck } from "lucide-react";
+import { Plus, Trash2, Calculator, CreditCard, Truck, Package } from "lucide-react";
 import { toast } from "sonner";
 import type {
   Client,
@@ -42,6 +41,7 @@ import type {
   Truck as TruckType,
 } from "@/lib/types";
 import { useAuth } from "@/components/auth-provider";
+import { Badge } from "@/components/ui/badge";
 
 interface OrderItem {
   id: string;
@@ -53,7 +53,6 @@ interface OrderItem {
   subtotal: number;
 }
 
-// El componente ahora recibe los catálogos iniciales como props
 export function CashierOrderClientUI({
   initialClients,
   initialProducts,
@@ -67,7 +66,6 @@ export function CashierOrderClientUI({
   const [selectedClient, setSelectedClient] = useState<string>("");
   const [selectedDestination, setSelectedDestination] = useState<string>("");
 
-  // Inicializamos los estados con los datos recibidos del servidor
   const [clients] = useState<Client[]>(initialClients);
   const [products] = useState<Product[]>(initialProducts);
   const [trucks] = useState<TruckType[]>(initialTrucks);
@@ -83,8 +81,11 @@ export function CashierOrderClientUI({
   const [selectedTruckId, setSelectedTruckId] = useState<string | null>(null);
   const [truckPhoto, setTruckPhoto] = useState<File | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  const [selectedProductId, setSelectedProductId] = useState<string>('');
+  const [availableFormats, setAvailableFormats] = useState<ProductFormat[]>([]);
+  const [isLoadingFormats, setIsLoadingFormats] = useState(false);
 
-  // El useEffect para cargar destinos se mantiene, ya que depende de una acción del usuario
   useEffect(() => {
     if (!selectedClient) {
       setDestinations([]);
@@ -134,6 +135,8 @@ export function CashierOrderClientUI({
     setCurrentProduct(null);
     setCurrentQuantity(0);
     setCurrentFormat(null);
+    setSelectedProductId('');
+    setAvailableFormats([]);
     toast.success("Item agregado a la comanda");
   };
 
@@ -192,6 +195,48 @@ export function CashierOrderClientUI({
 
   const canAuthorize = !!selectedClient && orderItems.length > 0 && !!selectedTruckId && !!paymentMethod;
 
+  const fetchFormats = useCallback(async (productId: string) => {
+    if (productId) {
+      setIsLoadingFormats(true);
+      setCurrentProduct({ productId, formatId: "" });
+      setCurrentFormat(null);
+      try {
+        const res = await fetch(`/api/product-formats?productId=${productId}`);
+        if (!res.ok) throw new Error("No se pudieron cargar los formatos");
+        const data: ProductFormat[] = await res.json();
+        setAvailableFormats(data);
+
+        if (data.length === 1) {
+          const singleFormat = data[0];
+          setCurrentProduct({ productId, formatId: singleFormat.id });
+          setCurrentFormat(singleFormat);
+        }
+      } catch (error) {
+        toast.error("Error al cargar formatos.");
+        setAvailableFormats([]);
+      } finally {
+        setIsLoadingFormats(false);
+      }
+    } else {
+      setAvailableFormats([]);
+      setCurrentProduct(null);
+      setCurrentFormat(null);
+    }
+  }, []);
+
+  const handleProductSelect = (productId: string) => {
+    setSelectedProductId(productId);
+    fetchFormats(productId);
+  };
+
+  const handleFormatSelect = (formatId: string) => {
+    if (selectedProductId) {
+      setCurrentProduct({ productId: selectedProductId, formatId });
+      const format = availableFormats.find(f => f.id === formatId);
+      setCurrentFormat(format || null);
+    }
+  };
+
   return (
       <div className="max-w-7xl mx-auto space-y-6">
         <Card>
@@ -205,7 +250,48 @@ export function CashierOrderClientUI({
           <Card>
             <CardHeader><CardTitle className="flex items-center gap-2"><Plus className="h-5 w-5" />Constructor de Items</CardTitle><CardDescription>Agrega productos a la comanda</CardDescription></CardHeader>
             <CardContent className="space-y-4">
-              <ProductPicker value={currentProduct} onChange={setCurrentProduct} onFormatChange={setCurrentFormat} products={products} />
+              <div className="space-y-2">
+                <Label>Producto</Label>
+                <Select value={selectedProductId} onValueChange={handleProductSelect}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Seleccionar producto..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {products.map((product) => (
+                      <SelectItem key={product.id} value={product.id}>
+                         {product.nombre}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {selectedProductId && (
+                <div className="space-y-2">
+                  <Label>Formato</Label>
+                  <Select
+                    value={currentProduct?.formatId || ""}
+                    onValueChange={handleFormatSelect}
+                    disabled={isLoadingFormats || availableFormats.length === 0}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder={isLoadingFormats ? "Cargando..." : "Seleccionar formato..."} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {availableFormats.map((format) => (
+                        <SelectItem key={format.id} value={format.id}>
+                          <div className="flex items-center justify-between w-full">
+                            <span>{format.sku || `Formato ${format.unidadBase}`}</span>
+                            <Badge variant="secondary" className="ml-2">
+                              {format.pricePerUnit ? `$${format.pricePerUnit.toFixed(2)}` : format.unidadBase}
+                            </Badge>
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
               {currentFormat && <QuantityInput unitBase={currentFormat.unidadBase} value={currentQuantity} onChange={setCurrentQuantity} />}
               {currentFormat && currentQuantity > 0 && (<div className="p-3 bg-muted/50 rounded-lg"><div className="flex justify-between items-center"><span className="text-sm text-muted-foreground">Subtotal:</span><span className="font-semibold">{(currentQuantity * Number(currentFormat.pricePerUnit ?? 0)).toFixed(2)}</span></div></div>)}
               <Button onClick={handleAddItem} disabled={!currentProduct || currentQuantity <= 0} className="w-full"><Plus className="h-4 w-4 mr-2" />Agregar Item</Button>
