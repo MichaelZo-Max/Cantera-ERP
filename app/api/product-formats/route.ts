@@ -3,6 +3,7 @@
 import { NextResponse } from 'next/server';
 import { executeQuery, TYPES } from '@/lib/db';
 import type { ProductFormat } from '@/lib/types';
+import { revalidateTag } from 'next/cache';
 
 /**
  * @route   GET /api/product-formats
@@ -81,6 +82,11 @@ export async function POST(request: Request) {
         ];
         
         const result = await executeQuery(query, params);
+
+        // ✨ INVALIDACIÓN DEL CACHÉ
+        revalidateTag('product-formats');
+        revalidateTag('products');
+
         return NextResponse.json(result[0], { status: 201 });
 
     } catch (error) {

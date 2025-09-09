@@ -2,6 +2,7 @@
 import { NextResponse } from "next/server";
 import { executeQuery, TYPES } from "@/lib/db";
 import type { Destination } from "@/lib/types";
+import { revalidateTag } from 'next/cache'; // Importamos revalidateTag
 
 /**
  * @route GET /api/destinations
@@ -101,6 +102,10 @@ export async function POST(request: Request) {
             nombre: clientResult[0]?.nombre || null
         }
     }
+    
+    // ✨ INVALIDACIÓN DEL CACHÉ
+    revalidateTag('destinations');
+    revalidateTag('customers'); // Porque un destino nuevo puede afectar la info de un cliente
 
     return NextResponse.json(newDestination, { status: 201 });
   } catch (error) {

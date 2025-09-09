@@ -1,6 +1,7 @@
 // app/api/customers/[id]/route.ts
 import { NextResponse } from "next/server";
 import { executeQuery, TYPES } from "@/lib/db";
+import { revalidateTag } from 'next/cache'; // Importamos revalidateTag
 
 // Utilidad para traer un cliente y mapearlo como lo espera el front
 async function fetchCustomerById(id: number) {
@@ -60,9 +61,6 @@ export async function PATCH(
     // is_active (boolean) → DESCATALOGADO 'F'/'T'
     let descatalogadoValue: "F" | "T" | undefined = undefined;
     if (typeof body?.is_active === "boolean") {
-      descatalogadoValue = body.is_active ? "F" : "T";
-    } else if (typeof body?.is_active === "boolean") {
-      // por si viene como is_active
       descatalogadoValue = body.is_active ? "F" : "T";
     }
 
@@ -163,6 +161,9 @@ export async function PATCH(
       email: r.E_MAIL ?? null,
       is_active: (r.DESCATALOGADO ?? "F").toString().toUpperCase() !== "T",
     };
+    
+    // ✨ INVALIDACIÓN DEL CACHÉ
+    revalidateTag('customers');
 
     return NextResponse.json(updated);
   } catch (e) {

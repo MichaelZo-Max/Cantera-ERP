@@ -2,6 +2,7 @@
 import { NextResponse } from 'next/server';
 import { executeQuery, TYPES } from '@/lib/db';
 import bcrypt from 'bcryptjs';
+import { revalidateTag } from 'next/cache'; // Importamos revalidateTag
 
 /**
  * @route GET /api/users/[id]
@@ -77,6 +78,10 @@ export async function PATCH(request: Request, { params }: { params: { id: string
         if (result.length === 0) {
             return new NextResponse('Usuario no encontrado para actualizar', { status: 404 });
         }
+
+        // ✨ INVALIDACIÓN DEL CACHÉ
+        revalidateTag('users');
+
         return NextResponse.json(result[0]);
     } catch (error) {
         console.error('[API_USERS_PATCH]', error);
@@ -96,6 +101,10 @@ export async function DELETE(request: Request, { params }: { params: { id: strin
             WHERE id = @id;
         `;
         await executeQuery(query, [{ name: 'id', type: TYPES.Int, value: params.id }]);
+        
+        // ✨ INVALIDACIÓN DEL CACHÉ
+        revalidateTag('users');
+
         return NextResponse.json({ message: 'Usuario desactivado correctamente' });
     } catch (error) {
         console.error('[API_USERS_DELETE]', error);

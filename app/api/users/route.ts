@@ -2,6 +2,7 @@
 import { NextResponse } from 'next/server';
 import { executeQuery, TYPES } from '@/lib/db';
 import bcrypt from 'bcryptjs';
+import { revalidateTag } from 'next/cache'; // Importamos revalidateTag
 
 /**
  * @route GET /api/users
@@ -52,6 +53,10 @@ export async function POST(request: Request) {
     ];
 
     const result = await executeQuery(query, params);
+
+    // ✨ INVALIDACIÓN DEL CACHÉ
+    revalidateTag('users');
+
     return NextResponse.json(result[0], { status: 201 });
 
   } catch (error) {

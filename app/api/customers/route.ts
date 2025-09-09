@@ -1,6 +1,7 @@
 // app/api/customers/route.ts
 import { NextResponse } from "next/server";
 import { executeQuery, TYPES } from "@/lib/db";
+import { revalidateTag } from 'next/cache'; // Importamos revalidateTag
 
 // ---------- GET: lista de clientes que tu UI muestra ----------
 export async function GET() {
@@ -141,6 +142,9 @@ export async function POST(req: Request) {
       email: r.E_MAIL ?? null,
       is_active: (r.DESCATALOGADO ?? "F").toString().toUpperCase() !== "T",
     };
+    
+    // ✨ INVALIDACIÓN DEL CACHÉ
+    revalidateTag('customers');
 
     // Tu página espera el objeto completo:
     return NextResponse.json(saved, { status: 201 });

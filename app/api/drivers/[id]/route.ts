@@ -1,6 +1,7 @@
 // app/api/drivers/[id]/route.ts
 import { NextResponse } from 'next/server';
 import { executeQuery, TYPES } from '@/lib/db';
+import { revalidateTag } from 'next/cache'; // Importamos revalidateTag
 
 /**
  * @route PATCH /api/drivers/[id]
@@ -47,10 +48,43 @@ export async function PATCH(request: Request, { params }: { params: { id: string
         `;
 
         const result = await executeQuery(query, queryParams);
+        
+        // ✨ INVALIDACIÓN DEL CACHÉ
+        revalidateTag('drivers');
+
         return NextResponse.json(result[0]);
 
     } catch (error) {
         console.error('[API_DRIVERS_PATCH]', error);
         return new NextResponse('Error al actualizar el chofer', { status: 500 });
+    }
+}
+
+/**
+ * @route DELETE /api/drivers/[id]
+ * @desc Desactivar un chofer (borrado lógico)
+ */
+export async function DELETE(request: Request, { params }: { params: { id: string } }) {
+    try {
+        const id = parseInt(params.id, 10);
+        if (isNaN(id)) {
+            return new NextResponse('ID de chofer inválido', { status: 400 });
+        }
+
+        const query = `
+            UPDATE RIP.APP_CHOFERES
+            SET is_active = 0, updated_at = GETDATE()
+            WHERE id = @id;
+        `;
+        
+        await executeQuery(query, [{ name: 'id', type: TYPES.Int, value: id }]);
+        
+        // ✨ INVALIDACIÓN DEL CACHÉ
+        revalidateTag('drivers');
+
+        return NextResponse.json({ message: 'Chofer desactivado correctamente' });
+    } catch (error) {
+        console.error(`[API_DRIVERS_DELETE]`, error);
+        return new NextResponse('Error al desactivar el chofer', { status: 500 });
     }
 }

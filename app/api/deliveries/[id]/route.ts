@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import { executeQuery, TYPES } from '@/lib/db';
 import path from 'path';
 import { writeFile, mkdir } from 'fs/promises';
+import { revalidateTag } from 'next/cache'; // Importamos revalidateTag
 
 
 export async function PATCH(request: Request, { params }: { params: { id: string } }) {
@@ -78,6 +79,11 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     }
 
     await executeQuery(sql, p);
+
+    // ✨ INVALIDACIÓN DEL CACHÉ
+    revalidateTag('deliveries');
+    revalidateTag('orders'); // Un cambio en el despacho puede afectar el estado general de la orden
+
     return NextResponse.json({ id, estado });
   } catch (e) {
     console.error('[API_DELIVERIES_PATCH]', e);

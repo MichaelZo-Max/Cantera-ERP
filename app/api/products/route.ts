@@ -1,6 +1,7 @@
 // app/api/products/route.ts
 import { NextResponse } from "next/server";
 import { executeQuery, TYPES } from "@/lib/db";
+import { revalidateTag } from 'next/cache'; // Importamos revalidateTag
 
 type RawBody = Record<string, any>;
 function pickFirst<T = any>(
@@ -118,6 +119,9 @@ export async function POST(req: Request) {
 
     const rows = await executeQuery<any>(insertSql, params);
     const r = rows[0];
+
+    // ✨ INVALIDACIÓN DEL CACHÉ
+    revalidateTag('products');
 
     return NextResponse.json(
       {

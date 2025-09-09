@@ -1,6 +1,7 @@
 // app/api/product-formats/[id]/route.ts
 import { NextResponse } from 'next/server';
 import { executeQuery, TYPES } from '@/lib/db';
+import { revalidateTag } from 'next/cache';
 
 export async function PATCH(request: Request, { params }: { params: { id: string } }) {
     try {
@@ -38,6 +39,11 @@ export async function PATCH(request: Request, { params }: { params: { id: string
         `;
 
         const result = await executeQuery(query, queryParams);
+        
+        // ✨ INVALIDACIÓN DEL CACHÉ
+        revalidateTag('product-formats');
+        revalidateTag('products');
+
         return NextResponse.json(result[0]);
 
     } catch (error) {

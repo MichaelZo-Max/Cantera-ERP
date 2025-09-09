@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server';
 import { executeQuery, TYPES } from '@/lib/db';
 import path from 'path';
 import { writeFile, mkdir } from 'fs/promises';
+import { revalidateTag } from 'next/cache'; // Importamos revalidateTag
 
 /**
  * @route   GET /api/orders
@@ -145,6 +146,10 @@ export async function POST(request: Request) {
       FROM RIP.APP_PEDIDOS_ITEMS WHERE order_id = @orderId;
     `;
     const total = (await executeQuery(totalQuery, [{ name: 'orderId', type: TYPES.Int, value: newOrderId }]))[0]?.total ?? 0;
+
+    // ✨ INVALIDACIÓN DEL CACHÉ
+    revalidateTag('orders');
+    revalidateTag('deliveries'); // También invalidamos despachos por si acaso
 
     return NextResponse.json({
       message: "Pedido y despacho creados exitosamente",

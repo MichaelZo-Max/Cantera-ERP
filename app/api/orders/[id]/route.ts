@@ -1,6 +1,7 @@
 // app/api/orders/[id]/route.ts
 import { NextResponse } from 'next/server';
 import { executeQuery, TYPES } from '@/lib/db';
+import { revalidateTag } from 'next/cache'; // Importamos revalidateTag
 
 /**
  * @route   GET /api/orders/[id]
@@ -99,9 +100,45 @@ export async function PATCH(request: Request, { params }: { params: { id: string
         return new NextResponse('Pedido no encontrado para actualizar', { status: 404 });
     }
 
+    // ✨ INVALIDACIÓN DEL CACHÉ
+    revalidateTag('orders');
+    revalidateTag('deliveries');
+
     return NextResponse.json(result[0]);
   } catch (error) {
     console.error(`[API_ORDERS_ID_PATCH]`, error);
+    return new NextResponse('Error interno del servidor', { status: 500 });
+  }
+}
+
+/**
+ * @route   DELETE /api/orders/[id]
+ * @desc    Cancelar un pedido (borrado lógico)
+ */
+export async function DELETE(request: Request, { params }: { params: { id: string } }) {
+  try {
+    const id = parseInt(params.id, 10);
+    if (isNaN(id)) {
+        return new NextResponse('ID de pedido inválido', { status: 400 });
+    }
+
+    const query = `
+        UPDATE RIP.APP_PEDIDOS
+        SET
+            status = 'CANCELADA',
+            updated_at = GETDATE()
+        WHERE id = @id;
+    `;
+    
+    await executeQuery(query, [{ name: 'id', type: TYPES.Int, value: id }]);
+
+    // ✨ INVALIDACIÓN DEL CACHÉ
+    revalidateTag('orders');
+    revalidateTag('deliveries');
+
+    return NextResponse.json({ message: 'Pedido cancelado correctamente' });
+  } catch (error) {
+    console.error(`[API_ORDERS_ID_DELETE]`, error);
     return new NextResponse('Error interno del servidor', { status: 500 });
   }
 }

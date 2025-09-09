@@ -2,6 +2,7 @@
 import { NextResponse } from 'next/server';
 import { executeQuery, TYPES } from '@/lib/db';
 import type { Driver } from '@/lib/types';
+import { revalidateTag } from 'next/cache'; // Importamos revalidateTag
 
 /**
  * @route GET /api/drivers
@@ -47,6 +48,10 @@ export async function POST(request: Request) {
         ];
         
         const result = await executeQuery(query, params);
+
+        // ✨ INVALIDACIÓN DEL CACHÉ
+        revalidateTag('drivers');
+
         return NextResponse.json(result[0], { status: 201 });
 
     } catch (error) {

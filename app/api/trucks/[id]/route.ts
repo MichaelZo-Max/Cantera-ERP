@@ -1,6 +1,7 @@
 // app/api/trucks/[id]/route.ts
 import { NextResponse } from 'next/server';
 import { executeQuery, TYPES } from '@/lib/db';
+import { revalidateTag } from 'next/cache'; // Importamos revalidateTag
 
 /**
  * @route GET /api/trucks/[id]
@@ -58,7 +59,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
             updates.push("capacity = @capacity");
             queryParams.push({ name: 'capacity', type: TYPES.Decimal, value: body.capacity });
         }
-        if (body.driverId !== undefined) { // ✨ CORREGIDO: Usar driverId
+        if (body.driverId !== undefined) {
             updates.push("driver_id = @driverId");
             queryParams.push({ name: 'driverId', type: TYPES.Int, value: body.driverId || null });
         }
@@ -68,7 +69,11 @@ export async function PATCH(request: Request, { params }: { params: { id: string
         }
 
         if (updates.length === 0) {
-            return new NextResponse('No hay campos para actualizar', { status: 400 });
+            const currentTruck = await executeQuery("SELECT * FROM RIP.APP_CAMIONES WHERE id = @id", [{ name: 'id', type: TYPES.Int, value: id }]);
+            if (currentTruck.length === 0) {
+                return new NextResponse('Camión no encontrado', { status: 404 });
+            }
+            return NextResponse.json(currentTruck[0]);
         }
 
         updates.push("updated_at = GETDATE()");
@@ -84,9 +89,15 @@ export async function PATCH(request: Request, { params }: { params: { id: string
         if (result.length === 0) {
             return new NextResponse('Camión no encontrado para actualizar', { status: 404 });
         }
+
+        // ✨ INVALIDACIÓN DEL CACHÉ
+        revalidateTag('trucks');
+        if (body.driverId !== undefined) {
+          revalidateTag('drivers'); // Invalidar choferes si se cambia la asignación
+        }
+
         return NextResponse.json(result[0]);
     } catch (error: any) {
-        // ✨ CORRECCIÓN: Manejo específico para llaves duplicadas
         if (error?.number === 2627 || error?.number === 2601) {
             const duplicateValue = error.message.match(/\(([^)]+)\)/)?.[1];
             return new NextResponse(`La placa '${duplicateValue}' ya existe.`, { status: 409 });
@@ -113,6 +124,10 @@ export async function DELETE(request: Request, { params }: { params: { id: strin
             WHERE id = @id;
         `;
         await executeQuery(query, [{ name: 'id', type: TYPES.Int, value: id }]);
+        
+        // ✨ INVALIDACIÓN DEL CACHÉ
+        revalidateTag('trucks');
+
         return NextResponse.json({ message: 'Camión desactivado correctamente' });
     } catch (error) {
         console.error('[API_TRUCKS_DELETE]', error);

@@ -1,6 +1,7 @@
 // app/api/trucks/route.ts
 import { NextResponse } from 'next/server';
 import { executeQuery, TYPES } from '@/lib/db';
+import { revalidateTag } from 'next/cache'; // Importamos revalidateTag
 
 /**
  * @route GET /api/trucks
@@ -73,12 +74,16 @@ export async function POST(request: Request) {
     const driverResult = driverId ? await executeQuery(driverQuery, [{name: 'driverId', type: TYPES.Int, value: driverId}]) : [];
     const driver = driverResult.length > 0 ? driverResult[0] : null;
 
+    // ✨ INVALIDACIÓN DEL CACHÉ
+    revalidateTag('trucks');
+    if (driverId) {
+      revalidateTag('drivers'); // Invalidar choferes si se asigna uno
+    }
+
     return NextResponse.json({ ...result[0], driver }, { status: 201 });
 
   } catch (error: any) {
-    // ✨ CORRECCIÓN: Manejo específico para llaves duplicadas
     if (error?.number === 2627 || error?.number === 2601) {
-      // Extraemos el valor duplicado del mensaje de error para más claridad
       const duplicateValue = error.message.match(/\(([^)]+)\)/)?.[1];
       return new NextResponse(`La placa '${duplicateValue}' ya existe.`, { status: 409 });
     }

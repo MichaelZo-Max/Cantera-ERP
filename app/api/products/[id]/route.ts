@@ -1,6 +1,7 @@
 // app/api/products/[id]/route.ts
 import { NextResponse } from "next/server";
 import { executeQuery, TYPES } from "@/lib/db";
+import { revalidateTag } from 'next/cache'; // Importamos revalidateTag
 
 async function getProductById(id: number) {
   const sql = `
@@ -110,6 +111,10 @@ export async function PATCH(
     await executeQuery(updateSql, paramsArr);
 
     const updatedProduct = await getProductById(id);
+
+    // ✨ INVALIDACIÓN DEL CACHÉ
+    revalidateTag('products');
+
     return NextResponse.json(updatedProduct);
   } catch (error: any) {
     if (error?.number === 2627 || error?.number === 2601) {

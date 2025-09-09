@@ -1,6 +1,7 @@
 // app/api/destinations/[id]/route.ts
 import { NextResponse } from "next/server";
 import { executeQuery, TYPES } from "@/lib/db";
+import { revalidateTag } from 'next/cache'; // Importamos revalidateTag
 
 /**
  * @route GET /api/destinations/[id]
@@ -96,6 +97,10 @@ export async function PATCH(
         status: 404,
       });
     }
+
+    // ✨ INVALIDACIÓN DEL CACHÉ
+    revalidateTag('destinations');
+
     return NextResponse.json(result[0]);
   } catch (error) {
     console.error("[API_DESTINATIONS_PATCH]", error);
@@ -120,6 +125,10 @@ export async function DELETE(
     await executeQuery(query, [
       { name: "id", type: TYPES.Int, value: params.id },
     ]);
+    
+    // ✨ INVALIDACIÓN DEL CACHÉ
+    revalidateTag('destinations');
+
     return NextResponse.json({ message: "Destino desactivado correctamente" });
   } catch (error) {
     console.error("[API_DESTINATIONS_DELETE]", error);
