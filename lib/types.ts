@@ -58,7 +58,7 @@ export interface Destination {
 
 export interface Product {
   id: string;
-  codigo: string;
+  refProveedor: string;
   nombre: string;
   description?: string;
   is_active: boolean;

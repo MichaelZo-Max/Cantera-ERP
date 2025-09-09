@@ -54,7 +54,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
-// --- Componente Anidado para el Modal de Formatos (se mantiene igual) ---
+// --- Componente Anidado para el Modal de Formatos ---
 function FormatsDialog({
   product,
   open,
@@ -194,45 +194,58 @@ function FormatsDialog({
   );
 }
 
-// El componente de cliente recibe los datos iniciales
 export function ProductsClientUI({ initialProducts }: { initialProducts: Product[] }) {
   const [products, setProducts] = useState<Product[]>(initialProducts);
+  const [providers, setProviders] = useState<{ id: string; nombre: string }[]>([]);
   const [apiError, setApiError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [showProductDialog, setShowProductDialog] = useState(false);
   const [showFormatDialog, setShowFormatDialog] = useState(false);
   const [selectedProductForFormats, setSelectedProductForFormats] = useState<Product | null>(null);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
-  const [formData, setFormData] = useState({ codigo: "", nombre: "", description: "" });
+  const [formData, setFormData] = useState({ refProveedor: "", nombre: "", description: "" });
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const fetchProducts = async () => {
-      try {
-        const res = await fetch("/api/products", { cache: "no-store" });
-        if (!res.ok) throw new Error(await res.text());
-        setProducts(await res.json());
-      } catch (e: any) {
-        toast.error("Error al recargar productos", { description: e.message });
-      }
-    };
+  const fetchProductsAndProviders = useCallback(async () => {
+    try {
+      const [productsRes, providersRes] = await Promise.all([
+        fetch("/api/products", { cache: "no-store" }),
+        fetch("/api/providers", { cache: "no-store" }),
+      ]);
+      if (!productsRes.ok) throw new Error(await productsRes.text());
+      if (!providersRes.ok) throw new Error(await providersRes.text());
+      
+      setProducts(await productsRes.json());
+      setProviders(await providersRes.json());
+    } catch (e: any) {
+      toast.error("Error al recargar datos", { description: e.message });
+    }
+  }, []);
+  
+  useEffect(() => {
+    fetchProductsAndProviders();
+  }, [fetchProductsAndProviders]);
 
   const filteredProducts = products.filter(
     (product) =>
       product.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (product.description && product.description.toLowerCase().includes(searchTerm.toLowerCase())) ||
-      product.codigo.toLowerCase().includes(searchTerm.toLowerCase())
+      (product.description && product.description.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
   const handleNewProduct = () => {
     setEditingProduct(null);
-    setFormData({ codigo: "", nombre: "", description: "" });
+    setFormData({ refProveedor: "", nombre: "", description: "" });
     setApiError(null);
     setShowProductDialog(true);
   };
 
   const handleEditProduct = (product: Product) => {
     setEditingProduct(product);
-    setFormData({ codigo: product.codigo, nombre: product.nombre, description: product.description || "" });
+    setFormData({ 
+        refProveedor: String(product.refProveedor || ''), 
+        nombre: product.nombre, 
+        description: product.description || "" 
+    });
     setApiError(null);
     setShowProductDialog(true);
   };
@@ -252,7 +265,7 @@ export function ProductsClientUI({ initialProducts }: { initialProducts: Product
     try {
       const res = await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(formData) });
       if (!res.ok) throw new Error(await res.text() || "Error al guardar el producto");
-      await fetchProducts();
+      await fetchProductsAndProviders();
       toast.success(editingProduct ? "Producto actualizado" : "Producto creado");
       setShowProductDialog(false);
     } catch (err: any) {
@@ -269,7 +282,7 @@ export function ProductsClientUI({ initialProducts }: { initialProducts: Product
     try {
       const res = await fetch(`/api/products/${product.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ is_active: !product.is_active }) });
       if (!res.ok) throw new Error(await res.text());
-      await fetchProducts();
+      await fetchProductsAndProviders();
       toast.success(`Producto ${!product.is_active ? "activado" : "desactivado"}.`);
     } catch (err: any) {
       toast.error("Error al cambiar el estado", { description: err.message });
@@ -299,7 +312,7 @@ export function ProductsClientUI({ initialProducts }: { initialProducts: Product
           <CardContent className="pt-6">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-5 w-5" />
-              <Input placeholder="Buscar por nombre, descripción o código..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-12 h-12 text-lg focus-ring" />
+              <Input placeholder="Buscar por nombre o descripción..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-12 h-12 text-lg focus-ring" />
             </div>
           </CardContent>
         </AnimatedCard>
@@ -323,7 +336,7 @@ export function ProductsClientUI({ initialProducts }: { initialProducts: Product
                   <div className="flex justify-between items-start">
                     <div className="flex-1">
                       <CardTitle className="text-xl font-bold bg-gradient-to-r from-foreground to-muted-foreground bg-clip-text text-transparent">{product.nombre}</CardTitle>
-                      <p className="text-sm text-muted-foreground mt-1 font-medium">Código: {product.codigo}</p>
+                      {/* Se elimina la línea del código del producto */}
                     </div>
                     <Badge variant={product.is_active ? "default" : "secondary"} className={product.is_active ? "bg-gradient-primary" : ""}>{product.is_active ? "Activo" : "Inactivo"}</Badge>
                   </div>
@@ -352,14 +365,31 @@ export function ProductsClientUI({ initialProducts }: { initialProducts: Product
             </DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-6 pt-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-2"><Label htmlFor="codigo" className="font-semibold">Código *</Label><Input id="codigo" value={formData.codigo} onChange={(e) => setFormData({ ...formData, codigo: e.target.value })} placeholder="Ej: ARE-001" required className="focus-ring" /></div>
-                <div className="space-y-2"><Label htmlFor="nombre" className="font-semibold">Nombre *</Label><Input id="nombre" value={formData.nombre} onChange={(e) => setFormData({ ...formData, nombre: e.target.value })} placeholder="Ej: Arena Fina" required className="focus-ring" /></div>
+                <div className="space-y-2">
+                  <Label htmlFor="refProveedor" className="font-semibold">Proveedor *</Label>
+                  <Select value={formData.refProveedor} onValueChange={(value) => setFormData({ ...formData, refProveedor: value })} required>
+                    <SelectTrigger id="refProveedor" className="focus-ring">
+                      <SelectValue placeholder="Selecciona un proveedor" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {providers.map((provider) => (
+                        <SelectItem key={provider.id} value={String(provider.id)}>
+                          {provider.nombre}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="nombre" className="font-semibold">Nombre *</Label>
+                  <Input id="nombre" value={formData.nombre} onChange={(e) => setFormData({ ...formData, nombre: e.target.value })} placeholder="Ej: Arena Fina" required className="focus-ring" />
+                </div>
               </div>
               <div className="space-y-2"><Label htmlFor="description" className="font-semibold">Descripción</Label><Textarea id="description" value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} placeholder="Descripción detallada del producto (opcional)" rows={3} className="focus-ring" /></div>
               {apiError && <p className="text-sm text-red-500">{apiError}</p>}
               <DialogFooter className="pt-4">
                 <Button type="button" variant="outline" onClick={() => setShowProductDialog(false)}>Cancelar</Button>
-                <GradientButton type="submit" disabled={isSubmitting}>
+                <GradientButton type="submit" disabled={isSubmitting || !formData.nombre || !formData.refProveedor}>
                   {isSubmitting ? (<><LoadingSkeleton className="w-4 h-4 mr-2" />Guardando...</>) : (<><Save className="h-4 w-4 mr-2" />{editingProduct ? "Guardar Cambios" : "Crear Producto"}</>)}
                 </GradientButton>
               </DialogFooter>
@@ -368,7 +398,7 @@ export function ProductsClientUI({ initialProducts }: { initialProducts: Product
         </Dialog>
 
         {/* Formats Management Dialog */}
-        <FormatsDialog product={selectedProductForFormats} open={showFormatDialog} onOpenChange={setShowFormatDialog} onFormatUpdate={fetchProducts} />
+        <FormatsDialog product={selectedProductForFormats} open={showFormatDialog} onOpenChange={setShowFormatDialog} onFormatUpdate={fetchProductsAndProviders} />
       </div>
     );
 }

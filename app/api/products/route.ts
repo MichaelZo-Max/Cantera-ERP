@@ -30,7 +30,6 @@ export async function GET() {
         A.USASTOCKS,
         A.DESCATALOGADO,
         A.FECHAMODIFICADO,
-        -- Un campo de descripción, puedes usar el mismo nombre o un campo específico si lo tienes
         A.DESCRIPCION AS description,
         MAX(AL.PRECIO) AS PRECIO_UNITARIO
       FROM dbo.ARTICULOS A
@@ -48,13 +47,13 @@ export async function GET() {
     const out = rows.map((r: any) => ({
       id: r.CODARTICULO.toString(),
       nombre: r.DESCRIPCION ?? "",
-      codigo: r.REFPROVEEDOR ?? null, // Renombrado de codigoProveedor a codigo
-      description: r.description ?? null, // Nuevo campo añadido
+      refProveedor: r.REFPROVEEDOR ?? null,
+      description: r.description ?? null,
       unidad: r.UNIDADMEDIDA ?? null,
       usaStocks: String(r.USASTOCKS ?? "F").toUpperCase() === "T",
       is_active: String(r.DESCATALOGADO ?? "F").toUpperCase() !== "T",
-      createdAt: r.FECHAMODIFICADO ?? new Date(), // Mapeado a createdAt
-      updatedAt: r.FECHAMODIFICADO ?? new Date(), // Mapeado a updatedAt
+      createdAt: r.FECHAMODIFICADO ?? new Date(),
+      updatedAt: r.FECHAMODIFICADO ?? new Date(),
       precioUnitario:
         r.PRECIO_UNITARIO != null ? Number(r.PRECIO_UNITARIO) : null,
     }));
@@ -69,47 +68,21 @@ export async function GET() {
 /**
  * @route   POST /api/products
  * @desc    Crear un artículo en dbo.ARTICULOS.
- * Front mínimo: { nombre, codigo }
- * Opcional: id (si falta => MAX+1)
+ * Front mínimo: { nombre, refProveedor }
  */
 export async function POST(req: Request) {
   try {
-    const ct = req.headers.get("content-type") || "";
-    const body: RawBody = ct.includes("application/json")
-      ? await req.json().catch(() => ({}))
-      : {};
+    const body: RawBody = await req.json().catch(() => ({}));
 
-    let id = pickFirst<number>(body, [
-      "id",
-      "codArticulo",
-      "codarticulo",
-      "codigo",
-      "code",
-    ]);
-    const nombre = (
-      pickFirst<string>(body, ["nombre", "descripcion", "DESCRIPCION"]) ?? ""
-    )
-      .toString()
-      .trim();
-    const codigo = pickFirst<string>(body, [
-      "codigo",
-      "codigoProveedor",
-      "refProveedor",
-      "REFPROVEEDOR",
-    ]);
-    let is_active: boolean | undefined =
-      typeof body?.is_active === "boolean"
-        ? body.is_active
-        : typeof body?.is_active === "boolean"
-        ? body.is_active
-        : undefined;
+    let id = pickFirst<number>(body, ["id", "codArticulo", "codarticulo"]);
+    const nombre = (pickFirst<string>(body, ["nombre", "descripcion"]) ?? "").toString().trim();
+    const refProveedor = pickFirst<string>(body, ["refProveedor"]);
+    let is_active: boolean | undefined = pickFirst<boolean>(body, ["is_active"]);
 
-    if (!nombre || !codigo)
-      return new NextResponse("El nombre y el código son obligatorios", {
-        status: 400,
-      });
+    if (!nombre) {
+      return new NextResponse("El nombre es obligatorio", { status: 400 });
+    }
 
-    // Defaults
     const descatalogadoTF = is_active ?? true ? "F" : "T";
 
     if (id == null) {
@@ -137,24 +110,9 @@ export async function POST(req: Request) {
     `;
     const params = [
       { name: "id", type: TYPES.Int, value: id },
-      {
-        name: "descripcion",
-        type: TYPES.NVarChar,
-        value: nombre,
-        options: { length: 250 },
-      },
-      {
-        name: "refProveedor",
-        type: TYPES.NVarChar,
-        value: codigo ?? null,
-        options: { length: 100 },
-      },
-      {
-        name: "descatalogado",
-        type: TYPES.NVarChar,
-        value: descatalogadoTF,
-        options: { length: 1 },
-      },
+      { name: "descripcion", type: TYPES.NVarChar, value: nombre, options: { length: 250 } },
+      { name: "refProveedor", type: TYPES.NVarChar, value: refProveedor ?? null, options: { length: 100 } },
+      { name: "descatalogado", type: TYPES.NVarChar, value: descatalogadoTF, options: { length: 1 } },
     ];
 
     const rows = await executeQuery<any>(insertSql, params);
@@ -164,7 +122,7 @@ export async function POST(req: Request) {
       {
         id: r.CODARTICULO.toString(),
         nombre: r.DESCRIPCION ?? "",
-        codigo: r.REFPROVEEDOR ?? null,
+        refProveedor: r.REFPROVEEDOR ?? null,
         is_active: String(r.DESCATALOGADO ?? "F").toUpperCase() !== "T",
         createdAt: r.FECHAMODIFICADO ?? new Date(),
         updatedAt: r.FECHAMODIFICADO ?? new Date(),
