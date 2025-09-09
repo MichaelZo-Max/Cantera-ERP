@@ -19,8 +19,7 @@ export function LoginForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const next = searchParams?.get("next")
-  const { theme } = useTheme();
-
+  const { theme } = useTheme()
 
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
@@ -95,14 +94,14 @@ export function LoginForm() {
         <Card className="card-shadow-lg border-border/50 bg-card/80 backdrop-blur-sm">
           <CardHeader className="text-center space-y-4 pb-6">
             <div className="mx-auto w-fit">
-               <Image
-                    src={theme === 'dark' ? '/logo-cantera-blanco.webp' : '/logo-cantera-negro.webp'}
-                    alt="Cantera ERP Logo"
-                    width={96}
-                    height={96}
-                    className="h-24 w-24 object-contain"
-                    priority
-                  />
+              <Image
+                src={theme === 'dark' ? '/logo-cantera-blanco.webp' : '/logo-cantera-negro.webp'}
+                alt="Cantera ERP Logo"
+                width={96}
+                height={96}
+                className="h-24 w-24 object-contain"
+                priority
+              />
             </div>
             <div className="space-y-2">
               <CardTitle className="text-3xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
