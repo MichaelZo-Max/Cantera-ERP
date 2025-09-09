@@ -2,7 +2,8 @@
 "use client";
 
 import type React from "react";
-import { useState } from "react";
+// 1. Importar `useCallback` y `useMemo`
+import { useState, useMemo, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -41,7 +42,7 @@ import { toast } from "sonner";
 import { LoadingSkeleton } from "@/components/ui/loading-skeleton";
 import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
 import { useConfirmation } from "@/hooks/use-confirmation";
-import { EmptyState } from "@/components/ui/empty-state"; // Única adición a tu código original
+import { EmptyState } from "@/components/ui/empty-state";
 
 export function UsersClientUI({ initialUsers }: { initialUsers: User[] }) {
   const [users, setUsers] = useState<User[]>(initialUsers);
@@ -58,11 +59,12 @@ export function UsersClientUI({ initialUsers }: { initialUsers: User[] }) {
   const [apiError, setApiError] = useState<string | null>(null);
   const { isOpen, options, confirm, handleConfirm, handleCancel } = useConfirmation();
 
-  const filteredUsers = users.filter(
+  // 2. Memorizar el resultado del filtro
+  const filteredUsers = useMemo(() => users.filter(
     (user) =>
       user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       user.email.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  ), [users, searchTerm]);
 
   const getInitials = (name: string) => {
     return name
@@ -72,14 +74,15 @@ export function UsersClientUI({ initialUsers }: { initialUsers: User[] }) {
       .toUpperCase();
   };
 
-  const handleNewUser = () => {
+  // 3. Envolver las funciones en `useCallback`
+  const handleNewUser = useCallback(() => {
     setEditingUser(null);
     setFormData({ name: "", email: "", role: "CASHIER", password: "" });
     setApiError(null);
     setShowDialog(true);
-  };
+  }, []);
 
-  const handleEditUser = (user: User) => {
+  const handleEditUser = useCallback((user: User) => {
     setEditingUser(user);
     setFormData({
       name: user.name,
@@ -89,9 +92,9 @@ export function UsersClientUI({ initialUsers }: { initialUsers: User[] }) {
     });
     setApiError(null);
     setShowDialog(true);
-  };
+  }, []);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
     setApiError(null);
@@ -116,7 +119,7 @@ export function UsersClientUI({ initialUsers }: { initialUsers: User[] }) {
       }
       const savedUser = await res.json();
       if (editingUser) {
-        setUsers(users.map((u) => (u.id === savedUser.id ? savedUser : u)));
+        setUsers((prevUsers) => prevUsers.map((u) => (u.id === savedUser.id ? savedUser : u)));
         toast.success("Usuario actualizado exitosamente.");
       } else {
         setUsers((prev) => [...prev, savedUser]);
@@ -130,9 +133,9 @@ export function UsersClientUI({ initialUsers }: { initialUsers: User[] }) {
     } finally {
       setIsSubmitting(false);
     }
-  };
+  }, [editingUser, formData]);
 
-  const handleToggleStatus = (user: User) => {
+  const handleToggleStatus = useCallback((user: User) => {
     const is_active = user.is_active;
       confirm({
         title: `¿Estás seguro?`,
@@ -151,7 +154,7 @@ export function UsersClientUI({ initialUsers }: { initialUsers: User[] }) {
           });
           if (!res.ok) throw new Error(await res.text());
           const updatedUser = await res.json();
-          setUsers(users.map((u) => (u.id === updatedUser.id ? updatedUser : u)));
+          setUsers((prevUsers) => prevUsers.map((u) => (u.id === updatedUser.id ? updatedUser : u)));
           toast.success(
             `Usuario ${!is_active ? "activado" : "desactivado"} exitosamente.`
           );
@@ -160,7 +163,7 @@ export function UsersClientUI({ initialUsers }: { initialUsers: User[] }) {
         }
       }
     );
-  };
+  }, [confirm]);
 
   return (
     <div className="space-y-8 animate-fade-in">

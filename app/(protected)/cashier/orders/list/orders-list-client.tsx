@@ -1,7 +1,7 @@
 // app/(protected)/cashier/orders/list/orders-list-client.tsx
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -13,33 +13,36 @@ import { PageHeader } from "@/components/page-header";
 import { AnimatedCard } from "@/components/ui/animated-card";
 import { EmptyState } from "@/components/ui/empty-state";
 
+const getStatusConfig = (status: string) => {
+  switch (status) {
+    case "CREADA":
+      return { label: "Creada", color: "bg-yellow-100 text-yellow-800 border-yellow-200 dark:bg-yellow-900/20 dark:text-yellow-300 dark:border-yellow-800" };
+    case "PAGADA":
+      return { label: "Pagada", color: "bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/20 dark:text-blue-300 dark:border-blue-800" };
+    case "EN_DESPACHO":
+      return { label: "En Despacho", color: "bg-green-100 text-green-800 border-green-200 dark:bg-green-900/20 dark:text-green-300 dark:border-green-800" };
+    case "CERRADA":
+      return { label: "Cerrada", color: "bg-muted text-muted-foreground border-border" };
+    case "CANCELADA":
+      return { label: "Cancelada", color: "bg-red-100 text-red-800 border-red-200 dark:bg-red-900/20 dark:text-red-300 dark:border-red-800" };
+    default:
+      return { label: status, color: "bg-muted text-muted-foreground border-border" };
+  }
+};
+
 export function OrdersListClientUI({ initialOrders }: { initialOrders: Order[] }) {
   const [searchTerm, setSearchTerm] = useState("");
   const [orders] = useState<Order[]>(initialOrders);
 
-  const filteredOrders = orders.filter((order) => {
-    const q = searchTerm.toLowerCase();
-    const orderNumber = order.orderNumber?.toLowerCase() ?? "";
-    const clientName = order.client?.nombre?.toLowerCase() ?? "";
-    return orderNumber.includes(q) || clientName.includes(q);
-  });
-
-  const getStatusConfig = (status: string) => {
-    switch (status) {
-      case "CREADA":
-        return { label: "Creada", color: "bg-yellow-100 text-yellow-800 border-yellow-200 dark:bg-yellow-900/20 dark:text-yellow-300 dark:border-yellow-800" };
-      case "PAGADA":
-        return { label: "Pagada", color: "bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/20 dark:text-blue-300 dark:border-blue-800" };
-      case "EN_DESPACHO":
-        return { label: "En Despacho", color: "bg-green-100 text-green-800 border-green-200 dark:bg-green-900/20 dark:text-green-300 dark:border-green-800" };
-      case "CERRADA":
-        return { label: "Cerrada", color: "bg-muted text-muted-foreground border-border" };
-      case "CANCELADA":
-        return { label: "Cancelada", color: "bg-red-100 text-red-800 border-red-200 dark:bg-red-900/20 dark:text-red-300 dark:border-red-800" };
-      default:
-        return { label: status, color: "bg-muted text-muted-foreground border-border" };
-    }
-  };
+  const filteredOrders = useMemo(() => {
+    if (!searchTerm) return orders;
+    return orders.filter((order) => {
+      const q = searchTerm.toLowerCase();
+      const orderNumber = order.orderNumber?.toLowerCase() ?? "";
+      const clientName = order.client?.nombre?.toLowerCase() ?? "";
+      return orderNumber.includes(q) || clientName.includes(q);
+    });
+  }, [orders, searchTerm]);
 
   return (
     <div className="space-y-6">

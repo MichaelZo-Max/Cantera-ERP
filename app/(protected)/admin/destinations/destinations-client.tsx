@@ -2,7 +2,8 @@
 "use client";
 
 import type React from "react";
-import { useState, useEffect } from "react";
+// 1. Importar `useCallback` y `useMemo`
+import { useState, useCallback, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -67,23 +68,25 @@ export function DestinationsClientUI({
   const [apiError, setApiError] = useState<string | null>(null);
   const { isOpen, options, confirm, handleConfirm, handleCancel } = useConfirmation();
 
-  const filteredDestinations = destinations.filter(
+  // 2. Memorizar el resultado del filtro
+  const filteredDestinations = useMemo(() => destinations.filter(
     (destination) =>
       destination.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (destination.direccion &&
         destination.direccion.toLowerCase().includes(searchTerm.toLowerCase())) ||
       (destination.client?.nombre &&
         destination.client.nombre.toLowerCase().includes(searchTerm.toLowerCase()))
-  );
+  ), [destinations, searchTerm]);
 
-  const handleNewDestination = () => {
+  // 3. Envolver las funciones en `useCallback`
+  const handleNewDestination = useCallback(() => {
     setEditingDestination(null);
     setFormData({ nombre: "", direccion: "", clientId: "" });
     setApiError(null);
     setShowDialog(true);
-  };
+  }, []);
 
-  const handleEditDestination = (destination: Destination) => {
+  const handleEditDestination = useCallback((destination: Destination) => {
     setEditingDestination(destination);
     setFormData({
       nombre: destination.nombre,
@@ -92,9 +95,9 @@ export function DestinationsClientUI({
     });
     setApiError(null);
     setShowDialog(true);
-  };
+  }, []);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
     setApiError(null);
@@ -120,7 +123,7 @@ export function DestinationsClientUI({
 
       if (editingDestination) {
         setDestinations(
-          destinations.map((d) => (d.id === savedDestination.id ? savedDestination : d))
+          (prevDestinations) => prevDestinations.map((d) => (d.id === savedDestination.id ? savedDestination : d))
         );
         toast.success("Destino actualizado exitosamente.");
       } else {
@@ -135,9 +138,9 @@ export function DestinationsClientUI({
     } finally {
       setIsSubmitting(false);
     }
-  };
+  }, [editingDestination, formData]);
 
-  const handleToggleStatus = (destination: Destination) => {
+  const handleToggleStatus = useCallback((destination: Destination) => {
     const is_active = destination.is_active;
     confirm({
         title: `¿Estás seguro?`,
@@ -158,7 +161,7 @@ export function DestinationsClientUI({
           if (!res.ok) throw new Error(await res.text());
           const updatedDestination = await res.json();
           setDestinations(
-            destinations.map((d) =>
+            (prevDestinations) => prevDestinations.map((d) =>
               d.id === updatedDestination.id ? updatedDestination : d
             )
           );
@@ -172,7 +175,7 @@ export function DestinationsClientUI({
         }
       }
     );
-  };
+  }, [confirm]);
 
   return (
     <div className="space-y-8 animate-fade-in">

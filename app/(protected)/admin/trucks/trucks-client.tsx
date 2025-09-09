@@ -2,7 +2,8 @@
 "use client";
 
 import type React from "react";
-import { useState } from "react";
+// 1. Importar `useCallback` y `useMemo`
+import { useState, useMemo, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -67,8 +68,8 @@ export function TrucksClientUI({
   const [apiError, setApiError] = useState<string | null>(null);
   const { isOpen, options, confirm, handleConfirm, handleCancel } = useConfirmation();
 
-  // La lógica de filtrado y los manejadores de eventos se mantienen aquí
-  const filteredTrucks = trucks.filter(
+  // 2. Memorizar el resultado del filtro
+  const filteredTrucks = useMemo(() => trucks.filter(
     (truck) =>
       truck.placa.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (truck.brand &&
@@ -77,9 +78,10 @@ export function TrucksClientUI({
         truck.model.toLowerCase().includes(searchTerm.toLowerCase())) ||
       (truck.driver?.nombre &&
         truck.driver.nombre.toLowerCase().includes(searchTerm.toLowerCase()))
-  );
+  ), [trucks, searchTerm]);
 
-  const handleNewTruck = () => {
+  // 3. Envolver las funciones en `useCallback`
+  const handleNewTruck = useCallback(() => {
     setEditingTruck(null);
     setFormData({
       placa: "",
@@ -90,9 +92,9 @@ export function TrucksClientUI({
     });
     setApiError(null);
     setShowDialog(true);
-  };
+  }, []);
 
-  const handleEditTruck = (truck: TruckType) => {
+  const handleEditTruck = useCallback((truck: TruckType) => {
     setEditingTruck(truck);
     setFormData({
       placa: truck.placa,
@@ -103,9 +105,9 @@ export function TrucksClientUI({
     });
     setApiError(null);
     setShowDialog(true);
-  };
+  }, []);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
     setApiError(null);
@@ -128,7 +130,7 @@ export function TrucksClientUI({
       const savedTruck = await res.json();
 
       if (editingTruck) {
-        setTrucks(trucks.map((t) => (t.id === savedTruck.id ? savedTruck : t)));
+        setTrucks((prevTrucks) => prevTrucks.map((t) => (t.id === savedTruck.id ? savedTruck : t)));
         toast.success("Camión actualizado exitosamente.");
       } else {
         setTrucks((prevTrucks) => [...prevTrucks, savedTruck]);
@@ -142,9 +144,9 @@ export function TrucksClientUI({
     } finally {
       setIsSubmitting(false);
     }
-  };
+  }, [editingTruck, formData]);
 
-  const handleToggleStatus = (truck: TruckType) => {
+  const handleToggleStatus = useCallback((truck: TruckType) => {
     const is_active = truck.is_active;
     confirm({
         title: `¿Estás seguro?`,
@@ -164,7 +166,7 @@ export function TrucksClientUI({
           if (!res.ok) throw new Error(await res.text());
           const updatedTruck = await res.json();
           setTrucks(
-            trucks.map((t) => (t.id === updatedTruck.id ? updatedTruck : t))
+            (prevTrucks) => prevTrucks.map((t) => (t.id === updatedTruck.id ? updatedTruck : t))
           );
           toast.success(
             `Camión ${!is_active ? "activado" : "desactivado"} exitosamente.`
@@ -174,7 +176,7 @@ export function TrucksClientUI({
         }
       }
     );
-  };
+  }, [confirm]);
 
   return (
     <div className="space-y-8 animate-fade-in">

@@ -10,8 +10,10 @@ interface AnimatedCardProps extends CardProps {
   delay?: number
 }
 
-const AnimatedCard = React.forwardRef<HTMLDivElement, AnimatedCardProps>(
+// Envuelve la definición de tu componente con React.memo
+const AnimatedCard = React.memo(React.forwardRef<HTMLDivElement, AnimatedCardProps>(
   ({ className, hoverEffect = "lift", animateIn = true, delay = 0, children, ...props }, ref) => {
+    // ... (el resto de tu lógica del componente se mantiene igual)
     const [isVisible, setIsVisible] = React.useState(!animateIn)
 
     React.useEffect(() => {
@@ -44,7 +46,7 @@ const AnimatedCard = React.forwardRef<HTMLDivElement, AnimatedCardProps>(
       </Card>
     )
   },
-)
+))
 AnimatedCard.displayName = "AnimatedCard"
 
 export { AnimatedCard }

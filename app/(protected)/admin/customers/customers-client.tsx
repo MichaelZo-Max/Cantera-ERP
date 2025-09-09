@@ -2,7 +2,8 @@
 "use client";
 
 import type React from "react";
-import { useState } from "react";
+// 1. Importar `useCallback` y `useMemo`
+import { useState, useCallback, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -63,20 +64,22 @@ export function CustomersClientUI({
 
   const { isOpen, options, confirm, handleConfirm, handleCancel } = useConfirmation();
 
-  const filteredCustomers = customers.filter(
+  // 2. Memorizar el resultado del filtro
+  const filteredCustomers = useMemo(() => customers.filter(
     (customer) =>
       customer.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (customer.rif && customer.rif.toLowerCase().includes(searchTerm.toLowerCase()))
-  );
+  ), [customers, searchTerm]);
 
-  const handleNewCustomer = () => {
+  // 3. Envolver las funciones en `useCallback`
+  const handleNewCustomer = useCallback(() => {
     setEditingCustomer(null);
     setFormData({ nombre: "", rif: "", address: "", email: "", phone: "" });
     setApiError(null);
     setShowDialog(true);
-  };
+  }, []);
 
-  const handleEditCustomer = (customer: ClientType) => {
+  const handleEditCustomer = useCallback((customer: ClientType) => {
     setEditingCustomer(customer);
     setFormData({
       nombre: customer.nombre,
@@ -87,9 +90,9 @@ export function CustomersClientUI({
     });
     setApiError(null);
     setShowDialog(true);
-  };
+  }, []);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
     setApiError(null);
@@ -113,7 +116,7 @@ export function CustomersClientUI({
 
       if (editingCustomer) {
         setCustomers(
-          customers.map((c) => (c.id === savedCustomer.id ? savedCustomer : c))
+          (prevCustomers) => prevCustomers.map((c) => (c.id === savedCustomer.id ? savedCustomer : c))
         );
         toast.success("Cliente actualizado exitosamente.");
       } else {
@@ -128,9 +131,9 @@ export function CustomersClientUI({
     } finally {
       setIsSubmitting(false);
     }
-  };
+  }, [editingCustomer, formData]);
 
-  const handleToggleStatus = (customer: ClientType) => {
+  const handleToggleStatus = useCallback((customer: ClientType) => {
     const is_active = customer.is_active;
     confirm(
       {
@@ -151,7 +154,7 @@ export function CustomersClientUI({
           if (!res.ok) throw new Error(await res.text());
           const updatedCustomer = await res.json();
           setCustomers(
-            customers.map((c) =>
+            (prevCustomers) => prevCustomers.map((c) =>
               c.id === updatedCustomer.id ? updatedCustomer : c
             )
           );
@@ -163,7 +166,7 @@ export function CustomersClientUI({
         }
       }
     );
-  };
+  }, [confirm]);
 
   return (
     <div className="space-y-8 animate-fade-in">

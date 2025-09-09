@@ -2,7 +2,8 @@
 "use client";
 
 import type React from "react";
-import { useState, useEffect, useCallback } from "react";
+// 1. Importar `useMemo`
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -103,13 +104,13 @@ function FormatsDialog({
     }
   }, [open, fetchFormats]);
 
-  const handleNewFormat = () => {
+  const handleNewFormat = useCallback(() => {
     setEditingFormat(null);
     setFormatData({ sku: "", pricePerUnit: 0, unitBase: "M3", baseUnitFactor: 1 });
     setShowFormatForm(true);
-  };
+  }, []);
 
-  const handleEditFormat = (format: ProductFormat) => {
+  const handleEditFormat = useCallback((format: ProductFormat) => {
     setEditingFormat(format);
     setFormatData({
       sku: format.sku || "",
@@ -118,9 +119,9 @@ function FormatsDialog({
       baseUnitFactor: format.factorUnidadBase,
     });
     setShowFormatForm(true);
-  };
+  }, []);
 
-  const handleSaveFormat = async (e: React.FormEvent) => {
+  const handleSaveFormat = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
     const url = editingFormat ? `/api/product-formats/${editingFormat.id}` : "/api/product-formats";
@@ -146,7 +147,7 @@ function FormatsDialog({
     } finally {
       setIsSubmitting(false);
     }
-  };
+  }, [editingFormat, formatData, product, fetchFormats, onFormatUpdate]);
 
   if (!product) return null;
 
@@ -230,20 +231,20 @@ export function ProductsClientUI({ initialProducts }: { initialProducts: Product
     fetchProductsAndProviders();
   }, [fetchProductsAndProviders]);
 
-  const filteredProducts = products.filter(
+  const filteredProducts = useMemo(() => products.filter(
     (product) =>
       product.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (product.description && product.description.toLowerCase().includes(searchTerm.toLowerCase()))
-  );
+  ), [products, searchTerm]);
 
-  const handleNewProduct = () => {
+  const handleNewProduct = useCallback(() => {
     setEditingProduct(null);
     setFormData({ refProveedor: "", nombre: "", description: "" });
     setApiError(null);
     setShowProductDialog(true);
-  };
+  }, []);
 
-  const handleEditProduct = (product: Product) => {
+  const handleEditProduct = useCallback((product: Product) => {
     setEditingProduct(product);
     setFormData({ 
         refProveedor: String(product.refProveedor || ''),
@@ -252,14 +253,14 @@ export function ProductsClientUI({ initialProducts }: { initialProducts: Product
     });
     setApiError(null);
     setShowProductDialog(true);
-  };
+  }, []);
 
-  const handleManageFormats = (product: Product) => {
+  const handleManageFormats = useCallback((product: Product) => {
     setSelectedProductForFormats(product);
     setShowFormatDialog(true);
-  };
+  }, []);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
     setApiError(null);
@@ -270,7 +271,7 @@ export function ProductsClientUI({ initialProducts }: { initialProducts: Product
       const res = await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(formData) });
       if (!res.ok) throw new Error(await res.text() || "Error al guardar el producto");
       
-      fetchProductsAndProviders();
+      await fetchProductsAndProviders();
 
       toast.success(editingProduct ? "Producto actualizado" : "Producto creado");
       setShowProductDialog(false);
@@ -280,9 +281,9 @@ export function ProductsClientUI({ initialProducts }: { initialProducts: Product
     } finally {
       setIsSubmitting(false);
     }
-  };
+  }, [editingProduct, formData, fetchProductsAndProviders]);
 
-  const handleToggleStatus = (product: Product) => {
+  const handleToggleStatus = useCallback((product: Product) => {
     confirm({
         title: `¿Estás seguro?`,
         description: `Esta acción ${product.is_active ? "desactivará" : "activará"} el producto "${product.nombre}".`,
@@ -300,7 +301,7 @@ export function ProductsClientUI({ initialProducts }: { initialProducts: Product
         }
       }
     );
-  };
+  }, [confirm, fetchProductsAndProviders]);
 
   return (
     <div className="space-y-8 animate-fade-in">

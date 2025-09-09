@@ -2,7 +2,8 @@
 "use client";
 
 import type React from "react";
-import { useState } from "react";
+// 1. Importar `useCallback` y `useMemo` de React.
+import { useState, useCallback, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -38,7 +39,7 @@ import { toast } from "sonner";
 import { LoadingSkeleton } from "@/components/ui/loading-skeleton";
 import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
 import { useConfirmation } from "@/hooks/use-confirmation";
-import { EmptyState } from "@/components/ui/empty-state"; // Importamos el componente
+import { EmptyState } from "@/components/ui/empty-state";
 
 // El componente recibe los datos iniciales como props
 export function DriversClientUI({ initialDrivers }: { initialDrivers: Driver[] }) {
@@ -56,21 +57,23 @@ export function DriversClientUI({ initialDrivers }: { initialDrivers: Driver[] }
 
   const { isOpen, options, confirm, handleConfirm, handleCancel } = useConfirmation();
 
-  const filteredDrivers = drivers.filter(
+  // useMemo para evitar recalcular el filtro en cada render si `drivers` o `searchTerm` no cambian.
+  const filteredDrivers = useMemo(() => drivers.filter(
     (driver) =>
       driver.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (driver.docId &&
         driver.docId.toLowerCase().includes(searchTerm.toLowerCase()))
-  );
+  ), [drivers, searchTerm]);
 
-  const handleNewDriver = () => {
+  // 2. Envolver las funciones en `useCallback`
+  const handleNewDriver = useCallback(() => {
     setEditingDriver(null);
     setFormData({ nombre: "", docId: "", phone: "" });
     setApiError(null);
     setShowDialog(true);
-  };
+  }, []); // Dependencias vacías porque no usa props o estado que cambien.
 
-  const handleEditDriver = (driver: Driver) => {
+  const handleEditDriver = useCallback((driver: Driver) => {
     setEditingDriver(driver);
     setFormData({
       nombre: driver.nombre,
@@ -79,9 +82,9 @@ export function DriversClientUI({ initialDrivers }: { initialDrivers: Driver[] }
     });
     setApiError(null);
     setShowDialog(true);
-  };
+  }, []); // Dependencias vacías por la misma razón.
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
     setApiError(null);
@@ -105,7 +108,7 @@ export function DriversClientUI({ initialDrivers }: { initialDrivers: Driver[] }
 
       if (editingDriver) {
         setDrivers(
-          drivers.map((d) => (d.id === savedDriver.id ? savedDriver : d))
+          (prevDrivers) => prevDrivers.map((d) => (d.id === savedDriver.id ? savedDriver : d))
         );
         toast.success("Chofer actualizado exitosamente.");
       } else {
@@ -120,9 +123,9 @@ export function DriversClientUI({ initialDrivers }: { initialDrivers: Driver[] }
     } finally {
       setIsSubmitting(false);
     }
-  };
+  }, [editingDriver, formData]); // Depende de `editingDriver` y `formData`.
 
-  const handleToggleStatus = (driver: Driver) => {
+  const handleToggleStatus = useCallback((driver: Driver) => {
     const is_active = driver.is_active;
     confirm(
         {
@@ -145,7 +148,7 @@ export function DriversClientUI({ initialDrivers }: { initialDrivers: Driver[] }
                 
                 const updatedDriver = await res.json();
                 setDrivers(
-                  drivers.map((d) => (d.id === updatedDriver.id ? updatedDriver : d))
+                  (prevDrivers) => prevDrivers.map((d) => (d.id === updatedDriver.id ? updatedDriver : d))
                 );
                 toast.success(
                   `Chofer ${!is_active ? "activado" : "desactivado"} exitosamente.`
@@ -155,7 +158,7 @@ export function DriversClientUI({ initialDrivers }: { initialDrivers: Driver[] }
               }
         }
       );
-  };
+  }, [confirm]); // Depende de `confirm` del hook. `drivers` no es necesario si usamos el setter con función.
 
   return (
     <div className="space-y-8 animate-fade-in">
