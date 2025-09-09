@@ -1,6 +1,7 @@
 // app/api/users/[id]/route.ts
 import { NextResponse } from 'next/server';
 import { executeQuery, TYPES } from '@/lib/db';
+import bcrypt from 'bcryptjs';
 
 /**
  * @route GET /api/users/[id]
@@ -22,31 +23,55 @@ export async function GET(request: Request, { params }: { params: { id: string }
 
 /**
  * @route PATCH /api/users/[id]
- * @desc Actualizar un usuario
+ * @desc Actualizar un usuario dinámicamente
  */
 export async function PATCH(request: Request, { params }: { params: { id: string } }) {
     try {
+        const id = parseInt(params.id, 10);
+        if (isNaN(id)) {
+            return new NextResponse('ID de usuario inválido', { status: 400 });
+        }
+
         const body = await request.json();
-        const { email, name, role, is_active } = body;
+        
+        const updates: string[] = [];
+        const queryParams: any[] = [{ name: 'id', type: TYPES.Int, value: id }];
+
+        if (body.name !== undefined) {
+            updates.push("name = @name");
+            queryParams.push({ name: 'name', type: TYPES.NVarChar, value: body.name });
+        }
+        if (body.email !== undefined) {
+            updates.push("email = @email");
+            queryParams.push({ name: 'email', type: TYPES.NVarChar, value: body.email });
+        }
+        if (body.role !== undefined) {
+            updates.push("role = @role");
+            queryParams.push({ name: 'role', type: TYPES.NVarChar, value: body.role });
+        }
+        if (body.is_active !== undefined) {
+            updates.push("is_active = @is_active");
+            queryParams.push({ name: 'is_active', type: TYPES.Bit, value: body.is_active });
+        }
+        if (body.password) {
+            const salt = await bcrypt.genSalt(10);
+            const password_hash = await bcrypt.hash(body.password, salt);
+            updates.push("password_hash = @password_hash");
+            queryParams.push({ name: 'password_hash', type: TYPES.NVarChar, value: password_hash });
+        }
+
+        if (updates.length === 0) {
+            return new NextResponse('No hay campos para actualizar', { status: 400 });
+        }
+
+        updates.push("updated_at = GETDATE()");
 
         const query = `
             UPDATE RIP.APP_USUARIOS
-            SET 
-                email = @email, 
-                name = @name, 
-                role = @role,
-                is_active = @is_active,
-                updated_at = GETDATE()
+            SET ${updates.join(', ')}
             OUTPUT INSERTED.id, INSERTED.email, INSERTED.name, INSERTED.role, INSERTED.is_active
             WHERE id = @id;
         `;
-        const queryParams = [
-            { name: 'id', type: TYPES.Int, value: params.id },
-            { name: 'email', type: TYPES.NVarChar, value: email },
-            { name: 'name', type: TYPES.NVarChar, value: name },
-            { name: 'role', type: TYPES.NVarChar, value: role },
-            { name: 'is_active', type: TYPES.Bit, value: is_active }
-        ];
 
         const result = await executeQuery(query, queryParams);
         if (result.length === 0) {
