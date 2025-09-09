@@ -1,7 +1,7 @@
 // app/(protected)/cashier/orders/cashier-order-client.tsx
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation"; // Importado para la redirección
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -105,13 +105,18 @@ export function CashierOrderClientUI({
     loadDestinations();
   }, [selectedClient]);
 
-  const findProduct = (id: string) => products.find((p) => p.id === id);
+  const findProduct = useCallback((id: string) => products.find((p) => p.id === id), [products]);
 
-  const subtotal = orderItems.reduce((sum, item) => sum + item.subtotal, 0);
-  const tax = subtotal * 0.16;
-  const total = subtotal + tax;
+  // OPTIMIZACIÓN: Calculamos los totales solo cuando los items de la orden cambian.
+  const { subtotal, tax, total } = useMemo(() => {
+    const subtotal = orderItems.reduce((sum, item) => sum + item.subtotal, 0);
+    const tax = subtotal * 0.16;
+    const total = subtotal + tax;
+    return { subtotal, tax, total };
+  }, [orderItems]);
 
-  const handleAddItem = () => {
+  // OPTIMIZACIÓN: Memorizamos la función para evitar que se recree en cada render.
+  const handleAddItem = useCallback(() => {
     if (!currentProduct || currentQuantity <= 0 || !currentFormat) {
       toast.error("Selecciona un producto, formato y cantidad válida");
       return;
@@ -139,14 +144,16 @@ export function CashierOrderClientUI({
     setSelectedProductId('');
     setAvailableFormats([]);
     toast.success("Item agregado a la comanda");
-  };
+  }, [currentProduct, currentQuantity, currentFormat, findProduct]);
 
-  const handleRemoveItem = (itemId: string) => {
+  // OPTIMIZACIÓN: Memorizamos la función.
+  const handleRemoveItem = useCallback((itemId: string) => {
     setOrderItems((prev) => prev.filter((item) => item.id !== itemId));
     toast.success("Item eliminado");
-  };
+  }, []);
 
-  const handleAuthorizeDispatch = async () => {
+  // OPTIMIZACIÓN: Memorizamos la función de autorización.
+  const handleAuthorizeDispatch = useCallback(async () => {
     if (!selectedClient || orderItems.length === 0 || !selectedTruckId || !paymentMethod) {
       toast.error("Completa los campos requeridos");
       return;
@@ -193,9 +200,9 @@ export function CashierOrderClientUI({
     } finally {
       setIsSubmitting(false);
     }
-  };
+  }, [selectedClient, selectedDestination, orderItems, paymentMethod, total, paymentReference, selectedTruckId, user, truckPhoto, router]);
 
-  const canAuthorize = !!selectedClient && orderItems.length > 0 && !!selectedTruckId && !!paymentMethod;
+  const canAuthorize = useMemo(() => !!selectedClient && orderItems.length > 0 && !!selectedTruckId && !!paymentMethod, [selectedClient, orderItems, selectedTruckId, paymentMethod]);
 
   const fetchFormats = useCallback(async (productId: string) => {
     if (productId) {
@@ -226,18 +233,18 @@ export function CashierOrderClientUI({
     }
   }, []);
 
-  const handleProductSelect = (productId: string) => {
+  const handleProductSelect = useCallback((productId: string) => {
     setSelectedProductId(productId);
     fetchFormats(productId);
-  };
+  }, [fetchFormats]);
 
-  const handleFormatSelect = (formatId: string) => {
+  const handleFormatSelect = useCallback((formatId: string) => {
     if (selectedProductId) {
       setCurrentProduct({ productId: selectedProductId, formatId });
       const format = availableFormats.find(f => f.id === formatId);
       setCurrentFormat(format || null);
     }
-  };
+  }, [selectedProductId, availableFormats]);
 
   return (
       <div className="max-w-7xl mx-auto space-y-6">

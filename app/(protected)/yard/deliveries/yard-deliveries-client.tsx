@@ -1,7 +1,7 @@
 // app/(protected)/yard/deliveries/yard-deliveries-client.tsx
 "use client";
 
-import { useState, useMemo, useCallback } from "react";
+import React, { useState, useMemo, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -10,11 +10,49 @@ import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { PhotoInput } from "@/components/forms/photo-input";
-import { Search, Truck, Package, User, CheckCircle, Clock, Camera, Eye } from "lucide-react";
+import { Search, Truck, User, CheckCircle, Clock, Camera, Eye } from "lucide-react";
 import { toast } from "sonner";
 import type { Delivery } from "@/lib/types";
 import { useAuth } from "@/components/auth-provider";
 import Image from "next/image";
+
+// OPTIMIZACIÓN: Se extrae DeliveryCard a su propio componente y se envuelve con React.memo.
+// Esto evita que todas las tarjetas se vuelvan a renderizar si solo una cambia o si el componente padre se actualiza.
+const DeliveryCard = React.memo(({ delivery, onSelect }: { delivery: Delivery; onSelect: (delivery: Delivery) => void; }) => (
+  <Card className="cursor-pointer hover:shadow-lg transition-shadow" onClick={() => onSelect(delivery)}>
+    <CardHeader className="pb-3">
+      <div className="flex justify-between items-start">
+        <div><p className="font-bold text-lg">{delivery.truck?.placa}</p><p className="text-sm text-muted-foreground">ID: {delivery.id}</p></div>
+        <Badge variant="secondary">{delivery.productFormat?.product?.nombre}</Badge>
+      </div>
+    </CardHeader>
+    <CardContent className="space-y-3">
+       {delivery.loadPhoto && (
+          <div className="relative h-40 w-full overflow-hidden rounded-md border group">
+               <Image
+                  src={delivery.loadPhoto}
+                  alt={`Foto de carga para ${delivery.truck?.placa}`}
+                  fill
+                  style={{ objectFit: "cover" }}
+                  className="transition-transform duration-300 group-hover:scale-105"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
+              <div className="absolute bottom-2 left-2 flex items-center gap-1 text-xs text-white bg-black/50 px-2 py-1 rounded">
+                  <Camera className="h-3 w-3" />
+                  <span>Foto de Carga</span>
+              </div>
+          </div>
+      )}
+      <div className="space-y-1 text-sm">
+        <div className="flex items-center gap-2"><User className="h-4 w-4 text-muted-foreground" /><span className="truncate">{delivery.order?.client?.nombre}</span></div>
+        <div className="flex justify-between"><span className="text-muted-foreground">Cantidad:</span><span className="font-medium">{delivery.cantidadBase} {delivery.productFormat?.unidadBase}</span></div>
+        <div className="flex justify-between"><span className="text-muted-foreground">Chofer:</span><span>{delivery.truck?.driver?.nombre || "N/A"}</span></div>
+      </div>
+    </CardContent>
+  </Card>
+));
+DeliveryCard.displayName = 'DeliveryCard';
+
 
 export function YardDeliveriesClientUI({ initialDeliveries }: { initialDeliveries: Delivery[] }) {
   const { user } = useAuth();
@@ -43,7 +81,8 @@ export function YardDeliveriesClientUI({ initialDeliveries }: { initialDeliverie
   const pendingDeliveries = useMemo(() => filteredDeliveries.filter((d) => d.estado === "ASIGNADA"), [filteredDeliveries]);
   const loadedDeliveries = useMemo(() => filteredDeliveries.filter((d) => d.estado === "CARGADA"), [filteredDeliveries]);
 
-  const handleSelectDelivery = (delivery: Delivery) => {
+  // OPTIMIZACIÓN: Memorizamos la función para que no se recree en cada render.
+  const handleSelectDelivery = useCallback((delivery: Delivery) => {
     if (delivery.estado !== 'ASIGNADA') {
         toast.info("Este viaje ya fue procesado.", {
             description: `Estado actual: ${delivery.estado}`
@@ -55,9 +94,10 @@ export function YardDeliveriesClientUI({ initialDeliveries }: { initialDeliverie
     setNotes(delivery.notes || "");
     setLoadPhoto(null);
     setShowModal(true);
-  };
+  }, []);
   
-  const handleConfirmLoad = async () => {
+  // OPTIMIZACIÓN: Memorizamos la función.
+  const handleConfirmLoad = useCallback(async () => {
     if (!selectedDelivery) return;
 
     if (!loadedQuantity || loadedQuantity <= 0) {
@@ -70,7 +110,6 @@ export function YardDeliveriesClientUI({ initialDeliveries }: { initialDeliverie
     }
     
     setIsSubmitting(true);
-    const originalDeliveries = deliveries;
 
     try {
       const formData = new FormData();
@@ -86,59 +125,25 @@ export function YardDeliveriesClientUI({ initialDeliveries }: { initialDeliverie
       
       const updatedDelivery = await res.json();
       
-      // Para una actualización instantánea en la UI:
       setDeliveries(prev => prev.map(d => d.id === selectedDelivery.id ? { ...d, ...updatedDelivery, estado: 'CARGADA', loadedQuantity } : d));
       
       toast.success(`Carga confirmada para ${selectedDelivery.truck?.placa}`);
       setShowModal(false);
 
     } catch (err: any) {
-      setDeliveries(originalDeliveries);
       toast.error("Error al confirmar la carga", { description: err.message });
     } finally {
       setIsSubmitting(false);
       setSelectedDelivery(null);
     }
-  };
+  }, [selectedDelivery, loadedQuantity, loadPhoto, notes, user?.id]);
   
-  const openImagePreview = (imageUrl: string) => {
+  // OPTIMIZACIÓN: Memorizamos la función.
+  const openImagePreview = useCallback((imageUrl: string) => {
     setPreviewImageUrl(imageUrl);
     setShowImagePreview(true);
-  };
+  }, []);
 
-  const DeliveryCard = ({ delivery }: { delivery: Delivery }) => (
-    <Card className="cursor-pointer hover:shadow-lg transition-shadow" onClick={() => handleSelectDelivery(delivery)}>
-      <CardHeader className="pb-3">
-        <div className="flex justify-between items-start">
-          <div><p className="font-bold text-lg">{delivery.truck?.placa}</p><p className="text-sm text-muted-foreground">ID: {delivery.id}</p></div>
-          <Badge variant="secondary">{delivery.productFormat?.product?.nombre}</Badge>
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-3">
-         {delivery.loadPhoto && (
-            <div className="relative h-40 w-full overflow-hidden rounded-md border group">
-                 <Image
-                    src={delivery.loadPhoto}
-                    alt={`Foto de carga para ${delivery.truck?.placa}`}
-                    fill
-                    style={{ objectFit: "cover" }}
-                    className="transition-transform duration-300 group-hover:scale-105"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
-                <div className="absolute bottom-2 left-2 flex items-center gap-1 text-xs text-white bg-black/50 px-2 py-1 rounded">
-                    <Camera className="h-3 w-3" />
-                    <span>Foto de Carga</span>
-                </div>
-            </div>
-        )}
-        <div className="space-y-1 text-sm">
-          <div className="flex items-center gap-2"><User className="h-4 w-4 text-muted-foreground" /><span className="truncate">{delivery.order?.client?.nombre}</span></div>
-          <div className="flex justify-between"><span className="text-muted-foreground">Cantidad:</span><span className="font-medium">{delivery.cantidadBase} {delivery.productFormat?.unidadBase}</span></div>
-          <div className="flex justify-between"><span className="text-muted-foreground">Chofer:</span><span>{delivery.truck?.driver?.nombre || "N/A"}</span></div>
-        </div>
-      </CardContent>
-    </Card>
-  );
 
   return (
     <div className="space-y-6">
@@ -148,8 +153,8 @@ export function YardDeliveriesClientUI({ initialDeliveries }: { initialDeliverie
       </div>
       <Card><CardContent className="pt-6"><Input placeholder="Buscar por placa, ID de viaje o cliente..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} /></CardContent></Card>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="space-y-4"><h3 className="font-semibold flex items-center gap-2"><Clock className="h-5 w-5 text-blue-500" />Pendientes por Cargar<Badge variant="secondary">{pendingDeliveries.length}</Badge></h3>{pendingDeliveries.map(d => <DeliveryCard key={d.id} delivery={d} />)}</div>
-        <div className="space-y-4"><h3 className="font-semibold flex items-center gap-2"><CheckCircle className="h-5 w-5 text-green-500" />Cargados (Listos para Salir)<Badge variant="secondary">{loadedDeliveries.length}</Badge></h3>{loadedDeliveries.map(d => <DeliveryCard key={d.id} delivery={d} />)}</div>
+        <div className="space-y-4"><h3 className="font-semibold flex items-center gap-2"><Clock className="h-5 w-5 text-blue-500" />Pendientes por Cargar<Badge variant="secondary">{pendingDeliveries.length}</Badge></h3>{pendingDeliveries.map(d => <DeliveryCard key={d.id} delivery={d} onSelect={handleSelectDelivery} />)}</div>
+        <div className="space-y-4"><h3 className="font-semibold flex items-center gap-2"><CheckCircle className="h-5 w-5 text-green-500" />Cargados (Listos para Salir)<Badge variant="secondary">{loadedDeliveries.length}</Badge></h3>{loadedDeliveries.map(d => <DeliveryCard key={d.id} delivery={d} onSelect={handleSelectDelivery} />)}</div>
       </div>
       <Dialog open={showModal} onOpenChange={setShowModal}>
         <DialogContent className="sm:max-w-3xl max-h-[90vh] overflow-y-auto">
@@ -182,3 +187,4 @@ export function YardDeliveriesClientUI({ initialDeliveries }: { initialDeliverie
     </div>
   );
 }
+

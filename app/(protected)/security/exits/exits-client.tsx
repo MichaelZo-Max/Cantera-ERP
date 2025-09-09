@@ -1,7 +1,7 @@
 // app/(protected)/security/exits/exits-client.tsx
 "use client";
 
-import { useState } from "react";
+import React, { useState, useMemo, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -28,6 +28,43 @@ import { toast } from "sonner";
 import type { Delivery } from "@/lib/types";
 import { useAuth } from "@/components/auth-provider";
 
+// OPTIMIZACIÓN: Se extrae la tarjeta a su propio componente y se envuelve con React.memo.
+const LoadedDeliveryCard = React.memo(({ delivery, onSelect }: { delivery: Delivery; onSelect: (delivery: Delivery) => void; }) => (
+    <Card className="cursor-pointer hover:shadow-md transition-shadow border-green-200 bg-green-50/50 dark:border-green-800 dark:bg-green-900/10" onClick={() => onSelect(delivery)}>
+        <CardContent className="pt-4">
+            <div className="flex justify-between items-start mb-3">
+                <div><p className="font-bold text-lg">{delivery.truck?.placa}</p><p className="text-sm text-muted-foreground">ID: {delivery.id}</p></div>
+                <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300">Listo</Badge>
+            </div>
+            <div className="space-y-2 text-sm">
+                <div className="flex items-center gap-2"><User className="h-4 w-4 text-muted-foreground" /><span className="truncate">{delivery.order?.client?.nombre}</span></div>
+                <div className="flex items-center gap-2"><Package className="h-4 w-4 text-muted-foreground" /><span>{delivery.productFormat?.product?.nombre}</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">Cantidad:</span><span className="font-medium">{delivery.cantidadBase} {delivery.productFormat?.unidadBase}</span></div>
+                {delivery.loadedAt && <div className="flex justify-between"><span className="text-muted-foreground">Cargado:</span><span>{new Date(delivery.loadedAt).toLocaleTimeString()}</span></div>}
+            </div>
+            <Button className="w-full mt-3" size="sm"><LogOut className="h-4 w-4 mr-2" />Autorizar Salida</Button>
+        </CardContent>
+    </Card>
+));
+LoadedDeliveryCard.displayName = 'LoadedDeliveryCard';
+
+const ExitedDeliveryCard = React.memo(({ delivery }: { delivery: Delivery }) => (
+     <Card className="bg-blue-50 border-blue-200 dark:bg-blue-900/20 dark:border-blue-800">
+        <CardContent className="pt-4">
+            <div className="flex justify-between items-start mb-3">
+                <div><p className="font-semibold">{delivery.truck?.placa}</p><p className="text-sm text-muted-foreground">{delivery.order?.client?.nombre}</p></div>
+                <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300">Salió</Badge>
+            </div>
+            <div className="text-sm space-y-1">
+                <div className="flex justify-between"><span className="text-muted-foreground">Cantidad:</span><span>{delivery.cantidadBase} {delivery.productFormat?.unidadBase}</span></div>
+                {delivery.exitedAt && <div className="flex justify-between"><span className="text-muted-foreground">Salida:</span><span>{new Date(delivery.exitedAt).toLocaleTimeString()}</span></div>}
+            </div>
+        </CardContent>
+    </Card>
+));
+ExitedDeliveryCard.displayName = 'ExitedDeliveryCard';
+
+
 export function SecurityExitsClientUI({ initialDeliveries }: { initialDeliveries: Delivery[] }) {
   const { user } = useAuth();
   const [allDeliveries, setAllDeliveries] = useState<Delivery[]>(initialDeliveries);
@@ -41,19 +78,22 @@ export function SecurityExitsClientUI({ initialDeliveries }: { initialDeliveries
   const [showImagePreview, setShowImagePreview] = useState(false);
   const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
 
-  const loadedDeliveries = allDeliveries.filter((d) => d.estado === "CARGADA");
-  const exitedDeliveries = allDeliveries.filter((d) => d.estado === "SALIDA_OK");
+  const loadedDeliveries = useMemo(() => allDeliveries.filter((d) => d.estado === "CARGADA"), [allDeliveries]);
+  const exitedDeliveries = useMemo(() => allDeliveries.filter((d) => d.estado === "SALIDA_OK"), [allDeliveries]);
 
-  const filteredDeliveries = loadedDeliveries.filter((delivery) => {
+  const filteredDeliveries = useMemo(() => {
     const query = searchQuery.toLowerCase();
-    return (
-      delivery.truck?.placa.toLowerCase().includes(query) ||
-      delivery.id.toLowerCase().includes(query) ||
-      delivery.order?.client?.nombre.toLowerCase().includes(query)
-    );
-  });
+    if (!query) return loadedDeliveries;
+    return loadedDeliveries.filter((delivery) => {
+      return (
+        delivery.truck?.placa.toLowerCase().includes(query) ||
+        delivery.id.toLowerCase().includes(query) ||
+        (delivery.order?.client?.nombre && delivery.order.client.nombre.toLowerCase().includes(query))
+      );
+    });
+  }, [searchQuery, loadedDeliveries]);
 
-  const handleSelectDelivery = (delivery: Delivery) => {
+  const handleSelectDelivery = useCallback((delivery: Delivery) => {
     if (delivery.estado !== "CARGADA") {
       toast.error("El viaje no está cargado y listo para salir.");
       return;
@@ -62,9 +102,9 @@ export function SecurityExitsClientUI({ initialDeliveries }: { initialDeliveries
     setExitPhoto(null);
     setExitNotes("");
     setShowExitModal(true);
-  };
+  }, []);
 
-  const handleAuthorizeExit = async () => {
+  const handleAuthorizeExit = useCallback(async () => {
     if (!selectedDelivery || !exitPhoto) {
       toast.error("La foto de salida es obligatoria.");
       return;
@@ -72,13 +112,6 @@ export function SecurityExitsClientUI({ initialDeliveries }: { initialDeliveries
 
     setIsSubmitting(true);
     
-    const originalDeliveries = allDeliveries;
-    const updatedDeliveries = allDeliveries.map((d) =>
-      d.id === selectedDelivery.id ? { ...d, estado: "SALIDA_OK" as const, exitedAt: new Date() } : d
-    );
-    setAllDeliveries(updatedDeliveries);
-    setShowExitModal(false);
-
     try {
       const formData = new FormData();
       formData.append('estado', 'SALIDA_OK');
@@ -89,30 +122,33 @@ export function SecurityExitsClientUI({ initialDeliveries }: { initialDeliveries
       const res = await fetch(`/api/deliveries/${selectedDelivery.id}`, { method: 'PATCH', body: formData });
       if (!res.ok) throw new Error(await res.text());
       
+      const updatedDeliveryData = await res.json();
+      setAllDeliveries(prev => prev.map(d => d.id === selectedDelivery.id ? { ...d, estado: 'SALIDA_OK', exitedAt: new Date() } : d));
+      
       const guideNumber = `GD-${new Date().getFullYear()}-${String(Date.now()).slice(-6)}`;
       toast.success("Salida autorizada", { description: `Guía de despacho ${guideNumber} generada para ${selectedDelivery.truck?.placa}` });
+      setShowExitModal(false);
 
-    } catch (error) {
-        setAllDeliveries(originalDeliveries);
-        toast.error("Error al autorizar la salida.", { description: "Por favor, inténtalo de nuevo." });
+    } catch (error: any) {
+        toast.error("Error al autorizar la salida.", { description: error.message });
     } finally {
       setIsSubmitting(false);
       setSelectedDelivery(null);
       setExitPhoto(null);
       setExitNotes("");
     }
-  };
+  }, [selectedDelivery, exitPhoto, exitNotes, user?.id]);
 
-  const handleCloseModal = () => {
+  const handleCloseModal = useCallback(() => {
     setShowExitModal(false);
     setSelectedDelivery(null);
     setPreviewImageUrl(null);
-  };
+  }, []);
 
-  const openImagePreview = (imageUrl: string) => {
+  const openImagePreview = useCallback((imageUrl: string) => {
     setPreviewImageUrl(imageUrl);
     setShowImagePreview(true);
-  };
+  }, []);
 
   return (
     <div className="space-y-6">
@@ -139,21 +175,7 @@ export function SecurityExitsClientUI({ initialDeliveries }: { initialDeliveries
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {filteredDeliveries.map((delivery) => (
-                  <Card key={delivery.id} className="cursor-pointer hover:shadow-md transition-shadow border-green-200 bg-green-50/50 dark:border-green-800 dark:bg-green-900/10" onClick={() => handleSelectDelivery(delivery)}>
-                    <CardContent className="pt-4">
-                      <div className="flex justify-between items-start mb-3">
-                        <div><p className="font-bold text-lg">{delivery.truck?.placa}</p><p className="text-sm text-muted-foreground">ID: {delivery.id}</p></div>
-                        <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300">Listo</Badge>
-                      </div>
-                      <div className="space-y-2 text-sm">
-                        <div className="flex items-center gap-2"><User className="h-4 w-4 text-muted-foreground" /><span className="truncate">{delivery.order?.client?.nombre}</span></div>
-                        <div className="flex items-center gap-2"><Package className="h-4 w-4 text-muted-foreground" /><span>{delivery.productFormat?.product?.nombre}</span></div>
-                        <div className="flex justify-between"><span className="text-muted-foreground">Cantidad:</span><span className="font-medium">{delivery.cantidadBase} {delivery.productFormat?.unidadBase}</span></div>
-                        {delivery.loadedAt && <div className="flex justify-between"><span className="text-muted-foreground">Cargado:</span><span>{new Date(delivery.loadedAt).toLocaleTimeString()}</span></div>}
-                      </div>
-                      <Button className="w-full mt-3" size="sm"><LogOut className="h-4 w-4 mr-2" />Autorizar Salida</Button>
-                    </CardContent>
-                  </Card>
+                  <LoadedDeliveryCard key={delivery.id} delivery={delivery} onSelect={handleSelectDelivery} />
                 ))}
               </div>
             )}
@@ -166,18 +188,7 @@ export function SecurityExitsClientUI({ initialDeliveries }: { initialDeliveries
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {exitedDeliveries.map((delivery) => (
-                  <Card key={delivery.id} className="bg-blue-50 border-blue-200 dark:bg-blue-900/20 dark:border-blue-800">
-                    <CardContent className="pt-4">
-                      <div className="flex justify-between items-start mb-3">
-                        <div><p className="font-semibold">{delivery.truck?.placa}</p><p className="text-sm text-muted-foreground">{delivery.order?.client?.nombre}</p></div>
-                        <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300">Salió</Badge>
-                      </div>
-                      <div className="text-sm space-y-1">
-                        <div className="flex justify-between"><span className="text-muted-foreground">Cantidad:</span><span>{delivery.cantidadBase} {delivery.productFormat?.unidadBase}</span></div>
-                        {delivery.exitedAt && <div className="flex justify-between"><span className="text-muted-foreground">Salida:</span><span>{new Date(delivery.exitedAt).toLocaleTimeString()}</span></div>}
-                      </div>
-                    </CardContent>
-                  </Card>
+                  <ExitedDeliveryCard key={delivery.id} delivery={delivery} />
                 ))}
               </div>
             </CardContent>
