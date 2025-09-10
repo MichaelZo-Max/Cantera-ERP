@@ -87,23 +87,32 @@ export function CashierOrderClientUI({
   const [availableFormats, setAvailableFormats] = useState<ProductFormat[]>([]);
   const [isLoadingFormats, setIsLoadingFormats] = useState(false);
 
-  useEffect(() => {
-    if (!selectedClient) {
+useEffect(() => {
+  if (!selectedClient) {
+    setDestinations([]);
+    setSelectedDestination("");
+    return;
+  }
+  
+  const loadDestinations = async () => {
+    try {
+
+      const res = await fetch(`/api/destinations?clientId=${selectedClient}`, {
+        next: {
+          revalidate: 60, // Revalida cada 60 segundos
+          tags: [`destinations-${selectedClient}`], 
+        },
+      });
+
+      if (!res.ok) throw new Error(await res.text());
+      setDestinations(await res.json());
+    } catch {
       setDestinations([]);
-      setSelectedDestination("");
-      return;
     }
-    const loadDestinations = async () => {
-      try {
-        const res = await fetch(`/api/destinations?clientId=${selectedClient}`, { cache: "no-store" });
-        if (!res.ok) throw new Error(await res.text());
-        setDestinations(await res.json());
-      } catch {
-        setDestinations([]);
-      }
-    };
-    loadDestinations();
-  }, [selectedClient]);
+  };
+  
+  loadDestinations();
+}, [selectedClient]);
 
   const findProduct = useCallback((id: string) => products.find((p) => p.id === id), [products]);
 

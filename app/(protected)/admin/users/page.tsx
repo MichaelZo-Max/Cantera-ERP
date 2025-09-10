@@ -7,7 +7,14 @@ import { UsersClientUI } from "./users-client"; // Importamos el componente de c
 async function getUsers(): Promise<{ users: User[] }> {
   try {
     const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
-    const res = await fetch(`${baseUrl}/api/users`, { cache: "no-store" });
+
+    const res = await fetch(`${baseUrl}/api/users`, {
+      next: {
+        revalidate: 60, // Revalida en segundo plano cada 60 segundos
+        tags: ["users"], // Etiqueta para invalidar la caché de usuarios
+      },
+    });
+
     if (!res.ok) {
       throw new Error("Failed to fetch users");
     }

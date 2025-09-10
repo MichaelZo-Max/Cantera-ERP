@@ -6,7 +6,13 @@ import { SecurityExitsClientUI } from "./exits-client"; // Importamos el nuevo c
 async function getDeliveries(): Promise<{ deliveries: Delivery[] }> {
   try {
     const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
-        const res = await fetch(`${baseUrl}/api/deliveries`, { cache: "no-store" });
+
+    const res = await fetch(`${baseUrl}/api/deliveries`, {
+      next: {
+        revalidate: 60, // Revalida en segundo plano cada 60 segundos
+        tags: ["deliveries"], // Etiqueta para la invalidación de despachos
+      },
+    });
 
     if (!res.ok) {
       throw new Error("Error al cargar los despachos");

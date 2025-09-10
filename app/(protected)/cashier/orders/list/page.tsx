@@ -7,7 +7,14 @@ import { OrdersListClientUI } from "./orders-list-client"; // Importamos el nuev
 async function getOrders(): Promise<{ orders: Order[] }> {
   try {
     const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
-    const res = await fetch(`${baseUrl}/api/orders`, { cache: "no-store" });
+    
+    const res = await fetch(`${baseUrl}/api/orders`, {
+      next: {
+        revalidate: 60, // Revalida la caché cada 60 segundos
+        tags: ["orders"], // Etiqueta para invalidar al crear/actualizar
+      },
+    });
+
     if (!res.ok) throw new Error("Error al cargar las órdenes");
 
     const orders = await res.json();

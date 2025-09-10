@@ -4,21 +4,34 @@ import type { Truck as TruckType, Driver } from "@/lib/types";
 import { TrucksClientUI } from "./trucks-client"; // Importamos el nuevo componente de cliente
 
 // Función para cargar los datos en el servidor
-async function getTrucksAndDrivers(): Promise<{ trucks: TruckType[]; drivers: Driver[] }> {
+async function getTrucksAndDrivers(): Promise<{
+  trucks: TruckType[];
+  drivers: Driver[];
+}> {
   try {
     const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
 
     const [trucksRes, driversRes] = await Promise.all([
-      fetch(`${baseUrl}/api/trucks`, { cache: "no-store" }),
-      fetch(`${baseUrl}/api/drivers`, { cache: "no-store" }),
+      fetch(`${baseUrl}/api/trucks`, {
+        next: {
+          revalidate: 60, // Revalida cada 60 segundos
+          tags: ["trucks"], // Etiqueta para camiones
+        },
+      }),
+      fetch(`${baseUrl}/api/drivers`, {
+        next: {
+          revalidate: 60, // Revalida cada 60 segundos
+          tags: ["drivers"], // Etiqueta para choferes
+        },
+      }),
     ]);
 
-    if (!trucksRes.ok) throw new Error('Error al cargar camiones');
-    if (!driversRes.ok) throw new Error('Error al cargar choferes');
+    if (!trucksRes.ok) throw new Error("Error al cargar camiones");
+    if (!driversRes.ok) throw new Error("Error al cargar choferes");
 
     const trucks = await trucksRes.json();
     const drivers = await driversRes.json();
-    
+
     return { trucks, drivers };
   } catch (error) {
     console.error("Error cargando datos en el servidor:", error);
