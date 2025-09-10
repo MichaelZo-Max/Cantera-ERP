@@ -1,3 +1,4 @@
+// components/forms/truck-plate-input.tsx
 "use client"
 
 import type React from "react"
@@ -20,7 +21,7 @@ export function TruckPlateInput({
   value,
   onChange,
   label = "Placa del camión",
-  placeholder = "ABC-123D",
+  placeholder = "A12AA34",
   disabled = false,
   required = false,
 }: TruckPlateInputProps) {
@@ -35,15 +36,7 @@ export function TruckPlateInput({
   const formatPlate = (input: string): string => {
     // Remover caracteres no válidos y convertir a mayúsculas
     const cleaned = input.replace(/[^A-Z0-9]/gi, "").toUpperCase()
-
-    // Aplicar formato AAA-123A (flexible)
-    if (cleaned.length <= 3) {
-      return cleaned
-    } else if (cleaned.length <= 6) {
-      return `${cleaned.slice(0, 3)}-${cleaned.slice(3)}`
-    } else {
-      return `${cleaned.slice(0, 3)}-${cleaned.slice(3, 6)}${cleaned.slice(6, 7)}`
-    }
+    return cleaned;
   }
 
   const validatePlate = (plate: string): string | null => {
@@ -51,17 +44,13 @@ export function TruckPlateInput({
       return "La placa es requerida"
     }
 
-    if (plate && plate.length < 5) {
-      return "La placa debe tener al menos 5 caracteres"
+    if (plate && plate.length < 6) {
+      return "La placa debe tener al menos 6 caracteres"
     }
-
-    if (plate && plate.length > 8) {
-      return "La placa no puede tener más de 8 caracteres"
-    }
-
-    // Validar formato básico (flexible)
-    const plateRegex = /^[A-Z]{2,3}-?[0-9]{2,3}[A-Z]?$/
-    if (plate && !plateRegex.test(plate.replace("-", ""))) {
+    
+    // Formato general para Venezuela (ej. A12AA34 o AA123AA)
+    const plateRegex = /^[A-Z0-9]{6,8}$/
+    if (plate && !plateRegex.test(plate)) {
       return "Formato de placa inválido"
     }
 
@@ -113,7 +102,7 @@ export function TruckPlateInput({
 
       {error && <p className="text-sm text-red-500">{error}</p>}
 
-      <p className="text-xs text-muted-foreground">Formato: AAA-123A (ejemplo: ABC-123D)</p>
+      <p className="text-xs text-muted-foreground">Formato de placa de Venezuela (ej: A12AA34)</p>
     </div>
   )
 }

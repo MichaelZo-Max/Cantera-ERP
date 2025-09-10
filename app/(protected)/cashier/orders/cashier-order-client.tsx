@@ -320,7 +320,7 @@ useEffect(() => {
             <CardContent className="space-y-4">
               <div className="space-y-2"><div className="flex justify-between"><span>Subtotal:</span><span>${subtotal.toFixed(2)}</span></div><div className="flex justify-between"><span>IVA (16%):</span><span>${tax.toFixed(2)}</span></div><div className="flex justify-between font-bold text-lg border-t pt-2"><span>Total:</span><span>${total.toFixed(2)}</span></div></div>
               <div className="space-y-4">
-                <div className="space-y-2"><Label>Método de pago *</Label><Select value={paymentMethod} onValueChange={setPaymentMethod}><SelectTrigger><SelectValue placeholder="Seleccionar método..." /></SelectTrigger><SelectContent><SelectItem value="efectivo">Efectivo</SelectItem><SelectItem value="transferencia">Transferencia</SelectItem><SelectItem value="cheque">Cheque</SelectItem><SelectItem value="credito">Crédito</SelectItem></SelectContent></Select></div>
+                <div className="space-y-2"><Label>Método de pago *</Label><Select value={paymentMethod} onValueChange={setPaymentMethod}><SelectTrigger><SelectValue placeholder="Seleccionar método..." /></SelectTrigger><SelectContent><SelectItem value="pago_movil">Pago Móvil</SelectItem><SelectItem value="efectivo">Efectivo</SelectItem><SelectItem value="transferencia">Transferencia</SelectItem><SelectItem value="credito">Crédito</SelectItem></SelectContent></Select></div>
                 <div className="space-y-2"><Label>Referencia</Label><Input value={paymentReference} onChange={(e) => setPaymentReference(e.target.value)} placeholder="Número de referencia..." /></div>
               </div>
               <div className="space-y-4 border-t pt-4">
