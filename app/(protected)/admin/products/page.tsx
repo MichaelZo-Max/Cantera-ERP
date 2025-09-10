@@ -7,7 +7,14 @@ import { ProductsClientUI } from "./products-client"; // Importamos el nuevo com
 async function getProducts(): Promise<{ products: Product[] }> {
   try {
     const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
-    const res = await fetch(`${baseUrl}/api/products`, { cache: "no-store" });
+
+    const res = await fetch(`${baseUrl}/api/products`, {
+      next: {
+        revalidate: 60, // Revalida cada 60 segundos
+        tags: ["products"],
+      },
+    });
+
     if (!res.ok) {
       throw new Error("Failed to fetch products");
     }
