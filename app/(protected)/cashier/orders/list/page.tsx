@@ -1,6 +1,6 @@
 // app/(protected)/cashier/orders/list/page.tsx
 
-export const dynamic = 'force-dynamic'
+export const dynamic = "force-dynamic";
 
 import { AppLayout } from "@/components/app-layout";
 import type { Order } from "@/lib/types";
@@ -9,8 +9,8 @@ import { OrdersListClientUI } from "./orders-list-client"; // Importamos el nuev
 // Función para cargar los datos en el servidor
 async function getOrders(): Promise<{ orders: Order[] }> {
   try {
-    const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
-    
+    const baseUrl = process.env.NEXT_PUBLIC_API_URL;
+
     const res = await fetch(`${baseUrl}/api/orders`, {
       next: {
         revalidate: 60, // Revalida la caché cada 60 segundos

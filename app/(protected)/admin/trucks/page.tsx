@@ -1,6 +1,6 @@
 // app/(protected)/admin/trucks/page.tsx
 
-export const dynamic = 'force-dynamic'
+export const dynamic = "force-dynamic";
 
 import { AppLayout } from "@/components/app-layout";
 import type { Truck as TruckType, Driver } from "@/lib/types";
@@ -12,7 +12,7 @@ async function getTrucksAndDrivers(): Promise<{
   drivers: Driver[];
 }> {
   try {
-    const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
+    const baseUrl = process.env.NEXT_PUBLIC_API_URL;
 
     const [trucksRes, driversRes] = await Promise.all([
       fetch(`${baseUrl}/api/trucks`, {

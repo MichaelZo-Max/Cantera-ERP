@@ -1,6 +1,6 @@
 // app/(protected)/admin/customers/page.tsx
 
-export const dynamic = 'force-dynamic'
+export const dynamic = "force-dynamic";
 
 import { AppLayout } from "@/components/app-layout";
 import type { Client } from "@/lib/types";
@@ -9,7 +9,7 @@ import { CustomersClientUI } from "./customers-client"; // Importamos el nuevo c
 // Función para obtener los datos en el servidor
 async function getCustomers(): Promise<{ customers: Client[] }> {
   try {
-    const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
+    const baseUrl = process.env.NEXT_PUBLIC_API_URL;
     const res = await fetch(`${baseUrl}/api/customers`, {
       next: { tags: ["customers"] },
     });

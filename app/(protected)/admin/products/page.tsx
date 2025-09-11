@@ -1,6 +1,6 @@
 // app/(protected)/admin/products/page.tsx
 
-export const dynamic = 'force-dynamic'
+export const dynamic = "force-dynamic";
 
 import { AppLayout } from "@/components/app-layout";
 import type { Product } from "@/lib/types";
@@ -9,7 +9,7 @@ import { ProductsClientUI } from "./products-client"; // Importamos el nuevo com
 // Función para cargar los datos en el servidor
 async function getProducts(): Promise<{ products: Product[] }> {
   try {
-    const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
+    const baseUrl = process.env.NEXT_PUBLIC_API_URL;
 
     const res = await fetch(`${baseUrl}/api/products`, {
       next: {

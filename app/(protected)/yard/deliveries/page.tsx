@@ -1,6 +1,6 @@
 // app/(protected)/yard/deliveries/page.tsx
 
-export const dynamic = 'force-dynamic'
+export const dynamic = "force-dynamic";
 
 import { AppLayout } from "@/components/app-layout";
 import type { Delivery } from "@/lib/types";
@@ -9,8 +9,8 @@ import { YardDeliveriesClientUI } from "./yard-deliveries-client"; // Importamos
 // Función para obtener los datos en el servidor
 async function getDeliveries(): Promise<{ deliveries: Delivery[] }> {
   try {
-    const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
-    
+    const baseUrl = process.env.NEXT_PUBLIC_API_URL;
+
     const res = await fetch(`${baseUrl}/api/deliveries`, {
       next: {
         revalidate: 60, // Revalida en segundo plano cada 60 segundos

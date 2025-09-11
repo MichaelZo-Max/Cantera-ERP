@@ -1,6 +1,6 @@
 // app/(protected)/admin/drivers/page.tsx
 
-export const dynamic = 'force-dynamic'
+export const dynamic = "force-dynamic";
 
 import { AppLayout } from "@/components/app-layout";
 import type { Driver } from "@/lib/types";
@@ -9,12 +9,12 @@ import { DriversClientUI } from "./drivers-client"; // Importamos el componente 
 // Función para obtener los datos en el servidor
 async function getDrivers(): Promise<{ drivers: Driver[] }> {
   try {
-    const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
-    
+    const baseUrl = process.env.NEXT_PUBLIC_API_URL;
+
     const res = await fetch(`${baseUrl}/api/drivers`, {
-      next: { 
+      next: {
         revalidate: 60,
-        tags: ["drivers"] 
+        tags: ["drivers"],
       },
     });
 

@@ -1,6 +1,6 @@
 // app/(protected)/admin/users/page.tsx
 
-export const dynamic = 'force-dynamic'
+export const dynamic = "force-dynamic";
 
 import { AppLayout } from "@/components/app-layout";
 import type { User } from "@/lib/types";
@@ -9,7 +9,7 @@ import { UsersClientUI } from "./users-client"; // Importamos el componente de c
 // Función para obtener los datos en el servidor
 async function getUsers(): Promise<{ users: User[] }> {
   try {
-    const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
+    const baseUrl = process.env.NEXT_PUBLIC_API_URL;
 
     const res = await fetch(`${baseUrl}/api/users`, {
       next: {

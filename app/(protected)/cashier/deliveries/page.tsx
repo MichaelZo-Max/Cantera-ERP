@@ -1,6 +1,6 @@
 // app/(protected)/cashier/deliveries/page.tsx
 
-export const dynamic = 'force-dynamic'
+export const dynamic = "force-dynamic";
 
 import { AppLayout } from "@/components/app-layout";
 import type { Delivery } from "@/lib/types";
@@ -8,7 +8,7 @@ import { CashierDeliveriesClientUI } from "./deliveries-client"; // Importamos e
 
 async function getDeliveries(): Promise<{ deliveries: Delivery[] }> {
   try {
-    const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
+    const baseUrl = process.env.NEXT_PUBLIC_API_URL;
 
     const res = await fetch(`${baseUrl}/api/deliveries`, {
       next: {

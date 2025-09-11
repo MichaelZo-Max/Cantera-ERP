@@ -1,6 +1,6 @@
 // app/(protected)/admin/destinations/page.tsx
 
-export const dynamic = 'force-dynamic'
+export const dynamic = "force-dynamic";
 
 import { AppLayout } from "@/components/app-layout";
 import type { Destination, Client } from "@/lib/types";
@@ -12,7 +12,7 @@ async function getDestinationsAndClients(): Promise<{
   clients: Client[];
 }> {
   try {
-    const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
+    const baseUrl = process.env.NEXT_PUBLIC_API_URL;
 
     const [destRes, clientRes] = await Promise.all([
       fetch(`${baseUrl}/api/destinations`, {

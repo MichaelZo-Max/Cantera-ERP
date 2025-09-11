@@ -1,6 +1,6 @@
 // app/(protected)/cashier/orders/page.tsx
 
-export const dynamic = 'force-dynamic'
+export const dynamic = "force-dynamic";
 
 import { AppLayout } from "@/components/app-layout";
 import { CashierOrderClientUI } from "./cashier-order-client"; // Importamos el nuevo componente de cliente
@@ -13,27 +13,27 @@ async function getOrderCatalogs(): Promise<{
   trucks: TruckType[];
 }> {
   try {
-    const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
+    const baseUrl = process.env.NEXT_PUBLIC_API_URL;
 
     const [cRes, pRes, tRes] = await Promise.all([
-      fetch(`${baseUrl}/api/customers`, { 
-        next: { 
-          revalidate: 60, 
-          tags: ["customers"] 
-        } 
+      fetch(`${baseUrl}/api/customers`, {
+        next: {
+          revalidate: 60,
+          tags: ["customers"],
+        },
       }),
-      fetch(`${baseUrl}/api/products`, { 
-        next: { 
-          revalidate: 60, 
-          tags: ["products"] 
-        } 
-      }), 
-      fetch(`${baseUrl}/api/trucks`, { 
-        next: { 
-          revalidate: 60, 
-          tags: ["trucks"] 
-        } 
-      }), 
+      fetch(`${baseUrl}/api/products`, {
+        next: {
+          revalidate: 60,
+          tags: ["products"],
+        },
+      }),
+      fetch(`${baseUrl}/api/trucks`, {
+        next: {
+          revalidate: 60,
+          tags: ["trucks"],
+        },
+      }),
     ]);
 
     if (!cRes.ok) throw new Error("Error al cargar clientes");
