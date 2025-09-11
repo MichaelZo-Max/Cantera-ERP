@@ -10,8 +10,8 @@ const app = next({ dev });
 const handle = app.getRequestHandler();
 
 const ip = '10.10.10.131'; 
-const keyPath = './localhost+3-key.pem';
-const certPath = './localhost+3.pem';
+const keyPath = './10.10.10.131+3-key.pem';
+const certPath = './10.10.10.131+3.pem';
 
 // Validar que los archivos de certificado existan antes de continuar
 if (!fs.existsSync(keyPath) || !fs.existsSync(certPath)) {
