@@ -1,4 +1,7 @@
 // app/(protected)/cashier/orders/page.tsx
+
+export const dynamic = 'force-dynamic'
+
 import { AppLayout } from "@/components/app-layout";
 import { CashierOrderClientUI } from "./cashier-order-client"; // Importamos el nuevo componente de cliente
 import type { Client, Product, Truck as TruckType } from "@/lib/types";

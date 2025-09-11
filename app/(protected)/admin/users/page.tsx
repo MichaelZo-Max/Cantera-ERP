@@ -1,4 +1,7 @@
 // app/(protected)/admin/users/page.tsx
+
+export const dynamic = 'force-dynamic'
+
 import { AppLayout } from "@/components/app-layout";
 import type { User } from "@/lib/types";
 import { UsersClientUI } from "./users-client"; // Importamos el componente de cliente

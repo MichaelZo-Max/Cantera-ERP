@@ -1,4 +1,7 @@
 // app/(protected)/admin/destinations/page.tsx
+
+export const dynamic = 'force-dynamic'
+
 import { AppLayout } from "@/components/app-layout";
 import type { Destination, Client } from "@/lib/types";
 import { DestinationsClientUI } from "./destinations-client"; // Importamos el nuevo componente

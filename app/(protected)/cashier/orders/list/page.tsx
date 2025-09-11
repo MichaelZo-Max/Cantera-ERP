@@ -1,4 +1,7 @@
 // app/(protected)/cashier/orders/list/page.tsx
+
+export const dynamic = 'force-dynamic'
+
 import { AppLayout } from "@/components/app-layout";
 import type { Order } from "@/lib/types";
 import { OrdersListClientUI } from "./orders-list-client"; // Importamos el nuevo componente

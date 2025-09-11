@@ -1,4 +1,7 @@
 // app/(protected)/admin/trucks/page.tsx
+
+export const dynamic = 'force-dynamic'
+
 import { AppLayout } from "@/components/app-layout";
 import type { Truck as TruckType, Driver } from "@/lib/types";
 import { TrucksClientUI } from "./trucks-client"; // Importamos el nuevo componente de cliente

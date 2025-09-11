@@ -1,4 +1,7 @@
 // app/(protected)/admin/drivers/page.tsx
+
+export const dynamic = 'force-dynamic'
+
 import { AppLayout } from "@/components/app-layout";
 import type { Driver } from "@/lib/types";
 import { DriversClientUI } from "./drivers-client"; // Importamos el componente de cliente

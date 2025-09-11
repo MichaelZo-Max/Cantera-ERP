@@ -1,3 +1,5 @@
+// app/layout.tsx
+
 import type React from "react"
 import type { Metadata } from "next"
 import { DM_Sans } from "next/font/google"
@@ -12,10 +14,12 @@ const dmSans = DM_Sans({
   variable: "--font-dm-sans",
 })
 
+// Modificamos Metadata para incluir el manifiesto
 export const metadata: Metadata = {
   title: "Cantera ERP",
   description: "Sistema de gestión para cantera",
   generator: "v0.app",
+  manifest: "/manifest.json", // <-- AÑADE ESTA LÍNEA
 }
 
 export default function RootLayout({
@@ -25,15 +29,12 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <head></head>
-      {/* Quitamos la clase de la fuente del <html> y la dejamos solo en <body> 
-        para que next-themes pueda gestionar la clase del tema (light/dark) sin conflictos.
-      */}
+      <head>{/* La etiqueta del manifiesto se añadirá aquí automáticamente gracias a la metadata */}</head>
       <body className={`${dmSans.variable} font-sans antialiased`}>
         <ThemeProvider
-          attribute="class" // 👈 Añadido: le dice a next-themes que use clases (<html>)
+          attribute="class"
           defaultTheme="system"
-          enableSystem // 👈 Añadido: habilita el cambio automático con el tema del sistema
+          enableSystem
           storageKey="cantera-erp-theme"
         >
           <AuthProvider>{children}</AuthProvider>

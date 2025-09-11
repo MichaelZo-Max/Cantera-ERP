@@ -1,4 +1,7 @@
 // app/(protected)/reports/page.tsx
+
+export const dynamic = 'force-dynamic'
+
 import { AppLayout } from "@/components/app-layout";
 import { ReportsClientUI } from "./reports-client"; // Importamos el nuevo componente
 

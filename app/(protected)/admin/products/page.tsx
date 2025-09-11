@@ -1,4 +1,7 @@
 // app/(protected)/admin/products/page.tsx
+
+export const dynamic = 'force-dynamic'
+
 import { AppLayout } from "@/components/app-layout";
 import type { Product } from "@/lib/types";
 import { ProductsClientUI } from "./products-client"; // Importamos el nuevo componente

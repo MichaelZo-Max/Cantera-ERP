@@ -1,4 +1,7 @@
 // app/(protected)/yard/deliveries/page.tsx
+
+export const dynamic = 'force-dynamic'
+
 import { AppLayout } from "@/components/app-layout";
 import type { Delivery } from "@/lib/types";
 import { YardDeliveriesClientUI } from "./yard-deliveries-client"; // Importamos el nuevo componente

@@ -1,4 +1,7 @@
 // app/(protected)/cashier/deliveries/page.tsx
+
+export const dynamic = 'force-dynamic'
+
 import { AppLayout } from "@/components/app-layout";
 import type { Delivery } from "@/lib/types";
 import { CashierDeliveriesClientUI } from "./deliveries-client"; // Importamos el nuevo componente
