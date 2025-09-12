@@ -57,14 +57,19 @@ export function UsersClientUI({ initialUsers }: { initialUsers: User[] }) {
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
-  const { isOpen, options, confirm, handleConfirm, handleCancel } = useConfirmation();
+  const { isOpen, options, confirm, handleConfirm, handleCancel } =
+    useConfirmation();
 
   // 2. Memorizar el resultado del filtro
-  const filteredUsers = useMemo(() => users.filter(
-    (user) =>
-      user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.email.toLowerCase().includes(searchTerm.toLowerCase())
-  ), [users, searchTerm]);
+  const filteredUsers = useMemo(
+    () =>
+      users.filter(
+        (user) =>
+          user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          user.email.toLowerCase().includes(searchTerm.toLowerCase())
+      ),
+    [users, searchTerm]
+  );
 
   const getInitials = (name: string) => {
     return name
@@ -94,80 +99,95 @@ export function UsersClientUI({ initialUsers }: { initialUsers: User[] }) {
     setShowDialog(true);
   }, []);
 
-  const handleSubmit = useCallback(async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsSubmitting(true);
-    setApiError(null);
+  const handleSubmit = useCallback(
+    async (e: React.FormEvent) => {
+      e.preventDefault();
+      setIsSubmitting(true);
+      setApiError(null);
 
-    const method = editingUser ? "PATCH" : "POST";
-    const url = editingUser ? `/api/users/${editingUser.id}` : "/api/users";
-    const body = { ...formData };
-    if (editingUser && !body.password) {
-      delete (body as any).password;
-    }
-
-    try {
-      const res = await fetch(url, {
-        method,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-
-      if (!res.ok) {
-        const errorText = await res.text();
-        throw new Error(errorText || "Error al guardar el usuario");
-      }
-      const savedUser = await res.json();
-      if (editingUser) {
-        setUsers((prevUsers) => prevUsers.map((u) => (u.id === savedUser.id ? savedUser : u)));
-        toast.success("Usuario actualizado exitosamente.");
-      } else {
-        setUsers((prev) => [...prev, savedUser]);
-        toast.success("Usuario creado exitosamente.");
+      const method = editingUser ? "PATCH" : "POST";
+      const url = editingUser ? `/api/users/${editingUser.id}` : "/api/users";
+      const body = { ...formData };
+      if (editingUser && !body.password) {
+        delete (body as any).password;
       }
 
-      setShowDialog(false);
-    } catch (err: any) {
-      setApiError(err.message);
-      toast.error("Error al guardar", { description: err.message });
-    } finally {
-      setIsSubmitting(false);
-    }
-  }, [editingUser, formData]);
+      try {
+        const res = await fetch(url, {
+          method,
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
 
-  const handleToggleStatus = useCallback((user: User) => {
-    const is_active = user.is_active;
-      confirm({
-        title: `¿Estás seguro?`,
-        description: `Esta acción ${
-          is_active ? "desactivará" : "activará"
-        } al usuario "${user.name}".`,
-        confirmText: is_active ? "Desactivar" : "Activar",
-        variant: is_active ? "destructive" : "default",
-      },
-      async () => {
-        try {
-          const res = await fetch(`/api/users/${user.id}`, {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ is_active: !is_active }),
-          });
-          if (!res.ok) throw new Error(await res.text());
-          const updatedUser = await res.json();
-          setUsers((prevUsers) => prevUsers.map((u) => (u.id === updatedUser.id ? updatedUser : u)));
-          toast.success(
-            `Usuario ${!is_active ? "activado" : "desactivado"} exitosamente.`
-          );
-        } catch (err: any) {
-          toast.error("Error al cambiar el estado", { description: err.message });
+        if (!res.ok) {
+          const errorText = await res.text();
+          throw new Error(errorText || "Error al guardar el usuario");
         }
+        const savedUser = await res.json();
+        if (editingUser) {
+          setUsers((prevUsers) =>
+            prevUsers.map((u) => (u.id === savedUser.id ? savedUser : u))
+          );
+          toast.success("Usuario actualizado exitosamente.");
+        } else {
+          setUsers((prev) => [...prev, savedUser]);
+          toast.success("Usuario creado exitosamente.");
+        }
+
+        setShowDialog(false);
+      } catch (err: any) {
+        setApiError(err.message);
+        toast.error("Error al guardar", { description: err.message });
+      } finally {
+        setIsSubmitting(false);
       }
-    );
-  }, [confirm]);
+    },
+    [editingUser, formData]
+  );
+
+  const handleToggleStatus = useCallback(
+    (user: User) => {
+      const is_active = user.is_active;
+      confirm(
+        {
+          title: `¿Estás seguro?`,
+          description: `Esta acción ${
+            is_active ? "desactivará" : "activará"
+          } al usuario "${user.name}".`,
+          confirmText: is_active ? "Desactivar" : "Activar",
+          variant: is_active ? "destructive" : "default",
+        },
+        async () => {
+          try {
+            const res = await fetch(`/api/users/${user.id}`, {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ is_active: !is_active }),
+            });
+            if (!res.ok) throw new Error(await res.text());
+            const updatedUser = await res.json();
+            setUsers((prevUsers) =>
+              prevUsers.map((u) => (u.id === updatedUser.id ? updatedUser : u))
+            );
+            toast.success(
+              `Usuario ${
+                !is_active ? "activado" : "desactivado"
+              } exitosamente.`
+            );
+          } catch (err: any) {
+            toast.error("Error al cambiar el estado", {
+              description: err.message,
+            });
+          }
+        }
+      );
+    },
+    [confirm]
+  );
 
   return (
     <div className="space-y-8 animate-fade-in">
-        <ConfirmationDialog
+      <ConfirmationDialog
         open={isOpen}
         onOpenChange={handleCancel}
         title={options?.title || ""}
@@ -265,14 +285,16 @@ export function UsersClientUI({ initialUsers }: { initialUsers: User[] }) {
                       </p>
                       <Badge
                         variant={user.is_active ? "default" : "secondary"}
-                        className={user.is_active ? "bg-gradient-primary" : ""}
+                        className={
+                          user.is_active ? "bg-gradient-primary" : ""
+                        }
                       >
                         {user.is_active ? "Activo" : "Inactivo"}
                       </Badge>
                     </div>
                     <p className="text-sm text-muted-foreground flex items-center gap-2">
-                        <Mail className="h-3 w-3" />
-                        {user.email}
+                      <Mail className="h-3 w-3" />
+                      {user.email}
                     </p>
                     <p className="text-xs text-muted-foreground mt-1 uppercase font-semibold tracking-wider">
                       {user.role}
@@ -390,7 +412,9 @@ export function UsersClientUI({ initialUsers }: { initialUsers: User[] }) {
                   onChange={(e) =>
                     setFormData({ ...formData, password: e.target.value })
                   }
-                  placeholder={editingUser ? "Dejar en blanco para no cambiar" : "••••••••"}
+                  placeholder={
+                    editingUser ? "Dejar en blanco para no cambiar" : "••••••••"
+                  }
                   required={!editingUser}
                   className="focus-ring"
                 />
