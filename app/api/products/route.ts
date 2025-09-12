@@ -3,6 +3,8 @@ import { NextResponse } from "next/server";
 import { executeQuery, TYPES } from "@/lib/db";
 import { revalidateTag } from 'next/cache'; // Importamos revalidateTag
 
+export const dynamic = 'force-dynamic'
+
 type RawBody = Record<string, any>;
 function pickFirst<T = any>(
   obj: RawBody,

@@ -3,6 +3,8 @@ import { NextResponse } from 'next/server';
 import { executeQuery, TYPES } from '@/lib/db';
 import { revalidateTag } from 'next/cache'; // Importamos revalidateTag
 
+export const dynamic = 'force-dynamic'
+
 /**
  * @route   GET /api/orders/[id]
  * @desc    Obtener un pedido específico por su ID desde la BDD

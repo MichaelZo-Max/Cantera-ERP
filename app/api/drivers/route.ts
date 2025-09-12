@@ -4,6 +4,8 @@ import { executeQuery, TYPES } from '@/lib/db';
 import type { Driver } from '@/lib/types';
 import { revalidateTag } from 'next/cache'; // Importamos revalidateTag
 
+export const dynamic = 'force-dynamic'
+
 /**
  * @route GET /api/drivers
  * @desc Obtener todos los choferes desde la tabla RIP.APP_CHOFERES.

@@ -4,6 +4,8 @@ import { executeQuery, TYPES } from "@/lib/db";
 import type { Destination } from "@/lib/types";
 import { revalidateTag } from 'next/cache'; // Importamos revalidateTag
 
+export const dynamic = 'force-dynamic'
+
 /**
  * @route GET /api/destinations
  * @desc Obtener destinos. Si se provee `clientId`, filtra por cliente; sino, devuelve todos CON el nombre del cliente.

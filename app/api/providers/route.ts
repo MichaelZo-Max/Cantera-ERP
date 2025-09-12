@@ -2,6 +2,8 @@
 import { NextResponse } from 'next/server';
 import { executeQuery } from '@/lib/db';
 
+export const dynamic = 'force-dynamic'
+
 /**
  * @route GET /api/providers
  * @desc Obtener todos los proveedores activos.

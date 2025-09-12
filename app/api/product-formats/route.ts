@@ -5,6 +5,8 @@ import { executeQuery, TYPES } from '@/lib/db';
 import type { ProductFormat } from '@/lib/types';
 import { revalidateTag } from 'next/cache';
 
+export const dynamic = 'force-dynamic'
+
 /**
  * @route   GET /api/product-formats
  * @desc    Obtener los formatos de un producto específico desde la BDD

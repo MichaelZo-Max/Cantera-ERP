@@ -6,6 +6,8 @@ import path from 'path';
 import { writeFile, mkdir } from 'fs/promises';
 import { revalidateTag } from 'next/cache'; // Importamos revalidateTag
 
+export const dynamic = 'force-dynamic'
+
 /**
  * @route   GET /api/orders
  * @desc    Obtener todas las órdenes para la lista del cajero.

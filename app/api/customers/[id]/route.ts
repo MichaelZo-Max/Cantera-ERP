@@ -3,6 +3,8 @@ import { NextResponse } from "next/server";
 import { executeQuery, TYPES } from "@/lib/db";
 import { revalidateTag } from 'next/cache'; // Importamos revalidateTag
 
+export const dynamic = 'force-dynamic'
+
 // Utilidad para traer un cliente y mapearlo como lo espera el front
 async function fetchCustomerById(id: number) {
   const rows = await executeQuery<any>(

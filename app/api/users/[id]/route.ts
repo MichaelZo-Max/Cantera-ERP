@@ -4,6 +4,8 @@ import { executeQuery, TYPES } from '@/lib/db';
 import bcrypt from 'bcryptjs';
 import { revalidateTag } from 'next/cache'; // Importamos revalidateTag
 
+export const dynamic = 'force-dynamic'
+
 /**
  * @route GET /api/users/[id]
  * @desc Obtener un usuario por ID

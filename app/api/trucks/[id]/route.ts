@@ -3,6 +3,8 @@ import { NextResponse } from 'next/server';
 import { executeQuery, TYPES } from '@/lib/db';
 import { revalidateTag } from 'next/cache'; // Importamos revalidateTag
 
+export const dynamic = 'force-dynamic'
+
 /**
  * @route GET /api/trucks/[id]
  * @desc Obtener un camión por su ID

@@ -9,22 +9,22 @@ const withPWA = nextPwa({
   disable: process.env.NODE_ENV === "development",
   runtimeCaching: [
     {
-      // Regla para la API: Rápido y se actualiza en segundo plano.
+      // Regla para la API: Intenta ir a la red primero.
       urlPattern: ({ url }) => url.pathname.startsWith("/api/"),
-      handler: "StaleWhileRevalidate", // <-- La estrategia clave para tu necesidad
+      handler: "NetworkFirst", // <-- Cambio de estrategia
       options: {
         cacheName: "api-cache",
         expiration: {
           maxEntries: 64,
-          maxAgeSeconds: 60 * 60 * 24, // 1 día
+          maxAgeSeconds: 60 * 60, // 1 hora (puedes ajustarlo)
         },
-        // Opcional: plugins para manejar errores de red, etc.
+        networkTimeoutSeconds: 10, // Si la red tarda más de 10s, usa la caché
       },
     },
     {
-      // Regla para las páginas: Intenta ir a la red primero, si no, usa la caché.
+      // Regla para las páginas (esta la puedes dejar como está)
       handler: "NetworkFirst",
-      urlPattern: ({ request, url }) => 
+      urlPattern: ({ request, url }) =>
         request.mode === "navigate" && url.pathname.startsWith("/"),
       options: {
         cacheName: 'pages',
@@ -32,7 +32,7 @@ const withPWA = nextPwa({
           maxEntries: 60,
           maxAgeSeconds: 30 * 24 * 60 * 60, // 30 días
         },
-        networkTimeoutSeconds: 10 // Si la red tarda más de 10s, usa la caché
+        networkTimeoutSeconds: 10
       }
     }
   ],
