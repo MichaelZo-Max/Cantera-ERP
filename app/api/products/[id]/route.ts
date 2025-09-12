@@ -1,17 +1,16 @@
 // app/api/products/[id]/route.ts
 import { NextResponse } from "next/server";
 import { executeQuery, TYPES } from "@/lib/db";
-import { revalidateTag } from 'next/cache'; // Importamos revalidateTag
 
 export const dynamic = 'force-dynamic'
 
 async function getProductById(id: number) {
   const sql = `
     SELECT
-      A.CODARTICULO, A.DESCRIPCION, A.REFPROVEEDOR,
-      A.DESCATALOGADO, A.FECHAMODIFICADO
-    FROM dbo.ARTICULOS A
-    WHERE A.CODARTICULO = @id;
+      id, codigo, name, description,
+      price_per_unit, unit, is_active
+    FROM RIP.VW_APP_PRODUCTOS
+    WHERE id = @id;
   `;
   const rows = await executeQuery<any>(sql, [
     { name: "id", type: TYPES.Int, value: id },
@@ -20,13 +19,13 @@ async function getProductById(id: number) {
 
   const r = rows[0];
   return {
-    id: r.CODARTICULO.toString(),
-    nombre: r.DESCRIPCION ?? "",
-    refProveedor: r.REFPROVEEDOR ?? "",
-    description: r.DESCRIPCION ?? "",
-    is_active: String(r.DESCATALOGADO ?? "F").toUpperCase() !== "T",
-    createdAt: r.FECHAMODIFICADO ?? new Date(),
-    updatedAt: r.FECHAMODIFICADO ?? new Date(),
+    id: r.id.toString(),
+    nombre: r.name ?? "",
+    refProveedor: r.codigo ?? "",
+    description: r.description ?? "",
+    price_per_unit: r.price_per_unit ? Number(r.price_per_unit) : 0,
+    unit: r.unit,
+    is_active: r.is_active,
   };
 }
 
@@ -48,84 +47,5 @@ export async function GET(
   } catch (error) {
     console.error("[API_PRODUCTS_GET_BY_ID]", error);
     return new NextResponse("Error al obtener el producto", { status: 500 });
-  }
-}
-
-/** PATCH /api/products/[id] */
-export async function PATCH(
-  req: Request,
-  { params }: { params: { id: string } }
-) {
-  try {
-    const id = parseInt(params.id, 10);
-    if (Number.isNaN(id))
-      return new NextResponse("ID inválido", { status: 400 });
-
-    const body = await req.json().catch(() => ({} as any));
-
-    const sets: string[] = [];
-    const paramsArr: any[] = [{ name: "id", type: TYPES.Int, value: id }];
-
-    if (body.nombre !== undefined) {
-      sets.push("DESCRIPCION = @nombre");
-      paramsArr.push({
-        name: "nombre",
-        type: TYPES.NVarChar,
-        value: body.nombre,
-      });
-    } else if (body.description !== undefined) {
-      sets.push("DESCRIPCION = @description");
-      paramsArr.push({
-        name: "description",
-        type: TYPES.NVarChar,
-        value: body.description,
-      });
-    }
-    if (body.codigo !== undefined) {
-      sets.push("REFPROVEEDOR = @codigo");
-      paramsArr.push({
-        name: "codigo",
-        type: TYPES.NVarChar,
-        value: body.codigo,
-      });
-    }
-    if (body.is_active !== undefined) {
-      sets.push("DESCATALOGADO = @descatalogado");
-      paramsArr.push({
-        name: "descatalogado",
-        type: TYPES.NVarChar,
-        value: body.is_active ? "F" : "T",
-      });
-    }
-
-    if (sets.length === 0) {
-      const currentProduct = await getProductById(id);
-      return NextResponse.json(currentProduct);
-    }
-
-    sets.push("FECHAMODIFICADO = GETDATE()");
-
-    const updateSql = `
-      UPDATE dbo.ARTICULOS
-      SET ${sets.join(", ")}
-      WHERE CODARTICULO = @id;
-    `;
-    await executeQuery(updateSql, paramsArr);
-
-    const updatedProduct = await getProductById(id);
-
-    // ✨ INVALIDACIÓN DEL CACHÉ
-    revalidateTag('products');
-
-    return NextResponse.json(updatedProduct);
-  } catch (error: any) {
-    if (error?.number === 2627 || error?.number === 2601) {
-      return new NextResponse(
-        "Conflicto: El código ya existe para otro producto.",
-        { status: 409 }
-      );
-    }
-    console.error("[API_PRODUCTS_PATCH]", error);
-    return new NextResponse("Error al actualizar el producto", { status: 500 });
   }
 }

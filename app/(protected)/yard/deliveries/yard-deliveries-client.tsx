@@ -23,7 +23,7 @@ const DeliveryCard = React.memo(({ delivery, onSelect }: { delivery: Delivery; o
     <CardHeader className="pb-3">
       <div className="flex justify-between items-start">
         <div><p className="font-bold text-lg">{delivery.truck?.placa}</p><p className="text-sm text-muted-foreground">ID: {delivery.id}</p></div>
-        <Badge variant="secondary">{delivery.productFormat?.product?.nombre}</Badge>
+        <Badge variant="secondary">{delivery.product?.nombre}</Badge>
       </div>
     </CardHeader>
     <CardContent className="space-y-3">
@@ -45,7 +45,7 @@ const DeliveryCard = React.memo(({ delivery, onSelect }: { delivery: Delivery; o
       )}
       <div className="space-y-1 text-sm">
         <div className="flex items-center gap-2"><User className="h-4 w-4 text-muted-foreground" /><span className="truncate">{delivery.order?.client?.nombre}</span></div>
-        <div className="flex justify-between"><span className="text-muted-foreground">Cantidad:</span><span className="font-medium">{delivery.cantidadBase} {delivery.productFormat?.unidadBase}</span></div>
+        <div className="flex justify-between"><span className="text-muted-foreground">Cantidad:</span><span className="font-medium">{delivery.cantidadBase} {delivery.cantidadBase}</span></div>
         <div className="flex justify-between"><span className="text-muted-foreground">Chofer:</span><span>{delivery.truck?.driver?.nombre || "N/A"}</span></div>
       </div>
     </CardContent>
@@ -163,8 +163,8 @@ export function YardDeliveriesClientUI({ initialDeliveries }: { initialDeliverie
             <div className="space-y-4">
               <div className="p-3 bg-muted rounded-lg text-sm space-y-1">
                 <div className="flex justify-between"><span>Cliente:</span><span className="font-medium">{selectedDelivery.order?.client?.nombre}</span></div>
-                <div className="flex justify-between"><span>Producto:</span><span className="font-medium">{selectedDelivery.productFormat?.product?.nombre}</span></div>
-                <div className="flex justify-between"><span>Cantidad Pedida:</span><span className="font-medium">{selectedDelivery.cantidadBase} {selectedDelivery.productFormat?.unidadBase}</span></div>
+                <div className="flex justify-between"><span>Producto:</span><span className="font-medium">{selectedDelivery.product?.nombre}</span></div>
+                <div className="flex justify-between"><span>Cantidad Pedida:</span><span className="font-medium">{selectedDelivery.cantidadBase} {selectedDelivery.cantidadBase}</span></div>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div><h4 className="font-medium mb-2 flex items-center gap-2 text-sm"><Eye className="h-4 w-4" />Foto de Cajero</h4>{selectedDelivery.loadPhoto ? (<div className="relative w-full h-48 rounded-lg overflow-hidden group border"><img src={selectedDelivery.loadPhoto || "/placeholder.svg"} alt="Foto de carga del cajero" className="w-full h-full object-cover" /><Button type="button" variant="ghost" size="icon" className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity" onClick={() => openImagePreview(selectedDelivery.loadPhoto!)}><Eye className="h-8 w-8 text-white" /></Button></div>) : (<div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-6 text-center h-48 flex flex-col items-center justify-center"><Camera className="h-8 w-8 text-muted-foreground mb-2" /><p className="text-sm text-muted-foreground">Sin foto de cajero</p></div>)}</div>

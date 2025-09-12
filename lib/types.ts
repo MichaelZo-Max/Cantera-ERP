@@ -62,20 +62,9 @@ export interface Product {
   refProveedor: string;
   nombre: string;
   description?: string;
+  price_per_unit?: number;
+  unit?: UnitBase;
   is_active: boolean;
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-export interface ProductFormat {
-  id: string;
-  productId: string;
-  product?: Product;
-  unidadBase: UnitBase;
-  factorUnidadBase: number;
-  sku?: string;
-  pricePerUnit?: number;
-  activo: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -94,8 +83,8 @@ export interface Truck {
   id: string;
   placa: string;
   transporterId?: string;
-  driverId?: string; // Columna para el ID del chofer
-  driver?: Driver; // Objeto anidado con la info del chofer
+  driverId?: string; 
+  driver?: Driver; 
   brand?: string;
   model?: string;
   capacity?: number;
@@ -115,16 +104,16 @@ export interface Order {
   total?: number;
   totalPagado?: number;
   notes?: string;
-  createdBy?: string; // <--- Cambiado a opcional
+  createdBy?: string;
   createdAt: Date;
-  updatedAt?: Date; // <--- Cambiado a opcional
+  updatedAt?: Date;
 }
 
 export interface OrderItem {
   id: string;
   orderId: string;
-  productFormatId: string;
-  productFormat?: ProductFormat;
+  productId: string; 
+  product?: Product;
   cantidadSolicitadaBase: number;
   cantidadPendienteBase: number;
   precioUnitario?: number;
@@ -141,7 +130,7 @@ export interface Delivery {
   driverId?: string;
   driver?: Driver;
   client?: Client;
-  productFormat?: ProductFormat;
+  product?: Product; 
   cantidadBase: number;
   loadedQuantity?: number;
   estado: DeliveryStatus;
@@ -165,12 +154,11 @@ export interface DispatchGuide {
   updatedAt: Date;
 }
 
-// Form types
 export interface CreateOrderForm {
   clientId: string;
   destinationId?: string;
   items: {
-    productFormatId: string;
+    productId: string;
     cantidadBase: number;
     pricePerUnit: number;
     quantity: number;
@@ -180,8 +168,8 @@ export interface CreateOrderForm {
     monto: number;
     ref?: string;
   };
-  truckId: string; // <--- CAMBIO: de 'truck' a 'truckId'
-  driverId: string; // ✨ Añadido para el nuevo flujo
+  truckId: string;
+  driverId: string;
   photoFile?: File;
 }
 

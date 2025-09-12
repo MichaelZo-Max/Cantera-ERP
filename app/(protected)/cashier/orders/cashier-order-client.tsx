@@ -2,7 +2,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, useMemo } from "react";
-import { useRouter } from "next/navigation"; // Importado para la redirección
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import {
@@ -36,18 +36,16 @@ import type {
   Client,
   Destination,
   Product,
-  ProductFormat,
-  ProductSelection,
   Truck as TruckType,
+  UnitBase, // Importamos UnitBase directamente
 } from "@/lib/types";
 import { useAuth } from "@/components/auth-provider";
 import { Badge } from "@/components/ui/badge";
 
+// La interfaz del item de la orden ahora se simplifica
 interface OrderItem {
   id: string;
-  productSelection: ProductSelection;
-  product?: Product;
-  format?: ProductFormat;
+  product: Product; // Almacenamos el producto completo
   quantity: number;
   pricePerUnit: number;
   subtotal: number;
@@ -63,7 +61,7 @@ export function CashierOrderClientUI({
   initialTrucks: TruckType[];
 }) {
   const { user } = useAuth();
-  const router = useRouter(); // Hook para manejar la navegación
+  const router = useRouter();
   const [selectedClient, setSelectedClient] = useState<string>("");
   const [selectedDestination, setSelectedDestination] = useState<string>("");
 
@@ -73,110 +71,104 @@ export function CashierOrderClientUI({
   const [destinations, setDestinations] = useState<Destination[]>([]);
 
   const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
-  const [currentProduct, setCurrentProduct] = useState<ProductSelection | null>(null);
+  
+  // Estados simplificados: solo necesitamos el producto seleccionado y la cantidad
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [currentQuantity, setCurrentQuantity] = useState<number>(0);
-  const [currentFormat, setCurrentFormat] = useState<ProductFormat | null>(null);
 
   const [paymentMethod, setPaymentMethod] = useState<string>("");
   const [paymentReference, setPaymentReference] = useState<string>("");
   const [selectedTruckId, setSelectedTruckId] = useState<string | null>(null);
   const [truckPhoto, setTruckPhoto] = useState<File | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  
-  const [selectedProductId, setSelectedProductId] = useState<string>('');
-  const [availableFormats, setAvailableFormats] = useState<ProductFormat[]>([]);
-  const [isLoadingFormats, setIsLoadingFormats] = useState(false);
 
-useEffect(() => {
-  if (!selectedClient) {
-    setDestinations([]);
-    setSelectedDestination("");
-    return;
-  }
-  
-  const loadDestinations = async () => {
-    try {
-
-      const res = await fetch(`/api/destinations?clientId=${selectedClient}`, {
-        next: {
-          revalidate: 60, // Revalida cada 60 segundos
-          tags: [`destinations-${selectedClient}`], 
-        },
-      });
-
-      if (!res.ok) throw new Error(await res.text());
-      setDestinations(await res.json());
-    } catch {
+  useEffect(() => {
+    if (!selectedClient) {
       setDestinations([]);
+      setSelectedDestination("");
+      return;
     }
-  };
-  
-  loadDestinations();
-}, [selectedClient]);
 
-  const findProduct = useCallback((id: string) => products.find((p) => p.id === id), [products]);
+    const loadDestinations = async () => {
+      try {
+        const res = await fetch(`/api/destinations?clientId=${selectedClient}`, {
+          next: { revalidate: 60, tags: [`destinations-${selectedClient}`] },
+        });
+        if (!res.ok) throw new Error(await res.text());
+        setDestinations(await res.json());
+      } catch {
+        setDestinations([]);
+      }
+    };
 
-  // OPTIMIZACIÓN: Calculamos los totales solo cuando los items de la orden cambian.
+    loadDestinations();
+  }, [selectedClient]);
+
   const { subtotal, tax, total } = useMemo(() => {
     const subtotal = orderItems.reduce((sum, item) => sum + item.subtotal, 0);
     const tax = subtotal * 0.16;
     const total = subtotal + tax;
     return { subtotal, tax, total };
   }, [orderItems]);
-
-  // OPTIMIZACIÓN: Memorizamos la función para evitar que se recree en cada render.
+  
+  // Lógica para añadir item simplificada
   const handleAddItem = useCallback(() => {
-    if (!currentProduct || currentQuantity <= 0 || !currentFormat) {
-      toast.error("Selecciona un producto, formato y cantidad válida");
-      return;
-    }
-    const product = findProduct(currentProduct.productId);
-    if (!product) {
-      toast.error("Producto no encontrado");
+    if (!selectedProduct || currentQuantity <= 0) {
+      toast.error("Selecciona un producto y una cantidad válida");
       return;
     }
 
-    const price = Number(currentFormat.pricePerUnit ?? 0);
+    const price = Number(selectedProduct.price_per_unit ?? 0);
     const newItem: OrderItem = {
       id: crypto.randomUUID(),
-      productSelection: currentProduct,
-      product,
-      format: currentFormat,
+      product: selectedProduct,
       quantity: currentQuantity,
       pricePerUnit: price,
       subtotal: currentQuantity * price,
     };
     setOrderItems((prev) => [...prev, newItem]);
-    setCurrentProduct(null);
+    
+    // Limpiamos los campos
+    setSelectedProduct(null);
     setCurrentQuantity(0);
-    setCurrentFormat(null);
-    setSelectedProductId('');
-    setAvailableFormats([]);
+    
     toast.success("Item agregado a la comanda");
-  }, [currentProduct, currentQuantity, currentFormat, findProduct]);
+  }, [selectedProduct, currentQuantity]);
 
-  // OPTIMIZACIÓN: Memorizamos la función.
   const handleRemoveItem = useCallback((itemId: string) => {
     setOrderItems((prev) => prev.filter((item) => item.id !== itemId));
     toast.success("Item eliminado");
   }, []);
 
-  // OPTIMIZACIÓN: Memorizamos la función de autorización.
+  // Lógica de producto simplificada
+  const handleProductSelect = useCallback((productId: string) => {
+      const product = products.find(p => p.id === productId);
+      if (product) {
+        setSelectedProduct(product);
+        setCurrentQuantity(1); // Valor por defecto
+      } else {
+        setSelectedProduct(null);
+        setCurrentQuantity(0);
+      }
+  }, [products]);
+
+
   const handleAuthorizeDispatch = useCallback(async () => {
+    // ... validaciones ...
     if (!selectedClient || orderItems.length === 0 || !selectedTruckId || !paymentMethod) {
       toast.error("Completa los campos requeridos");
       return;
     }
     setIsSubmitting(true);
     try {
+      // El payload ahora usa productId en lugar de productFormatId
       const orderData = {
         clientId: selectedClient,
         destinationId: selectedDestination || undefined,
         items: orderItems.map((item) => ({
-          productFormatId: item.format!.id,
+          productId: item.product.id, // CAMBIO CLAVE
           cantidadBase: item.quantity,
           pricePerUnit: item.pricePerUnit,
-          quantity: item.quantity,
         })),
         pago: { metodo: paymentMethod, monto: total, ref: paymentReference },
         truckId: selectedTruckId,
@@ -197,6 +189,7 @@ useEffect(() => {
       toast.success(`Orden ${order?.orderNumber ?? ""} creada`, { description: delivery ? `Despacho ${delivery.id} asignado` : undefined });
       router.push("/");
       
+      // Limpieza final
       setSelectedClient("");
       setSelectedDestination("");
       setOrderItems([]);
@@ -211,49 +204,9 @@ useEffect(() => {
     }
   }, [selectedClient, selectedDestination, orderItems, paymentMethod, total, paymentReference, selectedTruckId, user, truckPhoto, router]);
 
+
   const canAuthorize = useMemo(() => !!selectedClient && orderItems.length > 0 && !!selectedTruckId && !!paymentMethod, [selectedClient, orderItems, selectedTruckId, paymentMethod]);
 
-  const fetchFormats = useCallback(async (productId: string) => {
-    if (productId) {
-      setIsLoadingFormats(true);
-      setCurrentProduct({ productId, formatId: "" });
-      setCurrentFormat(null);
-      try {
-        const res = await fetch(`/api/product-formats?productId=${productId}`);
-        if (!res.ok) throw new Error("No se pudieron cargar los formatos");
-        const data: ProductFormat[] = await res.json();
-        setAvailableFormats(data);
-
-        if (data.length === 1) {
-          const singleFormat = data[0];
-          setCurrentProduct({ productId, formatId: singleFormat.id });
-          setCurrentFormat(singleFormat);
-        }
-      } catch (error) {
-        toast.error("Error al cargar formatos.");
-        setAvailableFormats([]);
-      } finally {
-        setIsLoadingFormats(false);
-      }
-    } else {
-      setAvailableFormats([]);
-      setCurrentProduct(null);
-      setCurrentFormat(null);
-    }
-  }, []);
-
-  const handleProductSelect = useCallback((productId: string) => {
-    setSelectedProductId(productId);
-    fetchFormats(productId);
-  }, [fetchFormats]);
-
-  const handleFormatSelect = useCallback((formatId: string) => {
-    if (selectedProductId) {
-      setCurrentProduct({ productId: selectedProductId, formatId });
-      const format = availableFormats.find(f => f.id === formatId);
-      setCurrentFormat(format || null);
-    }
-  }, [selectedProductId, availableFormats]);
 
   return (
       <div className="max-w-7xl mx-auto space-y-6">
@@ -270,49 +223,28 @@ useEffect(() => {
             <CardContent className="space-y-4">
               <div className="space-y-2">
                 <Label>Producto</Label>
-                <Select value={selectedProductId} onValueChange={handleProductSelect}>
+                <Select value={selectedProduct?.id || ""} onValueChange={handleProductSelect}>
                   <SelectTrigger>
                     <SelectValue placeholder="Seleccionar producto..." />
                   </SelectTrigger>
                   <SelectContent>
                     {products.map((product) => (
                       <SelectItem key={product.id} value={product.id}>
-                         {product.nombre}
+                         <div className="flex items-center justify-between w-full">
+                           <span>{product.nombre}</span>
+                           <Badge variant="secondary" className="ml-2">
+                              {product.price_per_unit ? `$${product.price_per_unit.toFixed(2)}` : 'Sin precio'} / {product.unit}
+                           </Badge>
+                         </div>
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
 
-              {selectedProductId && (
-                <div className="space-y-2">
-                  <Label>Formato</Label>
-                  <Select
-                    value={currentProduct?.formatId || ""}
-                    onValueChange={handleFormatSelect}
-                    disabled={isLoadingFormats || availableFormats.length === 0}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder={isLoadingFormats ? "Cargando..." : "Seleccionar formato..."} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {availableFormats.map((format) => (
-                        <SelectItem key={format.id} value={format.id}>
-                          <div className="flex items-center justify-between w-full">
-                            <span>{format.sku || `Formato ${format.unidadBase}`}</span>
-                            <Badge variant="secondary" className="ml-2">
-                              {format.pricePerUnit ? `$${format.pricePerUnit.toFixed(2)}` : format.unidadBase}
-                            </Badge>
-                          </div>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
-              {currentFormat && <QuantityInput unitBase={currentFormat.unidadBase} value={currentQuantity} onChange={setCurrentQuantity} />}
-              {currentFormat && currentQuantity > 0 && (<div className="p-3 bg-muted/50 rounded-lg"><div className="flex justify-between items-center"><span className="text-sm text-muted-foreground">Subtotal:</span><span className="font-semibold">{(currentQuantity * Number(currentFormat.pricePerUnit ?? 0)).toFixed(2)}</span></div></div>)}
-              <Button onClick={handleAddItem} disabled={!currentProduct || currentQuantity <= 0} className="w-full"><Plus className="h-4 w-4 mr-2" />Agregar Item</Button>
+              {selectedProduct && <QuantityInput unitBase={selectedProduct.unit as UnitBase} value={currentQuantity} onChange={setCurrentQuantity} />}
+              {selectedProduct && currentQuantity > 0 && (<div className="p-3 bg-muted/50 rounded-lg"><div className="flex justify-between items-center"><span className="text-sm text-muted-foreground">Subtotal:</span><span className="font-semibold">${(currentQuantity * Number(selectedProduct.price_per_unit ?? 0)).toFixed(2)}</span></div></div>)}
+              <Button onClick={handleAddItem} disabled={!selectedProduct || currentQuantity <= 0} className="w-full"><Plus className="h-4 w-4 mr-2" />Agregar Item</Button>
             </CardContent>
           </Card>
           <Card>
@@ -356,8 +288,8 @@ useEffect(() => {
             <CardHeader><CardTitle>Items de la Comanda</CardTitle></CardHeader>
             <CardContent>
               <Table>
-                <TableHeader><TableRow><TableHead>Producto/Formato</TableHead><TableHead>Cantidad</TableHead><TableHead>Precio Unit.</TableHead><TableHead>Subtotal</TableHead><TableHead className="w-[50px]"></TableHead></TableRow></TableHeader>
-                <TableBody>{orderItems.map((item) => (<TableRow key={item.id}><TableCell><div><div className="font-medium">{item.product?.nombre}</div><div className="text-sm text-muted-foreground">{item.format?.sku}</div></div></TableCell><TableCell>{item.quantity} {item.format?.unidadBase}</TableCell><TableCell>${item.pricePerUnit.toFixed(2)}</TableCell><TableCell className="font-medium">${item.subtotal.toFixed(2)}</TableCell><TableCell><Button variant="ghost" size="sm" onClick={() => handleRemoveItem(item.id)}><Trash2 className="h-4 w-4" /></Button></TableCell></TableRow>))}</TableBody>
+                <TableHeader><TableRow><TableHead>Producto</TableHead><TableHead>Cantidad</TableHead><TableHead>Precio Unit.</TableHead><TableHead>Subtotal</TableHead><TableHead className="w-[50px]"></TableHead></TableRow></TableHeader>
+                <TableBody>{orderItems.map((item) => (<TableRow key={item.id}><TableCell><div><div className="font-medium">{item.product?.nombre}</div><div className="text-sm text-muted-foreground">{item.product?.description}</div></div></TableCell><TableCell>{item.quantity} {item.product?.unit}</TableCell><TableCell>${item.pricePerUnit.toFixed(2)}</TableCell><TableCell className="font-medium">${item.subtotal.toFixed(2)}</TableCell><TableCell><Button variant="ghost" size="sm" onClick={() => handleRemoveItem(item.id)}><Trash2 className="h-4 w-4" /></Button></TableCell></TableRow>))}</TableBody>
               </Table>
             </CardContent>
           </Card>

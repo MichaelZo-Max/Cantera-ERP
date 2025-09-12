@@ -38,8 +38,9 @@ const LoadedDeliveryCard = React.memo(({ delivery, onSelect }: { delivery: Deliv
             </div>
             <div className="space-y-2 text-sm">
                 <div className="flex items-center gap-2"><User className="h-4 w-4 text-muted-foreground" /><span className="truncate">{delivery.order?.client?.nombre}</span></div>
-                <div className="flex items-center gap-2"><Package className="h-4 w-4 text-muted-foreground" /><span>{delivery.productFormat?.product?.nombre}</span></div>
-                <div className="flex justify-between"><span className="text-muted-foreground">Cantidad:</span><span className="font-medium">{delivery.cantidadBase} {delivery.productFormat?.unidadBase}</span></div>
+                {/* CORRECCIÓN AQUÍ */}
+                <div className="flex items-center gap-2"><Package className="h-4 w-4 text-muted-foreground" /><span>{delivery.product?.nombre}</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">Cantidad:</span><span className="font-medium">{delivery.cantidadBase} {delivery.product?.unit}</span></div>
                 {delivery.loadedAt && <div className="flex justify-between"><span className="text-muted-foreground">Cargado:</span><span>{new Date(delivery.loadedAt).toLocaleTimeString()}</span></div>}
             </div>
             <Button className="w-full mt-3" size="sm"><LogOut className="h-4 w-4 mr-2" />Autorizar Salida</Button>
@@ -56,7 +57,8 @@ const ExitedDeliveryCard = React.memo(({ delivery }: { delivery: Delivery }) => 
                 <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300">Salió</Badge>
             </div>
             <div className="text-sm space-y-1">
-                <div className="flex justify-between"><span className="text-muted-foreground">Cantidad:</span><span>{delivery.cantidadBase} {delivery.productFormat?.unidadBase}</span></div>
+                {/* CORRECCIÓN AQUÍ */}
+                <div className="flex justify-between"><span className="text-muted-foreground">Cantidad:</span><span>{delivery.cantidadBase} {delivery.product?.unit}</span></div>
                 {delivery.exitedAt && <div className="flex justify-between"><span className="text-muted-foreground">Salida:</span><span>{new Date(delivery.exitedAt).toLocaleTimeString()}</span></div>}
             </div>
         </CardContent>
@@ -202,8 +204,9 @@ export function SecurityExitsClientUI({ initialDeliveries }: { initialDeliveries
               <div className="space-y-4">
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 bg-muted/30 rounded-lg">
                   <div><p className="text-xs text-muted-foreground">Cliente</p><p className="font-medium text-sm">{selectedDelivery.order?.client?.nombre}</p></div>
-                  <div><p className="text-xs text-muted-foreground">Material</p><p className="font-medium text-sm">{selectedDelivery.productFormat?.product?.nombre}</p></div>
-                  <div><p className="text-xs text-muted-foreground">Cantidad</p><p className="font-medium text-sm">{selectedDelivery.cantidadBase} {selectedDelivery.productFormat?.unidadBase}</p></div>
+                  {/* CORRECCIÓN AQUÍ */}
+                  <div><p className="text-xs text-muted-foreground">Material</p><p className="font-medium text-sm">{selectedDelivery.product?.nombre}</p></div>
+                  <div><p className="text-xs text-muted-foreground">Cantidad</p><p className="font-medium text-sm">{selectedDelivery.cantidadBase} {selectedDelivery.product?.unit}</p></div>
                   <div><p className="text-xs text-muted-foreground">Destino</p><p className="font-medium text-sm">{selectedDelivery.order?.destination?.nombre || "No especificado"}</p></div>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

@@ -4,14 +4,11 @@ import { NextResponse } from 'next/server';
 import { executeQuery, TYPES } from '@/lib/db';
 import path from 'path';
 import { writeFile, mkdir } from 'fs/promises';
-import { revalidateTag } from 'next/cache'; // Importamos revalidateTag
+import { revalidateTag } from 'next/cache';
 
 export const dynamic = 'force-dynamic'
 
-/**
- * @route   GET /api/orders
- * @desc    Obtener todas las órdenes para la lista del cajero.
- */
+// La función GET se mantiene igual, ya que es para la lista de pedidos y debería funcionar.
 export async function GET() {
   try {
     const query = `
@@ -55,7 +52,7 @@ export async function GET() {
 
 /**
  * @route   POST /api/orders
- * @desc    Crear un nuevo pedido y su despacho inicial
+ * @desc    Crear un nuevo pedido y su despacho inicial (LÓGICA CORREGIDA)
  */
 export async function POST(request: Request) {
   try {
@@ -75,26 +72,19 @@ export async function POST(request: Request) {
     const items = JSON.parse(itemsJson);
     const pago = JSON.parse(pagoJson);
 
-    // --- LÓGICA REAL PARA GUARDAR LA FOTO ---
+    // --- LÓGICA DE FOTO (sin cambios) ---
     let photoUrl: string | null = null;
     if (photoFile) {
       const buffer = Buffer.from(await photoFile.arrayBuffer());
       const filename = `${Date.now()}_${photoFile.name.replace(/\s/g, '_')}`;
       const uploadDir = path.join(process.cwd(), 'public/uploads');
-
-      // Asegurarse de que el directorio de subida existe
       await mkdir(uploadDir, { recursive: true });
-
-      // Escribir el archivo en el directorio
       await writeFile(path.join(uploadDir, filename), buffer);
-
-      // La URL pública para guardar en la base de datos
       photoUrl = `/uploads/${filename}`;
-      console.log(`Foto guardada exitosamente en: ${photoUrl}`);
     }
     // --- FIN LÓGICA FOTO ---
 
-    // 1) Pedido
+    // 1) Pedido (sin cambios)
     const orderQuery = `
       INSERT INTO RIP.APP_PEDIDOS (customer_id, truck_id, destination_id, status, notes, created_by)
       OUTPUT INSERTED.id, INSERTED.order_number
@@ -111,24 +101,26 @@ export async function POST(request: Request) {
     const orderResult = await executeQuery(orderQuery, orderParams);
     const { id: newOrderId, order_number } = orderResult[0];
 
-    // 2) Ítems
+    // 2) Ítems (LÓGICA CORREGIDA)
     for (const item of items) {
-      const formatId = parseInt(item.productFormatId, 10);
+      const productId = parseInt(item.productId, 10);
+      
+      // La query ahora se alinea con tu SQL.md
       const itemQuery = `
-        INSERT INTO RIP.APP_PEDIDOS_ITEMS (order_id, product_id, format_id, quantity, price_per_unit)
-        SELECT @orderId, pf.product_id, @formatId, @quantity, pf.price_per_unit
-        FROM RIP.APP_PRODUCTOS_FORMATOS pf
-        WHERE pf.id = @formatId;
+        INSERT INTO RIP.APP_PEDIDOS_ITEMS (order_id, product_id, quantity, price_per_unit)
+        VALUES (@orderId, @productId, @quantity, @price_per_unit);
       `;
+      
       const itemParams = [
         { name: 'orderId', type: TYPES.Int, value: newOrderId },
-        { name: 'formatId', type: TYPES.Int, value: formatId },
+        { name: 'productId', type: TYPES.Int, value: productId }, // Usamos productId
         { name: 'quantity', type: TYPES.Decimal, value: item.cantidadBase, options: { precision: 18, scale: 2 } },
+        { name: 'price_per_unit', type: TYPES.Decimal, value: item.pricePerUnit, options: { precision: 18, scale: 2 } } // El precio viene del frontend
       ];
       await executeQuery(itemQuery, itemParams);
     }
 
-    // 3) Despacho inicial (con la URL de la foto)
+    // 3) Despacho inicial (sin cambios)
     const deliveryQuery = `
       INSERT INTO RIP.APP_DESPACHOS (order_id, status, notes, load_photo_url)
       OUTPUT INSERTED.id
@@ -142,16 +134,14 @@ export async function POST(request: Request) {
     const deliveryResult = await executeQuery(deliveryQuery, deliveryParams);
     const newDeliveryId = deliveryResult[0].id;
     
-    // ... (resto del código sin cambios)
     const totalQuery = `
       SELECT SUM(quantity * price_per_unit) AS total
       FROM RIP.APP_PEDIDOS_ITEMS WHERE order_id = @orderId;
     `;
     const total = (await executeQuery(totalQuery, [{ name: 'orderId', type: TYPES.Int, value: newOrderId }]))[0]?.total ?? 0;
 
-    // ✨ INVALIDACIÓN DEL CACHÉ
     revalidateTag('orders');
-    revalidateTag('deliveries'); // También invalidamos despachos por si acaso
+    revalidateTag('deliveries');
 
     return NextResponse.json({
       message: "Pedido y despacho creados exitosamente",
