@@ -66,19 +66,24 @@ export function TrucksClientUI({
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
-  const { isOpen, options, confirm, handleConfirm, handleCancel } = useConfirmation();
+  const { isOpen, options, confirm, handleConfirm, handleCancel } =
+    useConfirmation();
 
   // 2. Memorizar el resultado del filtro
-  const filteredTrucks = useMemo(() => trucks.filter(
-    (truck) =>
-      truck.placa.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (truck.brand &&
-        truck.brand.toLowerCase().includes(searchTerm.toLowerCase())) ||
-      (truck.model &&
-        truck.model.toLowerCase().includes(searchTerm.toLowerCase())) ||
-      (truck.driver?.nombre &&
-        truck.driver.nombre.toLowerCase().includes(searchTerm.toLowerCase()))
-  ), [trucks, searchTerm]);
+  const filteredTrucks = useMemo(
+    () =>
+      trucks.filter(
+        (truck) =>
+          truck.placa.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          (truck.brand &&
+            truck.brand.toLowerCase().includes(searchTerm.toLowerCase())) ||
+          (truck.model &&
+            truck.model.toLowerCase().includes(searchTerm.toLowerCase())) ||
+          (truck.driver?.nombre &&
+            truck.driver.nombre.toLowerCase().includes(searchTerm.toLowerCase()))
+      ),
+    [trucks, searchTerm]
+  );
 
   // 3. Envolver las funciones en `useCallback`
   const handleNewTruck = useCallback(() => {
@@ -107,80 +112,97 @@ export function TrucksClientUI({
     setShowDialog(true);
   }, []);
 
-  const handleSubmit = useCallback(async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsSubmitting(true);
-    setApiError(null);
+  const handleSubmit = useCallback(
+    async (e: React.FormEvent) => {
+      e.preventDefault();
+      setIsSubmitting(true);
+      setApiError(null);
 
-    const method = editingTruck ? "PATCH" : "POST";
-    const url = editingTruck ? `/api/trucks/${editingTruck.id}` : "/api/trucks";
+      const method = editingTruck ? "PATCH" : "POST";
+      const url = editingTruck
+        ? `/api/trucks/${editingTruck.id}`
+        : "/api/trucks";
 
-    try {
-      const res = await fetch(url, {
-        method,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
-      });
+      try {
+        const res = await fetch(url, {
+          method,
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(formData),
+        });
 
-      if (!res.ok) {
-        const errorText = await res.text();
-        throw new Error(errorText || "Error al guardar el camión");
-      }
-
-      const savedTruck = await res.json();
-
-      if (editingTruck) {
-        setTrucks((prevTrucks) => prevTrucks.map((t) => (t.id === savedTruck.id ? savedTruck : t)));
-        toast.success("Camión actualizado exitosamente.");
-      } else {
-        setTrucks((prevTrucks) => [...prevTrucks, savedTruck]);
-        toast.success("Camión creado exitosamente.");
-      }
-
-      setShowDialog(false);
-    } catch (err: any) {
-      setApiError(err.message);
-      toast.error("Error al guardar", { description: err.message });
-    } finally {
-      setIsSubmitting(false);
-    }
-  }, [editingTruck, formData]);
-
-  const handleToggleStatus = useCallback((truck: TruckType) => {
-    const is_active = truck.is_active;
-    confirm({
-        title: `¿Estás seguro?`,
-        description: `Esta acción ${
-          is_active ? "desactivará" : "activará"
-        } el camión con placas "${truck.placa}".`,
-        confirmText: is_active ? "Desactivar" : "Activar",
-        variant: is_active ? "destructive" : "default",
-      },
-      async () => {
-        try {
-          const res = await fetch(`/api/trucks/${truck.id}`, {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ is_active: !is_active }),
-          });
-          if (!res.ok) throw new Error(await res.text());
-          const updatedTruck = await res.json();
-          setTrucks(
-            (prevTrucks) => prevTrucks.map((t) => (t.id === updatedTruck.id ? updatedTruck : t))
-          );
-          toast.success(
-            `Camión ${!is_active ? "activado" : "desactivado"} exitosamente.`
-          );
-        } catch (err: any) {
-          toast.error("Error al cambiar el estado", { description: err.message });
+        if (!res.ok) {
+          const errorText = await res.text();
+          throw new Error(errorText || "Error al guardar el camión");
         }
+
+        const savedTruck = await res.json();
+
+        if (editingTruck) {
+          setTrucks((prevTrucks) =>
+            prevTrucks.map((t) => (t.id === savedTruck.id ? savedTruck : t))
+          );
+          toast.success("Camión actualizado exitosamente.");
+        } else {
+          setTrucks((prevTrucks) => [...prevTrucks, savedTruck]);
+          toast.success("Camión creado exitosamente.");
+        }
+
+        setShowDialog(false);
+      } catch (err: any) {
+        setApiError(err.message);
+        toast.error("Error al guardar", { description: err.message });
+      } finally {
+        setIsSubmitting(false);
       }
-    );
-  }, [confirm]);
+    },
+    [editingTruck, formData]
+  );
+
+  const handleToggleStatus = useCallback(
+    (truck: TruckType) => {
+      const is_active = truck.is_active;
+      confirm(
+        {
+          title: `¿Estás seguro?`,
+          description: `Esta acción ${
+            is_active ? "desactivará" : "activará"
+          } el camión con placas "${truck.placa}".`,
+          confirmText: is_active ? "Desactivar" : "Activar",
+          variant: is_active ? "destructive" : "default",
+        },
+        async () => {
+          try {
+            const res = await fetch(`/api/trucks/${truck.id}`, {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ is_active: !is_active }),
+            });
+            if (!res.ok) throw new Error(await res.text());
+            const updatedTruck = await res.json();
+            setTrucks((prevTrucks) =>
+              prevTrucks.map((t) =>
+                t.id === updatedTruck.id ? updatedTruck : t
+              )
+            );
+            toast.success(
+              `Camión ${
+                !is_active ? "activado" : "desactivado"
+              } exitosamente.`
+            );
+          } catch (err: any) {
+            toast.error("Error al cambiar el estado", {
+              description: err.message,
+            });
+          }
+        }
+      );
+    },
+    [confirm]
+  );
 
   return (
     <div className="space-y-8 animate-fade-in">
-        <ConfirmationDialog
+      <ConfirmationDialog
         open={isOpen}
         onOpenChange={handleCancel}
         title={options?.title || ""}

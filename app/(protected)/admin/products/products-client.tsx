@@ -1,7 +1,7 @@
 // app/(protected)/admin/products/products-client.tsx
 "use client";
 
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo } from "react";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -98,7 +98,8 @@ export function ProductsClientUI({
                       {product.nombre}
                     </CardTitle>
                     <p className="text-sm font-semibold text-primary mt-1">
-                      ${(product.price_per_unit || 0).toFixed(2)} / {product.unit}
+                      ${(product.price_per_unit || 0).toFixed(2)} /{" "}
+                      {product.unit}
                     </p>
                   </div>
                   <Badge
