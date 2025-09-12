@@ -1,5 +1,4 @@
 // lib/types.ts
-// lib/types.ts
 
 export type UnitBase = "M3" | "TON" | "SACO" | "UNIDAD";
 
@@ -11,14 +10,23 @@ export type OrderStatus =
   | "EN_DESPACHO"
   | "PARCIAL"
   | "CERRADA"
-  | "CANCELADA";
+  | "CANCELADA"
+  // Nuevos estados del SQL.md
+  | 'AWAITING_PAYMENT'
+  | 'PAID'
+  | 'PARTIALLY_DISPATCHED'
+  | 'DISPATCHED_COMPLETE'
+  | 'CANCELLED';
+
 
 export type DeliveryStatus =
   | "ASIGNADA"
   | "EN_CARGA"
   | "CARGADA"
   | "SALIDA_OK"
-  | "RECHAZADA";
+  | "RECHAZADA"
+  // Nuevo estado del SQL.md
+  | 'PENDING';
 
 // Core entity types
 export interface User {
@@ -107,6 +115,9 @@ export interface Order {
   createdBy?: string;
   createdAt: Date;
   updatedAt?: Date;
+  // --- CAMBIO CLAVE ---
+  // Ahora una orden puede tener múltiples items.
+  items?: OrderItem[];
 }
 
 export interface OrderItem {

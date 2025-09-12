@@ -37,15 +37,14 @@ import type {
   Destination,
   Product,
   Truck as TruckType,
-  UnitBase, // Importamos UnitBase directamente
+  UnitBase,
 } from "@/lib/types";
 import { useAuth } from "@/components/auth-provider";
 import { Badge } from "@/components/ui/badge";
 
-// La interfaz del item de la orden ahora se simplifica
 interface OrderItem {
   id: string;
-  product: Product; // Almacenamos el producto completo
+  product: Product;
   quantity: number;
   pricePerUnit: number;
   subtotal: number;
@@ -72,7 +71,6 @@ export function CashierOrderClientUI({
 
   const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
   
-  // Estados simplificados: solo necesitamos el producto seleccionado y la cantidad
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [currentQuantity, setCurrentQuantity] = useState<number>(0);
 
@@ -91,9 +89,7 @@ export function CashierOrderClientUI({
 
     const loadDestinations = async () => {
       try {
-        const res = await fetch(`/api/destinations?clientId=${selectedClient}`, {
-          next: { revalidate: 60, tags: [`destinations-${selectedClient}`] },
-        });
+        const res = await fetch(`/api/destinations?clientId=${selectedClient}`);
         if (!res.ok) throw new Error(await res.text());
         setDestinations(await res.json());
       } catch {
@@ -106,12 +102,11 @@ export function CashierOrderClientUI({
 
   const { subtotal, tax, total } = useMemo(() => {
     const subtotal = orderItems.reduce((sum, item) => sum + item.subtotal, 0);
-    const tax = subtotal * 0.16;
+    const tax = subtotal * 0.16; // Asumiendo 16% de IVA
     const total = subtotal + tax;
     return { subtotal, tax, total };
   }, [orderItems]);
   
-  // Lógica para añadir item simplificada
   const handleAddItem = useCallback(() => {
     if (!selectedProduct || currentQuantity <= 0) {
       toast.error("Selecciona un producto y una cantidad válida");
@@ -128,7 +123,6 @@ export function CashierOrderClientUI({
     };
     setOrderItems((prev) => [...prev, newItem]);
     
-    // Limpiamos los campos
     setSelectedProduct(null);
     setCurrentQuantity(0);
     
@@ -140,12 +134,11 @@ export function CashierOrderClientUI({
     toast.success("Item eliminado");
   }, []);
 
-  // Lógica de producto simplificada
   const handleProductSelect = useCallback((productId: string) => {
       const product = products.find(p => p.id === productId);
       if (product) {
         setSelectedProduct(product);
-        setCurrentQuantity(1); // Valor por defecto
+        setCurrentQuantity(1);
       } else {
         setSelectedProduct(null);
         setCurrentQuantity(0);
@@ -154,19 +147,19 @@ export function CashierOrderClientUI({
 
 
   const handleAuthorizeDispatch = useCallback(async () => {
-    // ... validaciones ...
     if (!selectedClient || orderItems.length === 0 || !selectedTruckId || !paymentMethod) {
-      toast.error("Completa los campos requeridos");
+      toast.error("Completa los campos requeridos: Cliente, Items, Camión y Método de Pago.");
       return;
     }
     setIsSubmitting(true);
     try {
-      // El payload ahora usa productId en lugar de productFormatId
+      // --- CAMBIO CLAVE ---
+      // Se envía el objeto `product` completo en cada item, como espera la API.
       const orderData = {
         clientId: selectedClient,
         destinationId: selectedDestination || undefined,
         items: orderItems.map((item) => ({
-          productId: item.product.id, // CAMBIO CLAVE
+          product: item.product, // Enviamos el objeto producto completo
           cantidadBase: item.quantity,
           pricePerUnit: item.pricePerUnit,
         })),
@@ -189,14 +182,6 @@ export function CashierOrderClientUI({
       toast.success(`Orden ${order?.orderNumber ?? ""} creada`, { description: delivery ? `Despacho ${delivery.id} asignado` : undefined });
       router.push("/");
       
-      // Limpieza final
-      setSelectedClient("");
-      setSelectedDestination("");
-      setOrderItems([]);
-      setPaymentMethod("");
-      setPaymentReference("");
-      setSelectedTruckId(null);
-      setTruckPhoto(null);
     } catch (err: any) {
       toast.error("Error al autorizar despacho", { description: err?.message });
     } finally {

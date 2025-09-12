@@ -25,22 +25,26 @@ import {
   Eye,
 } from "lucide-react";
 import { toast } from "sonner";
-import type { Delivery } from "@/lib/types";
+import type { Delivery, OrderItem } from "@/lib/types";
 import { useAuth } from "@/components/auth-provider";
+import Image from "next/image";
 
-// OPTIMIZACIÓN: Se extrae la tarjeta a su propio componente y se envuelve con React.memo.
 const LoadedDeliveryCard = React.memo(({ delivery, onSelect }: { delivery: Delivery; onSelect: (delivery: Delivery) => void; }) => (
     <Card className="cursor-pointer hover:shadow-md transition-shadow border-green-200 bg-green-50/50 dark:border-green-800 dark:bg-green-900/10" onClick={() => onSelect(delivery)}>
         <CardContent className="pt-4">
             <div className="flex justify-between items-start mb-3">
                 <div><p className="font-bold text-lg">{delivery.truck?.placa}</p><p className="text-sm text-muted-foreground">ID: {delivery.id}</p></div>
-                <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300">Listo</Badge>
+                <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300">Listo para Salir</Badge>
             </div>
             <div className="space-y-2 text-sm">
                 <div className="flex items-center gap-2"><User className="h-4 w-4 text-muted-foreground" /><span className="truncate">{delivery.order?.client?.nombre}</span></div>
-                {/* CORRECCIÓN AQUÍ */}
-                <div className="flex items-center gap-2"><Package className="h-4 w-4 text-muted-foreground" /><span>{delivery.product?.nombre}</span></div>
-                <div className="flex justify-between"><span className="text-muted-foreground">Cantidad:</span><span className="font-medium">{delivery.cantidadBase} {delivery.product?.unit}</span></div>
+                <div className="flex items-center gap-2"><Package className="h-4 w-4 text-muted-foreground" />
+                  <span>
+                    {delivery.order?.items && delivery.order.items.length > 0
+                      ? `${delivery.order.items[0].product?.nombre} ${delivery.order.items.length > 1 ? `y ${delivery.order.items.length - 1} más...` : ''}`
+                      : "Sin items"}
+                  </span>
+                </div>
                 {delivery.loadedAt && <div className="flex justify-between"><span className="text-muted-foreground">Cargado:</span><span>{new Date(delivery.loadedAt).toLocaleTimeString()}</span></div>}
             </div>
             <Button className="w-full mt-3" size="sm"><LogOut className="h-4 w-4 mr-2" />Autorizar Salida</Button>
@@ -57,8 +61,11 @@ const ExitedDeliveryCard = React.memo(({ delivery }: { delivery: Delivery }) => 
                 <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300">Salió</Badge>
             </div>
             <div className="text-sm space-y-1">
-                {/* CORRECCIÓN AQUÍ */}
-                <div className="flex justify-between"><span className="text-muted-foreground">Cantidad:</span><span>{delivery.cantidadBase} {delivery.product?.unit}</span></div>
+                {delivery.order?.items && delivery.order.items.length > 0 &&
+                  <div className="flex items-center gap-2"><Package className="h-4 w-4 text-muted-foreground" />
+                    <span>{delivery.order.items[0].product?.nombre} {delivery.order.items.length > 1 ? `y más...` : ''}</span>
+                  </div>
+                }
                 {delivery.exitedAt && <div className="flex justify-between"><span className="text-muted-foreground">Salida:</span><span>{new Date(delivery.exitedAt).toLocaleTimeString()}</span></div>}
             </div>
         </CardContent>
@@ -88,9 +95,9 @@ export function SecurityExitsClientUI({ initialDeliveries }: { initialDeliveries
     if (!query) return loadedDeliveries;
     return loadedDeliveries.filter((delivery) => {
       return (
-        delivery.truck?.placa.toLowerCase().includes(query) ||
+        (delivery.truck?.placa || '').toLowerCase().includes(query) ||
         delivery.id.toLowerCase().includes(query) ||
-        (delivery.order?.client?.nombre && delivery.order.client.nombre.toLowerCase().includes(query))
+        (delivery.order?.client?.nombre || '').toLowerCase().includes(query)
       );
     });
   }, [searchQuery, loadedDeliveries]);
@@ -116,7 +123,7 @@ export function SecurityExitsClientUI({ initialDeliveries }: { initialDeliveries
     
     try {
       const formData = new FormData();
-      formData.append('estado', 'SALIDA_OK');
+      formData.append('status', 'SALIDA_OK');
       formData.append('notes', exitNotes);
       if (user?.id) formData.append('userId', user.id);
       if (exitPhoto) formData.append('photoFile', exitPhoto);
@@ -125,7 +132,7 @@ export function SecurityExitsClientUI({ initialDeliveries }: { initialDeliveries
       if (!res.ok) throw new Error(await res.text());
       
       const updatedDeliveryData = await res.json();
-      setAllDeliveries(prev => prev.map(d => d.id === selectedDelivery.id ? { ...d, estado: 'SALIDA_OK', exitedAt: new Date() } : d));
+      setAllDeliveries(prev => prev.map(d => d.id === selectedDelivery.id ? { ...d, ...updatedDeliveryData } : d));
       
       const guideNumber = `GD-${new Date().getFullYear()}-${String(Date.now()).slice(-6)}`;
       toast.success("Salida autorizada", { description: `Guía de despacho ${guideNumber} generada para ${selectedDelivery.truck?.placa}` });
@@ -202,15 +209,19 @@ export function SecurityExitsClientUI({ initialDeliveries }: { initialDeliveries
             <DialogHeader className="pb-4"><DialogTitle className="flex items-center gap-2"><LogOut className="h-5 w-5 text-green-600" />Autorizar Salida - {selectedDelivery?.truck?.placa}</DialogTitle><DialogDescription>Verifica la información y toma foto de la placa para autorizar la salida</DialogDescription></DialogHeader>
             {selectedDelivery && (
               <div className="space-y-4">
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 bg-muted/30 rounded-lg">
-                  <div><p className="text-xs text-muted-foreground">Cliente</p><p className="font-medium text-sm">{selectedDelivery.order?.client?.nombre}</p></div>
-                  {/* CORRECCIÓN AQUÍ */}
-                  <div><p className="text-xs text-muted-foreground">Material</p><p className="font-medium text-sm">{selectedDelivery.product?.nombre}</p></div>
-                  <div><p className="text-xs text-muted-foreground">Cantidad</p><p className="font-medium text-sm">{selectedDelivery.cantidadBase} {selectedDelivery.product?.unit}</p></div>
-                  <div><p className="text-xs text-muted-foreground">Destino</p><p className="font-medium text-sm">{selectedDelivery.order?.destination?.nombre || "No especificado"}</p></div>
-                </div>
+                  <div>
+                    <p className="text-sm font-medium mb-2">Items Cargados:</p>
+                    <div className="border rounded-lg space-y-2 p-2 bg-muted/30">
+                      {selectedDelivery.order?.items?.map((item: OrderItem) => (
+                        <div key={item.id} className="flex justify-between text-sm">
+                          <span className="text-muted-foreground">{item.product?.nombre} ({item.cantidadSolicitadaBase} {item.product?.unit})</span>
+                          <span className="font-medium">{/* Aquí iría la cantidad cargada si la tuviéramos */}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div><h4 className="font-medium mb-2 flex items-center gap-2 text-sm"><Eye className="h-4 w-4" />Foto del Patio</h4>{selectedDelivery.loadPhoto ? (<div className="relative w-full h-48 rounded-lg overflow-hidden group border"><img src={selectedDelivery.loadPhoto || "/placeholder.svg"} alt="Foto de carga del patio" className="w-full h-full object-cover" /><Button type="button" variant="ghost" size="icon" className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity" onClick={() => openImagePreview(selectedDelivery.loadPhoto!)}><Eye className="h-8 w-8 text-white" /></Button></div>) : (<div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-6 text-center h-48 flex flex-col items-center justify-center"><Camera className="h-8 w-8 text-muted-foreground mb-2" /><p className="text-sm text-muted-foreground">Sin foto</p></div>)}</div>
+                  <div><h4 className="font-medium mb-2 flex items-center gap-2 text-sm"><Eye className="h-4 w-4" />Foto del Patio</h4>{selectedDelivery.loadPhoto ? (<div className="relative w-full h-48 rounded-lg overflow-hidden group border"><Image src={selectedDelivery.loadPhoto || "/placeholder.svg"} alt="Foto de carga del patio" fill style={{objectFit: 'cover'}} /><Button type="button" variant="ghost" size="icon" className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity" onClick={() => openImagePreview(selectedDelivery.loadPhoto!)}><Eye className="h-8 w-8 text-white" /></Button></div>) : (<div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-6 text-center h-48 flex flex-col items-center justify-center"><Camera className="h-8 w-8 text-muted-foreground mb-2" /><p className="text-sm text-muted-foreground">Sin foto</p></div>)}</div>
                   <div><PhotoInput onSelect={setExitPhoto} required={true} label="Foto de salida (obligatoria)" capture={true} /><p className="text-sm text-muted-foreground mt-2">Placa visible en la foto</p></div>
                 </div>
                 {selectedDelivery.notes && (<div className="p-2 bg-yellow-50 border border-yellow-200 dark:bg-yellow-900/20 dark:border-yellow-800 rounded-lg"><p className="text-xs font-medium text-yellow-800 dark:text-yellow-300">Notas del Patio:</p><p className="text-xs text-yellow-700 dark:text-yellow-400">{selectedDelivery.notes}</p></div>)}
@@ -226,7 +237,7 @@ export function SecurityExitsClientUI({ initialDeliveries }: { initialDeliveries
         </Dialog>
         
         <Dialog open={showImagePreview} onOpenChange={setShowImagePreview}>
-            <DialogContent className="max-w-3xl p-0"><DialogHeader><DialogTitle className="sr-only">Vista Previa de la Imagen</DialogTitle></DialogHeader>{previewImageUrl && (<img src={previewImageUrl} alt="Vista previa" className="w-full h-auto max-h-[90vh] object-contain" />)}</DialogContent>
+            <DialogContent className="max-w-3xl p-0"><DialogHeader><DialogTitle className="sr-only">Vista Previa de la Imagen</DialogTitle></DialogHeader>{previewImageUrl && (<Image src={previewImageUrl} alt="Vista previa" width={1200} height={900} className="w-full h-auto max-h-[90vh] object-contain" />)}</DialogContent>
         </Dialog>
       </div>
   );
