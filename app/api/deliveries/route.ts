@@ -57,7 +57,6 @@ export async function GET() {
       order: { id: r.order_id, orderNumber: r.order_number, client: { nombre: r.client_name } },
       client: { nombre: r.client_name },
       truck: { placa: r.truck_placa },
-      // Objeto simplificado a "product" en lugar de "productFormat"
       product: {
           id: r.product_id,
           nombre: r.product_name,

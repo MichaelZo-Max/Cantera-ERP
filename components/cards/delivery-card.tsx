@@ -81,7 +81,6 @@ export function DeliveryCard({ delivery, onConfirmLoad, onViewDetails, showActio
       </CardHeader>
 
       <CardContent className="space-y-3">
-         {/* Foto del camión */}
          {delivery.loadPhoto && (
             <div className="relative h-40 w-full overflow-hidden rounded-md border group">
                  <Image
@@ -99,13 +98,11 @@ export function DeliveryCard({ delivery, onConfirmLoad, onViewDetails, showActio
             </div>
         )}
 
-        {/* Cliente y Destino */}
         <div className="space-y-2">
           <div className="flex items-center gap-2 text-sm">
             <span className="font-medium">Cliente:</span>
             <span className="text-muted-foreground">{delivery.order?.client?.nombre || "Sin cliente"}</span>
           </div>
-
           {delivery.order?.destination && (
             <div className="flex items-center gap-2 text-sm">
               <MapPin className="h-4 w-4 text-muted-foreground" />
@@ -114,29 +111,28 @@ export function DeliveryCard({ delivery, onConfirmLoad, onViewDetails, showActio
           )}
         </div>
 
-        {/* Material */}
+        {/* CORRECCIÓN AQUÍ */}
         <div className="p-3 bg-muted/50 rounded-lg">
           <div className="flex items-center gap-2 mb-1">
             <Package className="h-4 w-4 text-muted-foreground" />
             <span className="font-medium text-sm">Material</span>
           </div>
           <div className="text-sm">
-            <div className="font-medium">{delivery.productFormat?.product?.nombre || "Sin producto"}</div>
+            <div className="font-medium">{delivery.product?.nombre || "Sin producto"}</div>
             <div className="text-muted-foreground">
-              {delivery.productFormat?.sku || `Formato ${delivery.productFormat?.unidadBase}`}
+              {delivery.product?.unit || 'N/A'}
             </div>
           </div>
         </div>
 
-        {/* Cantidad */}
+        {/* CORRECCIÓN AQUÍ */}
         <div className="flex justify-between items-center text-sm">
           <span className="text-muted-foreground">Cantidad solicitada:</span>
           <span className="font-semibold">
-            {delivery.cantidadBase} {delivery.productFormat?.unidadBase}
+            {delivery.cantidadBase} {delivery.product?.unit}
           </span>
         </div>
 
-        {/* Información adicional según estado */}
         {delivery.loadedAt && (
           <div className="text-xs text-muted-foreground">Cargado: {new Date(delivery.loadedAt).toLocaleString()}</div>
         )}

@@ -6,7 +6,6 @@ import type {
   Order,
   Delivery,
   Destination,
-  ProductFormat,
   User,
   Driver,
 } from "./types";
@@ -126,53 +125,6 @@ export const mockTrucks: Truck[] = [
     is_active: true,
     createdAt: new Date("2024-01-05"),
     updatedAt: new Date("2024-01-05"),
-  },
-];
-
-export const mockProductFormats: ProductFormat[] = [
-  {
-    id: "1",
-    productId: "1",
-    unidadBase: "M3",
-    factorUnidadBase: 1,
-    sku: "A granel (m³)",
-    pricePerUnit: 25.5,
-    activo: true,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  },
-  {
-    id: "2",
-    productId: "1",
-    unidadBase: "TON",
-    factorUnidadBase: 1.6,
-    sku: "Por tonelada",
-    pricePerUnit: 40.8,
-    activo: true,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  },
-  {
-    id: "3",
-    productId: "2",
-    unidadBase: "M3",
-    factorUnidadBase: 1,
-    sku: "A granel (m³)",
-    pricePerUnit: 22.0,
-    activo: true,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  },
-  {
-    id: "4",
-    productId: "3",
-    unidadBase: "TON",
-    factorUnidadBase: 1,
-    sku: "Tanque",
-    pricePerUnit: 850.0,
-    activo: true,
-    createdAt: new Date(),
-    updatedAt: new Date(),
   },
 ];
 
