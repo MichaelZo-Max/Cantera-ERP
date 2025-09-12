@@ -1,12 +1,14 @@
 // app/(protected)/cashier/deliveries/deliveries-client.tsx
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Search, Truck, MapPin, Clock, CheckCircle, Package } from "lucide-react";
 import type { Delivery } from "@/lib/types";
+import { AnimatedCard } from "@/components/ui/animated-card"; // Importar AnimatedCard
+import { EmptyState } from "@/components/ui/empty-state"; // Importar EmptyState para consistencia
 
 const statusConfig = {
   ASIGNADA: { label: "Asignada", color: "bg-blue-500/10 text-blue-700 border-blue-200 dark:bg-blue-500/20 dark:text-blue-300 dark:border-blue-800", icon: Clock },
@@ -20,125 +22,137 @@ export function CashierDeliveriesClientUI({ initialDeliveries }: { initialDelive
   const [searchTerm, setSearchTerm] = useState("");
   const [deliveries] = useState<Delivery[]>(initialDeliveries);
 
-  const filteredDeliveries = deliveries.filter((delivery) => {
+  const filteredDeliveries = useMemo(() => deliveries.filter((delivery) => {
     const q = searchTerm.toLowerCase();
     const placa = delivery.truck?.placa?.toLowerCase() ?? "";
     const cliente = delivery.client?.nombre?.toLowerCase() ?? "";
     const id = String(delivery.id)?.toLowerCase() ?? "";
     return placa.includes(q) || cliente.includes(q) || id.includes(q);
-  });
-  
-  const completedDeliveriesCount = deliveries.filter((d) => d.estado === "SALIDA_OK").length;
-  const inProgressDeliveriesCount = deliveries.length - completedDeliveriesCount;
+  }), [deliveries, searchTerm]);
 
+  const completedDeliveriesCount = useMemo(() =>
+    deliveries.filter((d) => d.estado === "SALIDA_OK").length,
+    [deliveries]
+  );
+
+  const inProgressDeliveriesCount = useMemo(() =>
+    deliveries.length - completedDeliveriesCount,
+    [deliveries, completedDeliveriesCount]
+  );
 
   return (
-    <div className="space-y-6 p-4 sm:p-6 lg:p-8">
+    <div className="space-y-8 animate-fade-in">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-foreground">Seguimiento de Despachos</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-foreground to-muted-foreground bg-clip-text text-transparent">Seguimiento de Despachos</h1>
           <p className="text-muted-foreground mt-1">Monitorea el estado de las órdenes creadas</p>
         </div>
         <div className="flex items-center gap-4 text-sm text-muted-foreground">
           <div className="flex items-center gap-2">
-            <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+            <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
             <span>{completedDeliveriesCount} Completados</span>
           </div>
           <div className="flex items-center gap-2">
-            <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
+            <div className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse"></div>
             <span>{inProgressDeliveriesCount} En Proceso</span>
           </div>
         </div>
       </div>
 
-      {/* Search */}
-      <div className="relative max-w-md">
-        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-        <Input
-          placeholder="Buscar por placa, cliente o ID…"
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="pl-10"
-        />
-      </div>
+      {/* Search Bar (con estilo unificado) */}
+      <AnimatedCard hoverEffect="lift" className="glass">
+        <CardContent className="pt-6">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-5 w-5" />
+            <Input
+              placeholder="Buscar por placa, cliente o ID…"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-12 h-12 text-lg focus-ring"
+            />
+          </div>
+        </CardContent>
+      </AnimatedCard>
 
       {/* Deliveries Grid */}
-      <div className="grid gap-4 sm:gap-6 grid-cols-1 lg:grid-cols-2 xl:grid-cols-3">
-        {filteredDeliveries.map((delivery) => {
-          const conf = statusConfig[delivery.estado as keyof typeof statusConfig];
-          const StatusIcon = conf?.icon ?? Clock;
-          const statusStyle = conf?.color ?? "";
-          const statusLabel = conf?.label ?? delivery.estado;
+      <div className="grid gap-6 grid-cols-1 md:grid-cols-2 xl:grid-cols-3">
+        {filteredDeliveries.length > 0 ? (
+          filteredDeliveries.map((delivery, index) => {
+            const conf = statusConfig[delivery.estado as keyof typeof statusConfig];
+            const StatusIcon = conf?.icon ?? Clock;
+            const statusStyle = conf?.color ?? "";
+            const statusLabel = conf?.label ?? delivery.estado;
 
-          const createdAt = delivery.createdAt ? new Date(delivery.createdAt as unknown as string) : null;
-          const loadedAt = delivery.loadedAt ? new Date(delivery.loadedAt as unknown as string) : null;
-          const exitedAt = delivery.exitedAt ? new Date(delivery.exitedAt as unknown as string) : null;
+            const createdAt = delivery.createdAt ? new Date(delivery.createdAt as unknown as string) : null;
+            const loadedAt = delivery.loadedAt ? new Date(delivery.loadedAt as unknown as string) : null;
+            const exitedAt = delivery.exitedAt ? new Date(delivery.exitedAt as unknown as string) : null;
 
-          return (
-            <Card key={delivery.id} className="hover:shadow-lg transition-all duration-200 border-border/50">
-              <CardHeader className="pb-3">
-                <div className="flex items-start justify-between">
-                  <div className="flex items-center gap-2">
-                    <Truck className="h-5 w-5 text-primary" />
-                    <CardTitle className="text-lg font-semibold">{delivery.truck?.placa || "N/A"}</CardTitle>
+            return (
+              <AnimatedCard key={delivery.id} hoverEffect="lift" animateIn delay={index * 100} className="glass overflow-hidden">
+                <CardHeader className="pb-3">
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-center gap-2">
+                      <Truck className="h-5 w-5 text-primary" />
+                      <CardTitle className="text-lg font-semibold">{delivery.truck?.placa || "N/A"}</CardTitle>
+                    </div>
+                    <Badge className={`${statusStyle} font-medium`}>
+                      <StatusIcon className="h-3 w-3 mr-1" />
+                      {statusLabel}
+                    </Badge>
                   </div>
-                  <Badge className={`${statusStyle} font-medium`}>
-                    <StatusIcon className="h-3 w-3 mr-1" />
-                    {statusLabel}
-                  </Badge>
-                </div>
-              </CardHeader>
-
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2 text-sm">
-                    <div className="w-2 h-2 bg-primary rounded-full"></div>
-                    <span className="font-medium text-foreground">{delivery.client?.nombre || "N/A"}</span>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2 text-sm">
+                      <div className="w-2 h-2 bg-primary rounded-full"></div>
+                      <span className="font-medium text-foreground">{delivery.client?.nombre || "N/A"}</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <MapPin className="h-3 w-3" />
+                      <span>Orden #{delivery.order?.orderNumber || delivery.orderId}</span>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <MapPin className="h-3 w-3" />
-                    <span>Orden #{delivery.order?.orderNumber || delivery.orderId}</span>
-                  </div>
-                </div>
-
-                <div className="bg-muted/30 rounded-lg p-3 space-y-2">
-                  <div className="flex justify-between items-center text-sm">
-                    <span className="text-muted-foreground">Cantidad Pedida:</span>
-                    <span className="font-semibold text-foreground">{delivery.cantidadBase}</span>
-                  </div>
-                  {!!delivery.loadedQuantity && delivery.loadedQuantity > 0 && (
+                  <div className="bg-muted/30 rounded-lg p-3 space-y-2">
                     <div className="flex justify-between items-center text-sm">
-                      <span className="text-muted-foreground">Cantidad Cargada:</span>
-                      <span className="font-semibold text-foreground">{delivery.loadedQuantity}</span>
+                      <span className="text-muted-foreground">Cantidad Pedida:</span>
+                      <span className="font-semibold text-foreground">{delivery.cantidadBase}</span>
+                    </div>
+                    {!!delivery.loadedQuantity && delivery.loadedQuantity > 0 && (
+                      <div className="flex justify-between items-center text-sm">
+                        <span className="text-muted-foreground">Cantidad Cargada:</span>
+                        <span className="font-semibold text-foreground">{delivery.loadedQuantity}</span>
+                      </div>
+                    )}
+                  </div>
+                  {!!delivery.notes && (
+                    <div className="text-xs text-muted-foreground bg-muted/20 p-2 rounded">
+                      <strong>Notas:</strong> {delivery.notes}
                     </div>
                   )}
-                </div>
-
-                {!!delivery.notes && (
-                  <div className="text-xs text-muted-foreground bg-muted/20 p-2 rounded">
-                    <strong>Notas:</strong> {delivery.notes}
+                  <div className="text-xs text-muted-foreground border-t border-border/50 pt-3">
+                    {createdAt && <>Creado: {createdAt.toLocaleString("es-ES", { dateStyle: 'short', timeStyle: 'short' })}</>}
+                    {loadedAt && <><br />Cargado: {loadedAt.toLocaleString("es-ES", { dateStyle: 'short', timeStyle: 'short' })}</>}
+                    {exitedAt && <><br />Salida: {exitedAt.toLocaleString("es-ES", { dateStyle: 'short', timeStyle: 'short' })}</>}
                   </div>
-                )}
-
-                <div className="text-xs text-muted-foreground border-t border-border/50 pt-3">
-                  {createdAt && <>Creado: {createdAt.toLocaleString("es-ES", { dateStyle: 'short', timeStyle: 'short' })}</>}
-                  {loadedAt && <><br />Cargado: {loadedAt.toLocaleString("es-ES", { dateStyle: 'short', timeStyle: 'short' })}</>}
-                  {exitedAt && <><br />Salida: {exitedAt.toLocaleString("es-ES", { dateStyle: 'short', timeStyle: 'short' })}</>}
-                </div>
-              </CardContent>
-            </Card>
-          );
-        })}
+                </CardContent>
+              </AnimatedCard>
+            );
+          })
+        ) : (
+            <div className="col-span-full">
+                <Card className="glass">
+                    <CardContent className="pt-6">
+                        <EmptyState
+                            icon={<Truck className="h-12 w-12" />}
+                            title="No se encontraron despachos"
+                            description={searchTerm ? "Intenta con otros términos de búsqueda" : "Aún no hay despachos registrados"}
+                        />
+                    </CardContent>
+                </Card>
+            </div>
+        )}
       </div>
-
-      {filteredDeliveries.length === 0 && (
-        <div className="text-center py-12">
-          <Truck className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-          <h3 className="text-lg font-semibold text-foreground mb-2">No se encontraron despachos</h3>
-          <p className="text-muted-foreground">{searchTerm ? "Intenta con otros términos de búsqueda" : "Aún no hay despachos registrados"}</p>
-        </div>
-      )}
     </div>
   );
 }
