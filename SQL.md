@@ -1,6 +1,3 @@
-¡Por supuesto\! Aquí tienes el documento `.md` completamente actualizado para reflejar la nueva lógica de negocio.
-
-He añadido comentarios `-- MODIFICADO` o `-- NUEVO` en las secciones correspondientes para que puedas identificar fácilmente qué partes de tu aplicativo necesitan ajustarse.
 
 -----
 
@@ -163,7 +160,7 @@ He añadido comentarios `-- MODIFICADO` o `-- NUEVO` en las secciones correspond
 -----
 
 \-- =================================================================
-\-- SCRIPT DE DESPLIEGUE A PRODUCCIÓN (Versión Final)
+\-- SCRIPT DE DESPLIEGUE A PRODUCCIÓN (Versión Final Completa)
 \-- Propósito: Crea y ajusta el esquema, tablas y vistas para el aplicativo.
 \-- =================================================================
 
@@ -174,8 +171,8 @@ EXEC('CREATE SCHEMA RIP');
 END
 GO
 
-\-- 2. CREACIÓN/MODIFICACIÓN DE TABLAS
-\-- (Se incluyen todas las tablas, tanto las originales como las nuevas y modificadas)
+\-- 2. CREACIÓN DE TABLAS
+\-- Se crean las tablas en orden de dependencia.
 
 \-- Tabla de Usuarios
 IF OBJECT\_ID('RIP.APP\_USUARIOS', 'U') IS NULL
@@ -192,8 +189,53 @@ CODVENDEDOR INT NULL,
 FOREIGN KEY (CODVENDEDOR) REFERENCES dbo.VENDEDORES(CODVENDEDOR)
 );
 GO
-\-- (Tablas APP\_CHOFERES, APP\_CAMIONES, APP\_DESTINOS se mantienen igual)
-\-- ...
+
+\-- Tabla de Choferes
+IF OBJECT\_ID('RIP.APP\_CHOFERES', 'U') IS NULL
+BEGIN
+CREATE TABLE RIP.APP\_CHOFERES (
+id INT IDENTITY(1,1) PRIMARY KEY,
+nombre NVARCHAR(255) NOT NULL,
+docId NVARCHAR(50) NULL,
+phone NVARCHAR(50) NULL,
+is\_active BIT NOT NULL DEFAULT 1,
+created\_at DATETIME NOT NULL DEFAULT GETDATE(),
+updated\_at DATETIME NOT NULL DEFAULT GETDATE()
+);
+END
+GO
+
+\-- Tabla de Camiones
+IF OBJECT\_ID('RIP.APP\_CAMIONES', 'U') IS NULL
+CREATE TABLE RIP.APP\_CAMIONES (
+id INT IDENTITY(1,1) PRIMARY KEY,
+placa NVARCHAR(20) NOT NULL UNIQUE,
+brand NVARCHAR(100),
+model NVARCHAR(100),
+capacity DECIMAL(18, 2) NOT NULL,
+driver\_name NVARCHAR(255), -- Obsoleto, usar driver\_id
+driver\_phone NVARCHAR(50), -- Obsoleto
+driver\_id INT NULL,
+is\_active BIT NOT NULL DEFAULT 1,
+created\_at DATETIME NOT NULL DEFAULT GETDATE(),
+updated\_at DATETIME NOT NULL DEFAULT GETDATE(),
+CONSTRAINT FK\_APP\_CAMIONES\_CHOFERES FOREIGN KEY (driver\_id) REFERENCES RIP.APP\_CHOFERES(id)
+);
+GO
+
+\-- Tabla de Destinos
+IF OBJECT\_ID('RIP.APP\_DESTINOS', 'U') IS NULL
+CREATE TABLE RIP.APP\_DESTINOS (
+id INT PRIMARY KEY IDENTITY(1,1),
+customer\_id INT NOT NULL,
+name NVARCHAR(255) NOT NULL,
+address NVARCHAR(MAX) NULL,
+is\_active BIT NOT NULL DEFAULT 1,
+created\_at DATETIME DEFAULT GETDATE(),
+updated\_at DATETIME DEFAULT GETDATE(),
+CONSTRAINT FK\_APP\_DESTINOS\_CLIENTES FOREIGN KEY (customer\_id) REFERENCES dbo.CLIENTES(CODCLIENTE)
+);
+GO
 
 \-- Tabla de Encabezados de Pedidos (Modificada)
 IF OBJECT\_ID('RIP.APP\_PEDIDOS', 'U') IS NULL
@@ -214,6 +256,12 @@ FOREIGN KEY (created\_by) REFERENCES RIP.APP\_USUARIOS(id),
 FOREIGN KEY (destination\_id) REFERENCES RIP.APP\_DESTINOS(id),
 CONSTRAINT CK\_APP\_PEDIDOS\_status CHECK (status IN ('AWAITING\_PAYMENT', 'PAID', 'PARTIALLY\_DISPATCHED', 'DISPATCHED\_COMPLETE', 'CANCELLED'))
 );
+ELSE
+BEGIN
+\-- Lógica para modificar la tabla si ya existe (como se hizo en el script de corrección)
+IF OBJECT\_ID('CK\_APP\_PEDIDOS\_status', 'C') IS NOT NULL ALTER TABLE RIP.APP\_PEDIDOS DROP CONSTRAINT CK\_APP\_PEDIDOS\_status;
+ALTER TABLE RIP.APP\_PEDIDOS ADD CONSTRAINT CK\_APP\_PEDIDOS\_status CHECK (status IN ('AWAITING\_PAYMENT', 'PAID', 'PARTIALLY\_DISPATCHED', 'DISPATCHED\_COMPLETE', 'CANCELLED'));
+END
 GO
 
 \-- Tabla de Líneas/Items de Pedidos (Modificada)
@@ -229,6 +277,13 @@ subtotal AS (quantity \* price\_per\_unit),
 FOREIGN KEY (order\_id) REFERENCES RIP.APP\_PEDIDOS(id),
 FOREIGN KEY (product\_id) REFERENCES dbo.ARTICULOS(CODARTICULO)
 );
+ELSE
+BEGIN
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE Name = N'unit' AND Object\_ID = Object\_ID(N'RIP.APP\_PEDIDOS\_ITEMS'))
+BEGIN
+ALTER TABLE RIP.APP\_PEDIDOS\_ITEMS ADD unit NVARCHAR(50) NULL;
+END
+END
 GO
 
 \-- Tabla de Despachos
