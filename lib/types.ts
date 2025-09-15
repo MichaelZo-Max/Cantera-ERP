@@ -1,7 +1,7 @@
 // --- ENUMS y Tipos Base ---
-export type UnitBase = "M3" | "TON" | "SACO" | "UNIDAD"
+export type UnitBase = "M3" | "TON" | "SACO" | "UNIDAD";
 
-export type UserRole = "CASHIER" | "YARD" | "SECURITY" | "ADMIN" | "REPORTS"
+export type UserRole = "CASHIER" | "YARD" | "SECURITY" | "ADMIN" | "REPORTS";
 
 export type OrderStatus =
   | "AWAITING_PAYMENT"
@@ -11,25 +11,25 @@ export type OrderStatus =
   | "CANCELLED";
 
 export type DeliveryStatus =
-  | "PENDING"  // Viaje creado, esperando en patio
-  | "CARGADA"  // Viaje cargado, esperando para salir
-  | "EXITED";  // Viaje ya salió de la planta
+  | "PENDING" // Viaje creado, esperando en patio
+  | "CARGADA" // Viaje cargado, esperando para salir
+  | "EXITED"; // Viaje ya salió de la planta
 
 // --- Entidades Principales (Alineadas con la Base de Datos) ---
 
 export interface User {
-  id: string
-  email: string
-  name: string
-  role: UserRole
-  is_active: boolean
-  createdAt: Date
-  updatedAt: Date
-  image?: string | null
+  id: string;
+  email: string;
+  name: string;
+  role: UserRole;
+  is_active: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+  image?: string | null;
 }
 
 export interface Client {
-  id: number; // MODIFICADO: Coincide con INT de la DB
+  id: number;
   name: string;
   rif?: string;
   address?: string;
@@ -54,9 +54,9 @@ export interface Destination {
 }
 
 export interface Product {
-  id: number; // MODIFICADO: Coincide con INT de la DB
+  id: number;
   name: string;
-  unit: string; // MODIFICADO: Simplificado para que coincida con la vista
+  unit: string;
   refProveedor?: string;
   description?: string;
   price_per_unit?: number;
@@ -66,7 +66,7 @@ export interface Product {
 }
 
 export interface Driver {
-  id: number; // MODIFICADO: Coincide con INT de la DB
+  id: number;
   name: string;
   docId?: string;
   phone?: string;
@@ -76,9 +76,8 @@ export interface Driver {
 }
 
 export interface Truck {
-  id: number; // MODIFICADO: Coincide con INT de la DB
+  id: number;
   placa: string;
-  // MODIFICADO: El conductor ya no es una propiedad directa del camión
   brand?: string;
   model?: string;
   capacity?: number;
@@ -93,7 +92,7 @@ export interface OrderItem {
   id: number;
   order_id: number;
   product_id: number;
-  product: Product; // MODIFICADO: El producto completo es más útil
+  product: Product;
   quantity: number;
   price_per_unit: number;
   unit: string;
@@ -104,9 +103,9 @@ export interface OrderItem {
 
 export interface Order {
   id: number;
-  order_number: string; // MODIFICADO: Nombre corregido
+  order_number: string;
   customer_id: number;
-  client: Client; // MODIFICADO: Objeto completo en lugar de solo el nombre
+  client: Client;
   destination_id?: number;
   destination?: Destination;
   status: OrderStatus;
@@ -114,20 +113,16 @@ export interface Order {
   created_at: Date;
   updated_at?: Date;
   notes?: string;
-  items: OrderItem[]; // MODIFICADO: Es un array de OrderItem
+  items: OrderItem[];
   deliveries?: Delivery[];
 }
 
-/**
- * MODIFICADO: Esta es la interfaz central.
- * Representa un único viaje (despacho) con toda su información asociada.
- */
 export interface Delivery {
   id: number;
   estado: DeliveryStatus;
-  order: Order;    // El pedido completo al que pertenece este viaje
-  truck: Truck;    // El camión específico que se usó en este viaje
-  driver: Driver;  // El conductor que manejó en este viaje
+  order: Order;
+  truck: Truck;
+  driver: Driver;
   loadedAt?: Date;
   exitedAt?: Date;
   notes?: string;
@@ -136,9 +131,9 @@ export interface Delivery {
 }
 
 export interface DeliveryItem {
-  id: number; // MODIFICADO: Se agrega el ID propio de la tabla
-  despacho_id: number; // MODIFICADO: Se agrega el ID del despacho
-  pedido_item_id: number; // MODIFICADO: Se agrega el ID del item del pedido
+  id: number;
+  despacho_id: number;
+  pedido_item_id: number;
   dispatched_quantity: number;
 }
 
@@ -158,25 +153,28 @@ export interface DispatchGuide {
   updatedAt: Date;
 }
 
-// --- Interfaces para Formularios y UI (Sin cambios) ---
+// --- Interfaces para Formularios y UI ---
 
+/**
+ * @description MODIFICADO: Representa un item en el formulario de creación de pedidos.
+ * Sincronizado con `createOrderItemSchema`.
+ */
+export interface CreateOrderItemForm {
+  product_id: number;
+  quantity: number;
+  price_per_unit: number;
+  unit: string;
+}
+
+/**
+ * @description MODIFICADO: Representa el formulario para crear un nuevo pedido.
+ * Esta interfaz ahora coincide exactamente con el `createOrderSchema` y los datos
+ * que la API route espera.
+ */
 export interface CreateOrderForm {
-  customer_id: string;
-  destinationId?: string;
-  items: {
-    productId: string;
-    cantidadBase: number;
-    pricePerUnit: number;
-    quantity: number;
-  }[];
-  pago: {
-    metodo: string;
-    monto: number;
-    ref?: string;
-  };
-  truckId: string;
-  driverId: string;
-  photoFile?: File;
+  customer_id: number;
+  destination_id?: number | null;
+  items: CreateOrderItemForm[];
 }
 
 export interface LoadDeliveryForm {

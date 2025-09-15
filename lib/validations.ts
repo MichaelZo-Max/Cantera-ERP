@@ -1,12 +1,11 @@
 import { z } from "zod";
-import { VALIDATION } from "./config";
 
 /**
  * @description Esquema para un item individual dentro del formulario de creación de pedidos.
  * Estandarizado para usar 'product_id'.
  */
 export const createOrderItemSchema = z.object({
-  // Corregido: 'producto_id' a 'product_id' para consistencia.
+  // 'product_id' se alinea con el campo usado en el bucle de la API route.
   product_id: z.number({
     required_error: "El ID del producto es obligatorio.",
   }),
@@ -21,21 +20,19 @@ export const createOrderItemSchema = z.object({
 
 /**
  * @description Esquema para la CREACIÓN de un nuevo pedido.
- * Adaptado a la lógica final sin camión y con destino opcional.
+ * Sincronizado con los campos que la API route realmente utiliza.
  */
 export const createOrderSchema = z.object({
   customer_id: z.number({ required_error: "El cliente es requerido." }),
 
-  // Se añade 'destination_id' como opcional y que puede ser nulo.
+  // 'destination_id' es opcional y puede ser nulo, tal como lo maneja la API.
   destination_id: z.number().nullable().optional(),
 
-  // Se elimina el campo 'total', ya que no se guarda en el encabezado.
+  // Se elimina el campo 'notes', ya que no se utiliza en la lógica de inserción de la API.
 
   items: z
     .array(createOrderItemSchema)
     .min(1, "El pedido debe tener al menos un producto."),
-
-  notes: z.string().max(VALIDATION.maxNotesLength).optional(),
 });
 
 // ... aquí irían los otros esquemas que no necesitan cambios

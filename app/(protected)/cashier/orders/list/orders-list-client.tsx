@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import type { Order, OrderProgress } from "@/lib/types"
+import type { Order, OrderProgress, OrderItem, DeliveryItem } from "@/lib/types"
 import { Search, Eye, FileText, Calendar, User, Truck, Package } from "lucide-react"
 import Link from "next/link"
 import { PageHeader } from "@/components/page-header"
@@ -15,34 +15,29 @@ import { Progress } from "@/components/ui/progress"
 
 const getStatusConfig = (status: string) => {
   switch (status) {
-    case "CREADA":
     case "AWAITING_PAYMENT":
       return {
         label: "Esperando Pago",
         color:
           "bg-yellow-100 text-yellow-800 border-yellow-200 dark:bg-yellow-900/20 dark:text-yellow-300 dark:border-yellow-800",
       }
-    case "PAGADA":
     case "PAID":
       return {
         label: "Pagada",
         color: "bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/20 dark:text-blue-300 dark:border-blue-800",
       }
-    case "EN_DESPACHO":
     case "PARTIALLY_DISPATCHED":
       return {
         label: "Despacho Parcial",
         color:
           "bg-orange-100 text-orange-800 border-orange-200 dark:bg-orange-900/20 dark:text-orange-300 dark:border-orange-800",
       }
-    case "CERRADA":
     case "DISPATCHED_COMPLETE":
       return {
         label: "Completada",
         color:
           "bg-green-100 text-green-800 border-green-200 dark:bg-green-900/20 dark:text-green-300 dark:border-green-800",
       }
-    case "CANCELADA":
     case "CANCELLED":
       return {
         label: "Cancelada",
@@ -57,19 +52,22 @@ const getStatusConfig = (status: string) => {
 }
 
 const calculateOrderProgress = (order: Order): OrderProgress => {
-  console.log("[v0] Calculating progress for order:", order.id, order)
+  const totalItems = order.items?.reduce((sum: number, item: OrderItem) => sum + item.quantity, 0) || 0;
 
-  const totalItems = order.items?.reduce((sum, item) => sum + item.quantity, 0) || 0
   const dispatchedItems =
-    order.deliveries?.reduce(
-      (sum, delivery) => sum + (delivery.items?.reduce((itemSum, item) => itemSum + item.dispatched_quantity, 0) || 0),
-      0,
-    ) || 0
+    order.items?.reduce((sum: number, item: OrderItem) => {
+      const itemDispatched =
+        item.dispatchItems?.reduce(
+          (dispatchSum: number, dispatch: DeliveryItem) => dispatchSum + dispatch.dispatched_quantity,
+          0
+        ) || 0;
+      return sum + itemDispatched;
+    }, 0) || 0;
 
-  const completedTrips = order.deliveries?.filter((d) => d.estado === "SALIDA_OK" || d.estado === "EXITED").length || 0
-  const totalTrips = order.deliveries?.length || 0
+  const completedTrips = order.deliveries?.filter((d) => d.estado === "EXITED").length || 0;
+  const totalTrips = order.deliveries?.length || 0;
 
-  const progress = {
+  return {
     orderId: String(order.id),
     totalItems,
     dispatchedItems,
@@ -77,18 +75,15 @@ const calculateOrderProgress = (order: Order): OrderProgress => {
     completedTrips,
     totalTrips,
     status: order.status,
-  }
-
-  console.log("[v0] Calculated progress:", progress)
-  return progress
+  };
 }
+
 
 export function OrdersListClientUI({
   initialOrders,
 }: {
   initialOrders: Order[]
 }) {
-  console.log("[v0] Orders received in component:", initialOrders)
 
   const [searchTerm, setSearchTerm] = useState("")
   const [orders] = useState<Order[]>(initialOrders)
@@ -98,7 +93,7 @@ export function OrdersListClientUI({
     return orders.filter((order) => {
       const q = searchTerm.toLowerCase()
       const orderNumber = order.order_number?.toLowerCase() ?? ""
-      const clientName = order.client_name?.toLowerCase() ?? ""
+      const clientName = order.client?.name?.toLowerCase() ?? ""
       return orderNumber.includes(q) || clientName.includes(q)
     })
   }, [orders, searchTerm])
@@ -110,7 +105,7 @@ export function OrdersListClientUI({
         description="Consulta y gestiona los pedidos con seguimiento de múltiples viajes"
         actions={
           <Button asChild>
-            <Link href="/cashier/orders" className="flex items-center space-x-2">
+            <Link href="/cashier/orders/new" className="flex items-center space-x-2">
               <FileText className="h-4 w-4" />
               <span>Nuevo Pedido</span>
             </Link>
@@ -162,7 +157,7 @@ export function OrdersListClientUI({
                 <CardContent className="space-y-3 flex-grow">
                   <div className="flex items-center space-x-2">
                     <User className="h-4 w-4 text-muted-foreground" />
-                    <span className="font-medium">{order.client_name}</span>
+                    <span className="font-medium">{order.client?.name}</span>
                   </div>
                   <div className="flex items-center space-x-2 text-sm text-muted-foreground">
                     <Calendar className="h-4 w-4" />

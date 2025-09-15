@@ -144,7 +144,7 @@ export function CashierOrderClientUI({
           ? parseInt(selectedDestinationId, 10)
           : null,
         items: orderItems.map((item) => ({
-          product_id: parseInt(item.product.id.toString(), 10), // Corregido: 'product_id'
+          product_id: item.product.id,
           quantity: item.quantity,
           price_per_unit: item.pricePerUnit,
           unit: item.product.unit || "UNIDAD",
@@ -281,7 +281,7 @@ export function CashierOrderClientUI({
               <div className="space-y-2">
                 <Label>Cantidad</Label>
                 <QuantityInput
-                  unitBase={(selectedProduct?.unit as UnitBase) || "m3"}
+                  unitBase={(selectedProduct?.unit as UnitBase) || "M3"}
                   value={currentQuantity}
                   onChange={setCurrentQuantity}
                   disabled={!selectedProduct}
