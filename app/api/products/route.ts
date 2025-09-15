@@ -26,7 +26,7 @@ export async function GET() {
     const rows = await executeQuery<any>(sql);
 
     const out = rows.map((r: any) => ({
-      id: r.id.toString(),
+      id: r.id,
       name: r.name ?? "",
       refProveedor: r.codigo ?? null,
       description: r.name ?? null, // Usar 'name' también para 'description'
