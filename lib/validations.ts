@@ -28,6 +28,7 @@ export const orderSchema = z.object({
   createdBy: z.string().min(1, "Creado por es requerido"),
   createdAt: z.date(),
   updatedAt: z.date(),
+  userId: z.number(),
 });
 
 // Esquema para un item individual dentro de un pedido

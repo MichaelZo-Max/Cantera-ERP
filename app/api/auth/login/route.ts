@@ -1,57 +1,90 @@
-import { NextResponse } from "next/server";
-import { executeQuery } from "@/lib/db";
-import { TYPES } from "tedious";
+// app/api/auth/login/route.ts
+
+import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import bcrypt from "bcryptjs";
+import * as jose from "jose";
+import { executeQuery, TYPES } from "@/lib/db";
 import type { User } from "@/lib/types";
 
-export async function POST(request: Request) {
+// Esquema de validación para el login
+const loginSchema = z.object({
+  email: z.string().email("Email inválido"),
+  password: z.string().min(1, "La contraseña es requerida"),
+});
+
+export async function POST(req: NextRequest) {
   try {
-    const body = await request.json();
-    const email = body.email ? String(body.email).trim() : "";
-    const password = body.password ? String(body.password).trim() : "";
+    const body = await req.json();
+    const validation = loginSchema.safeParse(body);
 
-    if (!email || !password) {
-      return new NextResponse("Email y contraseña son requeridos", {
-        status: 400,
-      });
+    if (!validation.success) {
+      return new NextResponse("Datos inválidos", { status: 400 });
     }
 
-    const query = `
-      SELECT id, name, email, role, password_hash, is_active 
-      FROM RIP.APP_USUARIOS 
-      WHERE email = @email;
+    const { email, password } = validation.data;
+
+    // 1. Buscar al usuario en la base de datos (CON LOS NOMBRES CORRECTOS)
+    const userSql = `
+      SELECT id, name, email, password_hash, role, is_active 
+      FROM CANTERA.RIP.APP_USUARIOS 
+      WHERE email = @email
     `;
+    const userParams = [{ name: "email", type: TYPES.NVarChar, value: email }];
+    const userResult = await executeQuery<any>(userSql, userParams);
 
-    const params = [{ name: "email", type: TYPES.NVarChar, value: email }];
-    const result = (await executeQuery(query, params)) as any[];
+    const user = userResult[0];
 
-    if (result.length === 0) {
-      return new NextResponse("Credenciales inválidas", { status: 401 });
+    if (!user) {
+      return new NextResponse("Credenciales incorrectas", { status: 401 });
     }
 
-    const user = result[0];
-
-    if (!user.is_active) {
-      return new NextResponse("Usuario inactivo", { status: 401 });
-    }
-
+    // 2. Verificar la contraseña (usando la columna 'password_hash')
     const isPasswordValid = await bcrypt.compare(password, user.password_hash);
-
     if (!isPasswordValid) {
-      return new NextResponse("Credenciales inválidas", { status: 401 });
+      return new NextResponse("Credenciales incorrectas", { status: 401 });
     }
 
-    const userToReturn: Partial<User> = {
-      id: user.id.toString(),
-      email: user.email,
-      name: user.name,
-      role: user.role,
-      is_active: user.is_active,
-    };
+    // 3. Crear el token JWT
+    const secret = new TextEncoder().encode(process.env.JWT_SECRET!);
+    const alg = "HS256";
+    const token = await new jose.SignJWT({
+        id: user.id,
+        email: user.email,
+        role: user.role,
+        name: user.name,
+        is_active: user.is_active,
+      })
+      .setProtectedHeader({ alg })
+      .setExpirationTime("24h")
+      .setIssuedAt()
+      .sign(secret);
 
-    return NextResponse.json(userToReturn);
+    // 4. Preparar la respuesta y establecer la cookie segura
+    const userResponse: User = {
+        id: String(user.id),
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        is_active: user.is_active,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+    };
+    
+    const response = NextResponse.json(userResponse);
+
+    response.cookies.set("session", token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "strict",
+      path: "/",
+      maxAge: 60 * 60 * 24, // 24 horas
+    });
+
+    return response;
+
   } catch (error) {
-    console.error("[API_AUTH_LOGIN_POST] Error:", error);
+    console.error("[API_LOGIN_POST]", error);
     return new NextResponse("Error interno del servidor", { status: 500 });
   }
 }

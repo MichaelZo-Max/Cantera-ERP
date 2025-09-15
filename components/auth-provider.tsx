@@ -1,3 +1,4 @@
+// components/auth-provider.tsx
 "use client";
 
 import {
@@ -32,17 +33,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
 
+  // Al cargar, SIEMPRE pregunta al backend por la sesión actual.
+  // Esto elimina la necesidad de localStorage y es mucho más seguro.
   useEffect(() => {
-    try {
-      const storedUser = localStorage.getItem("cantera-user");
-      if (storedUser) {
-        setUser(JSON.parse(storedUser));
+    const checkUserSession = async () => {
+      try {
+        const response = await fetch("/api/auth/me");
+        if (response.ok) {
+          const data = await response.json();
+          setUser(data.user);
+        } else {
+          setUser(null);
+        }
+      } catch (error) {
+        console.error("No se pudo obtener la sesión del usuario:", error);
+        setUser(null);
+      } finally {
+        setIsLoading(false);
       }
-    } catch (error) {
-      console.error("Failed to parse stored user:", error);
-      localStorage.removeItem("cantera-user");
-    }
-    setIsLoading(false);
+    };
+
+    checkUserSession();
   }, []);
 
   const login = async (email: string, password: string) => {
@@ -50,9 +61,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const response = await fetch("/api/auth/login", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
       });
 
@@ -63,7 +72,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       const loggedInUser: User = await response.json();
       setUser(loggedInUser);
-      localStorage.setItem("cantera-user", JSON.stringify(loggedInUser));
+      // NO MÁS LOCALSTORAGE. La sesión vive en la cookie httpOnly del servidor.
     } catch (error) {
       throw error;
     } finally {
@@ -71,17 +80,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  // components/auth-provider.tsx
-
-  const logout = () => {
+  const logout = async () => {
+    // Llama al backend para que destruya la cookie de sesión.
+    await fetch("/api/auth/logout", { method: "POST" });
     setUser(null);
-    localStorage.removeItem("cantera-user");
+    // NO MÁS LOCALSTORAGE.
     router.replace("/");
   };
 
   return (
     <AuthContext.Provider value={{ user, login, logout, isLoading }}>
-      {children}
+      {isLoading ? <div>Cargando sesión...</div> : children}
     </AuthContext.Provider>
   );
 }

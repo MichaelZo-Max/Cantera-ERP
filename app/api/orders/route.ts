@@ -1,9 +1,9 @@
 // app/api/orders/route.ts
 import { NextResponse } from "next/server";
+import { getUser } from "@/lib/auth"; // Importamos la función para obtener el usuario del servidor
 import { executeQuery, TYPES } from "@/lib/db";
 import { revalidateTag } from 'next/cache';
 import { createOrderSchema } from "@/lib/validations";
-import { z } from "zod";
 
 /**
  * @route   POST /api/orders
@@ -12,12 +12,15 @@ import { z } from "zod";
  */
 export async function POST(req: Request) {
   try {
-    const rawBody = await req.text();
-    if (!rawBody) {
-      return new NextResponse("El cuerpo de la solicitud está vacío.", { status: 400 });
+    // 1. Obtener el usuario de la sesión
+    const { user } = await getUser();
+    if (!user) {
+      return new NextResponse("No autorizado. Inicia sesión para continuar.", { status: 401 });
     }
-    const body = JSON.parse(rawBody);
 
+    const body = await req.json();
+
+    // 2. Validar el cuerpo de la solicitud (sin userId, ya que lo tomamos de la sesión)
     const validation = createOrderSchema.safeParse(body);
     if (!validation.success) {
       return new NextResponse(JSON.stringify(validation.error.errors), { status: 400 });
@@ -27,29 +30,27 @@ export async function POST(req: Request) {
       customer_id,
       destination_id,
       truck_id,
-      // driver_id, // Lo recibimos pero no lo insertamos aquí
       items,
     } = validation.data;
 
-    // 👇 --- INICIO DEL CAMBIO --- 👇
-    // Se elimina `driver_id` de la consulta y de los parámetros.
+    // 3. Preparar y ejecutar la consulta SQL para insertar el pedido
     const pedidoSql = `
-      INSERT INTO rip.APP_PEDIDOS (customer_id, destination_id, truck_id, created_at, status)
+      INSERT INTO rip.APP_PEDIDOS (customer_id, destination_id, truck_id, created_by, created_at, status)
       OUTPUT INSERTED.id
-      VALUES (@customer_id, @destination_id, @truck_id, GETDATE(), 'PENDIENTE');
+      VALUES (@customer_id, @destination_id, @truck_id, @created_by, GETDATE(), 'PENDIENTE');
     `;
 
     const pedidoParams = [
       { name: "customer_id", type: TYPES.Int, value: customer_id },
       { name: "destination_id", type: TYPES.Int, value: destination_id },
       { name: "truck_id", type: TYPES.Int, value: truck_id },
+      { name: "created_by", type: TYPES.Int, value: user.id }, // Usamos el ID del usuario de la sesión
     ];
-    // ☝️ --- FIN DEL CAMBIO --- ☝️
 
     const pedidoResult = await executeQuery<any>(pedidoSql, pedidoParams);
     const pedido_id = pedidoResult[0].id;
 
-    // La inserción de los items del pedido se mantiene igual
+    // 4. Insertar los items del pedido (esto se mantiene igual)
     for (const item of items) {
       const itemSql = `
         INSERT INTO rip.APP_PEDIDOS_ITEMS (pedido_id, producto_id, quantity, unit_price, total_price)
