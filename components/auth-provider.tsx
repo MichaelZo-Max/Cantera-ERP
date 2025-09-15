@@ -1,96 +1,84 @@
-// components/auth-provider.tsx
-"use client";
+"use client"
 
-import {
-  createContext,
-  useContext,
-  useState,
-  useEffect,
-  type ReactNode,
-} from "react";
-import { useRouter } from "next/navigation";
-import type { User } from "@/lib/types";
+import { createContext, useContext, useState, useEffect, type ReactNode } from "react"
+import { useRouter } from "next/navigation"
+import type { User } from "@/lib/types"
 
 interface AuthContextType {
-  user: User | null;
-  login: (email: string, password: string) => Promise<void>;
-  logout: () => void;
-  isLoading: boolean;
+  user: User | null
+  login: (email: string, password: string) => Promise<void>
+  logout: () => void
+  isLoading: boolean
 }
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
 export function useAuth() {
-  const context = useContext(AuthContext);
+  const context = useContext(AuthContext)
   if (context === undefined) {
-    throw new Error("useAuth must be used within an AuthProvider");
+    throw new Error("useAuth must be used within an AuthProvider")
   }
-  return context;
+  return context
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const router = useRouter();
+  const [user, setUser] = useState<User | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const router = useRouter()
 
-  // Al cargar, SIEMPRE pregunta al backend por la sesión actual.
-  // Esto elimina la necesidad de localStorage y es mucho más seguro.
   useEffect(() => {
     const checkUserSession = async () => {
       try {
-        const response = await fetch("/api/auth/me");
+        const response = await fetch("/api/auth/me")
         if (response.ok) {
-          const data = await response.json();
-          setUser(data.user);
+          const data = await response.json()
+          setUser(data.user)
         } else {
-          setUser(null);
+          setUser(null)
         }
       } catch (error) {
-        console.error("No se pudo obtener la sesión del usuario:", error);
-        setUser(null);
+        console.error("No se pudo obtener la sesión del usuario:", error)
+        setUser(null)
       } finally {
-        setIsLoading(false);
+        setIsLoading(false)
       }
-    };
+    }
 
-    checkUserSession();
-  }, []);
+    checkUserSession()
+  }, [])
 
   const login = async (email: string, password: string) => {
-    setIsLoading(true);
+    setIsLoading(true)
     try {
       const response = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
-      });
+      })
 
       if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(errorText || "Error al iniciar sesión");
+        const errorText = await response.text()
+        throw new Error(errorText || "Error al iniciar sesión")
       }
 
-      const loggedInUser: User = await response.json();
-      setUser(loggedInUser);
-      // NO MÁS LOCALSTORAGE. La sesión vive en la cookie httpOnly del servidor.
+      const loggedInUser: User = await response.json()
+      setUser(loggedInUser)
     } catch (error) {
-      throw error;
+      throw error
     } finally {
-      setIsLoading(false);
+      setIsLoading(false)
     }
-  };
+  }
 
   const logout = async () => {
-    // Llama al backend para que destruya la cookie de sesión.
-    await fetch("/api/auth/logout", { method: "POST" });
-    setUser(null);
-    // NO MÁS LOCALSTORAGE.
-    router.replace("/");
-  };
+    try {
+      await fetch("/api/auth/logout", { method: "POST" })
+    } catch (error) {
+      console.error("Error during logout:", error)
+    }
+    setUser(null)
+    router.replace("/")
+  }
 
-  return (
-    <AuthContext.Provider value={{ user, login, logout, isLoading }}>
-      {isLoading ? <div>Cargando sesión...</div> : children}
-    </AuthContext.Provider>
-  );
+  return <AuthContext.Provider value={{ user, login, logout, isLoading }}>{children}</AuthContext.Provider>
 }
