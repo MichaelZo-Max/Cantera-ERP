@@ -5,9 +5,6 @@ import { USER_ROLES, ORDER_STATUS, DELIVERY_STATUS } from "./constants";
 
 // ... (se conservan los otros esquemas como userSchema, customerSchema, etc.)
 
-// --- INICIO DE CAMBIOS ---
-
-// Se mantiene el esquema original si se usa para mostrar datos en otra parte
 export const orderSchema = z.object({
   id: z.string().min(1, "ID es requerido"),
   orderNumber: z.string().min(1, "Número de orden es requerido"),
@@ -39,16 +36,44 @@ export const orderItemSchema = z.object({
   total_price: z.number().min(0, "El precio total no puede ser negativo"),
 });
 
-
-// Nuevo esquema para la CREACIÓN de pedidos, que coincide con la API
-export const createOrderSchema = z.object({
-  customer_id: z.number({ required_error: "ID de cliente es requerido." }),
-  destination_id: z.number({ required_error: "ID de destino es requerido." }),
-  truck_id: z.number({ required_error: "ID de camión es requerido." }),
-  driver_id: z.number({ required_error: "ID de conductor es requerido." }),
-  items: z.array(orderItemSchema).min(1, "El pedido debe tener al menos un producto."),
-  notes: z.string().max(VALIDATION.maxNotesLength).optional(),
+/**
+ * @description Esquema para un item individual dentro del formulario de creación de pedidos.
+ * Coincide con la estructura de la tabla `APP_PEDIDOS_ITEMS`.
+ */
+export const createOrderItemSchema = z.object({
+  producto_id: z.number({
+    required_error: "El ID del producto es obligatorio.",
+  }),
+  quantity: z.number().positive("La cantidad debe ser un número positivo."),
+  // Corresponde a 'price_per_unit' en la BBDD
+  price_per_unit: z
+    .number()
+    .min(0, "El precio unitario no puede ser negativo."),
+  // Nuevo campo requerido por la BBDD
+  unit: z.string({
+    required_error: "La unidad de medida es obligatoria.",
+  }),
 });
 
+/**
+ * @description Esquema para la CREACIÓN de un nuevo pedido.
+ * Adaptado a la nueva estructura de la base de datos y la API.
+ */
+export const createOrderSchema = z.object({
+  // Se cambia 'customer_id' por 'customer_id' para mantener consistencia.
+  customer_id: z.number({ required_error: "El cliente es requerido." }),
+
+  // Se añade el campo 'total' que ahora es parte del encabezado del pedido.
+  total: z.number().min(0, "El total del pedido no puede ser negativo."),
+
+  // Se eliminan 'destination_id', 'truck_id' y 'driver_id' porque ahora
+  // pertenecen a la entidad de Despacho, no al Pedido.
+
+  items: z
+    .array(createOrderItemSchema)
+    .min(1, "El pedido debe tener al menos un producto."),
+
+  notes: z.string().max(VALIDATION.maxNotesLength).optional(),
+});
 
 // ... (se conservan los otros esquemas como deliverySchema, etc.)
