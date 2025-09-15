@@ -1,7 +1,6 @@
-// app/(protected)/cashier/orders/cashier-order-client.tsx
 "use client";
 
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -30,7 +29,7 @@ import {
 import { QuantityInput } from "@/components/forms/quantity-input";
 import { Plus, Trash2, Calculator, CreditCard } from "lucide-react";
 import { toast } from "sonner";
-import type { Client, Product, UnitBase } from "@/lib/types";
+import type { Client, Product, UnitBase, Destination } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
 
 // Interface para los items del carrito/orden
@@ -42,22 +41,28 @@ interface OrderItem {
   subtotal: number;
 }
 
-// Props del componente, ahora simplificadas
+// Props del componente, ahora con destinos
 export function CashierOrderClientUI({
   initialClients,
   initialProducts,
+  initialDestinations,
 }: {
   initialClients: Client[];
   initialProducts: Product[];
+  initialDestinations: Destination[];
 }) {
   const router = useRouter();
 
   // Estados para los datos maestros
   const [clients] = useState<Client[]>(initialClients);
   const [products] = useState<Product[]>(initialProducts);
+  const [destinations] = useState<Destination[]>(initialDestinations);
 
-  // Estado para la selección del cliente
-  const [selectedClientId, setSelectedClientId] = useState<string>("");
+  // Estados para la selección
+  const [selectedcustomer_id, setSelectedcustomer_id] = useState<string>("");
+  const [selectedDestinationId, setSelectedDestinationId] = useState<
+    string | undefined
+  >();
 
   // Estados para el constructor de items
   const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
@@ -66,6 +71,14 @@ export function CashierOrderClientUI({
 
   // Estado para el envío
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Filtrar destinos basados en el cliente seleccionado
+  const filteredDestinations = useMemo(() => {
+    if (!selectedcustomer_id) return [];
+    return destinations.filter(
+      (d) => d.customer_id.toString() === selectedcustomer_id
+    );
+  }, [selectedcustomer_id, destinations]);
 
   // Calcular totales
   const total = useMemo(() => {
@@ -92,7 +105,7 @@ export function CashierOrderClientUI({
     setSelectedProduct(null);
     setCurrentQuantity(0);
 
-    toast.success(`${newItem.product.nombre} agregado al pedido.`);
+    toast.success(`${newItem.product.name} agregado al pedido.`);
   }, [selectedProduct, currentQuantity]);
 
   // Quitar un item del pedido
@@ -104,17 +117,17 @@ export function CashierOrderClientUI({
   // Seleccionar un producto de la lista
   const handleProductSelect = useCallback(
     (productId: string) => {
-      const product = products.find((p) => p.id === productId);
+      const product = products.find((p) => p.id.toString() === productId);
       setSelectedProduct(product || null);
       setCurrentQuantity(product ? 1 : 0);
     },
     [products]
   );
 
-  // --- LÓGICA DE ENVÍO CORREGIDA Y ADAPTADA ---
+  // --- LÓGICA DE ENVÍO ADAPTADA ---
   const handleCreateOrder = useCallback(async () => {
     // Validaciones
-    if (!selectedClientId || orderItems.length === 0) {
+    if (!selectedcustomer_id || orderItems.length === 0) {
       toast.error(
         "Por favor, completa todos los campos requeridos: Cliente y al menos un producto."
       );
@@ -124,15 +137,17 @@ export function CashierOrderClientUI({
     setIsSubmitting(true);
 
     try {
-      // 1. Construir el objeto de datos que la API espera
+      // 1. Construir el objeto de datos que la API espera (sin truck_id ni total)
       const orderData = {
-        customer_id: parseInt(selectedClientId, 10),
-        total: total, // El total calculado
+        customer_id: parseInt(selectedcustomer_id, 10),
+        destination_id: selectedDestinationId
+          ? parseInt(selectedDestinationId, 10)
+          : null,
         items: orderItems.map((item) => ({
-          producto_id: parseInt(item.product.id, 10),
+          product_id: parseInt(item.product.id.toString(), 10), // Corregido: 'product_id'
           quantity: item.quantity,
           price_per_unit: item.pricePerUnit,
-          unit: item.product.unit, // Se añade la unidad del producto
+          unit: item.product.unit || "UNIDAD",
         })),
       };
 
@@ -147,7 +162,6 @@ export function CashierOrderClientUI({
 
       if (!res.ok) {
         const errorData = await res.json();
-        // Si la validación falla, Zod envía un array de errores
         if (Array.isArray(errorData)) {
           const errorMessages = errorData.map((e) => e.message).join("\n");
           throw new Error(errorMessages);
@@ -163,12 +177,12 @@ export function CashierOrderClientUI({
     } finally {
       setIsSubmitting(false);
     }
-  }, [selectedClientId, orderItems, total, router]);
+  }, [selectedcustomer_id, selectedDestinationId, orderItems, router]);
 
   // Memo para habilitar/deshabilitar el botón de envío
   const canSubmit = useMemo(
-    () => !!selectedClientId && orderItems.length > 0,
-    [selectedClientId, orderItems]
+    () => !!selectedcustomer_id && orderItems.length > 0,
+    [selectedcustomer_id, orderItems]
   );
 
   return (
@@ -177,27 +191,51 @@ export function CashierOrderClientUI({
         <CardHeader>
           <CardTitle>Datos Generales del Pedido</CardTitle>
           <CardDescription>
-            Selecciona el cliente para el pedido.
+            Selecciona el cliente y el destino para el pedido.
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="space-y-2 max-w-sm">
-            <Label>Cliente *</Label>
-            <Select
-              value={selectedClientId}
-              onValueChange={setSelectedClientId}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Selecciona cliente..." />
-              </SelectTrigger>
-              <SelectContent>
-                {clients.map((client) => (
-                  <SelectItem key={client.id} value={client.id}>
-                    {client.nombre}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-2xl">
+            <div className="space-y-2">
+              <Label>Cliente *</Label>
+              <Select
+                value={selectedcustomer_id}
+                onValueChange={(value) => {
+                  setSelectedcustomer_id(value);
+                  setSelectedDestinationId(undefined); // Reset destination on client change
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecciona cliente..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {clients.map((client) => (
+                    <SelectItem key={client.id} value={client.id.toString()}>
+                      {client.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Destino (Opcional)</Label>
+              <Select
+                value={selectedDestinationId}
+                onValueChange={setSelectedDestinationId}
+                disabled={!selectedcustomer_id}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecciona destino..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {filteredDestinations.map((dest) => (
+                    <SelectItem key={dest.id} value={dest.id.toString()}>
+                      {dest.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -216,7 +254,7 @@ export function CashierOrderClientUI({
               <div className="space-y-2">
                 <Label>Producto</Label>
                 <Select
-                  value={selectedProduct?.id || ""}
+                  value={selectedProduct?.id.toString() || ""}
                   onValueChange={handleProductSelect}
                 >
                   <SelectTrigger>
@@ -224,11 +262,14 @@ export function CashierOrderClientUI({
                   </SelectTrigger>
                   <SelectContent>
                     {products.map((product) => (
-                      <SelectItem key={product.id} value={product.id}>
-                        <span>{product.nombre}</span>
+                      <SelectItem
+                        key={product.id}
+                        value={product.id.toString()}
+                      >
+                        <span>{product.name}</span>
                         <Badge variant="secondary" className="ml-4">
                           {product.price_per_unit
-                            ? `$${product.price_per_unit.toFixed(2)}`
+                            ? `$${Number(product.price_per_unit).toFixed(2)}`
                             : "N/A"}{" "}
                           / {product.unit}
                         </Badge>
@@ -251,7 +292,8 @@ export function CashierOrderClientUI({
               <div className="text-right font-semibold">
                 Subtotal del item: $
                 {(
-                  currentQuantity * (selectedProduct.price_per_unit ?? 0)
+                  currentQuantity *
+                  (Number(selectedProduct.price_per_unit) ?? 0)
                 ).toFixed(2)}
               </div>
             )}
@@ -310,7 +352,7 @@ export function CashierOrderClientUI({
               <TableBody>
                 {orderItems.map((item) => (
                   <TableRow key={item.id}>
-                    <TableCell>{item.product.nombre}</TableCell>
+                    <TableCell>{item.product.name}</TableCell>
                     <TableCell>
                       {item.quantity} {item.product.unit}
                     </TableCell>

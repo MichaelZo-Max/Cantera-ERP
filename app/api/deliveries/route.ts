@@ -1,8 +1,8 @@
 // app/api/deliveries/route.ts
-import { NextResponse } from 'next/server';
-import { executeQuery } from '@/lib/db';
+import { NextResponse } from "next/server";
+import { executeQuery } from "@/lib/db";
 
-export const dynamic = 'force-dynamic'
+export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
@@ -42,7 +42,7 @@ export async function GET() {
       ORDER BY d.id DESC;
     `;
     const rows = await executeQuery(q);
-    
+
     // Mapeo de respuesta CORREGIDO
     const out = rows.map((r: any) => ({
       id: r.id,
@@ -52,22 +52,26 @@ export async function GET() {
       loadedAt: r.loaded_at ? new Date(r.loaded_at) : null,
       exitedAt: r.exited_at ? new Date(r.exited_at) : null,
       notes: r.notes ?? null,
-      loadPhoto: r.load_photo_url ?? null, 
+      loadPhoto: r.load_photo_url ?? null,
       exitPhoto: r.exit_photo_url ?? null,
-      order: { id: r.order_id, orderNumber: r.order_number, client: { nombre: r.client_name } },
-      client: { nombre: r.client_name },
+      order: {
+        id: r.order_id,
+        orderNumber: r.order_number,
+        client: { name: r.client_name },
+      },
+      client: { name: r.client_name },
       truck: { placa: r.truck_placa },
       product: {
-          id: r.product_id,
-          nombre: r.product_name,
-          unit: r.unidadBase
+        id: r.product_id,
+        name: r.product_name,
+        unit: r.unidadBase,
       },
-      cantidadBase: Number(r.cantidadBase) || 0
+      cantidadBase: Number(r.cantidadBase) || 0,
     }));
 
     return NextResponse.json(out);
   } catch (e) {
-    console.error('[API_DELIVERIES_GET]', e);
-    return new NextResponse('Error al obtener despachos', { status: 500 });
+    console.error("[API_DELIVERIES_GET]", e);
+    return new NextResponse("Error al obtener despachos", { status: 500 });
   }
 }

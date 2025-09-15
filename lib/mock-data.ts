@@ -13,7 +13,7 @@ import type {
 export const mockClients: Client[] = [
   {
     id: "1",
-    nombre: "Constructora ABC S.A. de C.V.",
+    name: "Constructora ABC S.A. de C.V.",
     rif: "CABC850101ABC",
     address: "Av. Construcción 123, Ciudad",
     phone: "555-0101",
@@ -24,7 +24,7 @@ export const mockClients: Client[] = [
   },
   {
     id: "2",
-    nombre: "Materiales del Norte",
+    name: "Materiales del Norte",
     rif: "MDN900202DEF",
     address: "Calle Norte 456, Ciudad",
     phone: "555-0202",
@@ -35,7 +35,7 @@ export const mockClients: Client[] = [
   },
   {
     id: "3",
-    nombre: "Obras y Proyectos",
+    name: "Obras y Proyectos",
     rif: "OYP950303GHI",
     address: "Blvd. Proyectos 789, Ciudad",
     phone: "555-0303",
@@ -50,7 +50,7 @@ export const mockProducts: Product[] = [
   {
     id: "1",
     refProveedor: "ARE-001",
-    nombre: "Arena",
+    name: "Arena",
     description: "Arena de río para construcción",
     is_active: true,
     createdAt: new Date("2024-01-10"),
@@ -59,7 +59,7 @@ export const mockProducts: Product[] = [
   {
     id: "2",
     refProveedor: "GRA-001",
-    nombre: "Grava",
+    name: "Grava",
     description: 'Grava triturada 3/4"',
     is_active: true,
     createdAt: new Date("2024-01-10"),
@@ -68,7 +68,7 @@ export const mockProducts: Product[] = [
   {
     id: "3",
     refProveedor: "PIE-001",
-    nombre: "Piedra",
+    name: "Piedra",
     description: "Piedra braza para construcción",
     is_active: true,
     createdAt: new Date("2024-01-10"),
@@ -77,7 +77,7 @@ export const mockProducts: Product[] = [
   {
     id: "4",
     refProveedor: "TEP-001",
-    nombre: "Tepetate",
+    name: "Tepetate",
     description: "Tepetate para relleno",
     is_active: true,
     createdAt: new Date("2024-01-10"),
@@ -131,8 +131,8 @@ export const mockTrucks: Truck[] = [
 export const mockDestinations: Destination[] = [
   {
     id: "1",
-    clientId: "1",
-    nombre: "Obra Av. Norte",
+    customer_id: "1",
+    name: "Obra Av. Norte",
     direccion: "Av. Norte, Caracas",
     is_active: true,
     createdAt: new Date(),
@@ -140,8 +140,8 @@ export const mockDestinations: Destination[] = [
   },
   {
     id: "2",
-    clientId: "1",
-    nombre: "Proyecto Residencial",
+    customer_id: "1",
+    name: "Proyecto Residencial",
     direccion: "Urb. Los Palos Grandes",
     is_active: true,
     createdAt: new Date(),
@@ -149,8 +149,8 @@ export const mockDestinations: Destination[] = [
   },
   {
     id: "3",
-    clientId: "2",
-    nombre: "Puente Autopista",
+    customer_id: "2",
+    name: "Puente Autopista",
     direccion: "Autopista Regional",
     is_active: true,
     createdAt: new Date(),
@@ -210,7 +210,7 @@ export const mockOrders: Order[] = [
   {
     id: "1",
     orderNumber: "ORD-2024-001",
-    clientId: "1",
+    customer_id: "1",
     client: mockClients[0],
     estado: "CREADA",
     total: 2500.0,
@@ -222,7 +222,7 @@ export const mockOrders: Order[] = [
   {
     id: "2",
     orderNumber: "ORD-2024-002",
-    clientId: "2",
+    customer_id: "2",
     client: mockClients[1],
     estado: "EN_DESPACHO",
     total: 4500.0,
@@ -236,7 +236,7 @@ export const mockOrders: Order[] = [
 export const mockDrivers: Driver[] = [
   {
     id: "1",
-    nombre: "Juan Pérez",
+    name: "Juan Pérez",
     docId: "V-12345678",
     phone: "+58-414-1234567",
     is_active: true,
@@ -245,7 +245,7 @@ export const mockDrivers: Driver[] = [
   },
   {
     id: "2",
-    nombre: "Carlos Rodriguez",
+    name: "Carlos Rodriguez",
     docId: "V-87654321",
     phone: "+58-412-7654321",
     is_active: true,

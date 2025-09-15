@@ -23,7 +23,7 @@ export function ProductsClientUI({
     () =>
       products.filter(
         (product) =>
-          product.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
           (product.description &&
             product.description
               .toLowerCase()
@@ -59,7 +59,7 @@ export function ProductsClientUI({
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-5 w-5" />
             <Input
-              placeholder="Buscar por nombre o descripción..."
+              placeholder="Buscar por name o descripción..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-12 h-12 text-lg focus-ring"
@@ -95,7 +95,7 @@ export function ProductsClientUI({
                 <div className="flex justify-between items-start">
                   <div className="flex-1">
                     <CardTitle className="text-xl font-bold bg-gradient-to-r from-foreground to-muted-foreground bg-clip-text text-transparent">
-                      {product.nombre}
+                      {product.name}
                     </CardTitle>
                     <p className="text-sm font-semibold text-primary mt-1">
                       ${(product.price_per_unit || 0).toFixed(2)} /{" "}

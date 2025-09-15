@@ -7,12 +7,7 @@ import { useState, useCallback, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
@@ -53,7 +48,7 @@ export function DriversClientUI({
   const [showDialog, setShowDialog] = useState(false);
   const [editingDriver, setEditingDriver] = useState<Driver | null>(null);
   const [formData, setFormData] = useState({
-    nombre: "",
+    name: "",
     docId: "",
     phone: "",
   });
@@ -67,7 +62,7 @@ export function DriversClientUI({
     () =>
       drivers.filter(
         (driver) =>
-          driver.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          driver.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
           (driver.docId &&
             driver.docId.toLowerCase().includes(searchTerm.toLowerCase()))
       ),
@@ -77,7 +72,7 @@ export function DriversClientUI({
   // 2. Envolver las funciones en `useCallback`
   const handleNewDriver = useCallback(() => {
     setEditingDriver(null);
-    setFormData({ nombre: "", docId: "", phone: "" });
+    setFormData({ name: "", docId: "", phone: "" });
     setApiError(null);
     setShowDialog(true);
   }, []); // Dependencias vacías porque no usa props o estado que cambien.
@@ -85,7 +80,7 @@ export function DriversClientUI({
   const handleEditDriver = useCallback((driver: Driver) => {
     setEditingDriver(driver);
     setFormData({
-      nombre: driver.nombre,
+      name: driver.name,
       docId: driver.docId || "",
       phone: driver.phone || "",
     });
@@ -147,7 +142,7 @@ export function DriversClientUI({
           title: `¿Estás seguro?`,
           description: `Esta acción ${
             is_active ? "desactivará" : "activará"
-          } al chofer "${driver.nombre}".`,
+          } al chofer "${driver.name}".`,
           confirmText: is_active ? "Desactivar" : "Activar",
           variant: is_active ? "destructive" : "default",
         },
@@ -225,7 +220,7 @@ export function DriversClientUI({
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-5 w-5" />
             <Input
-              placeholder="Buscar por nombre o documento..."
+              placeholder="Buscar por name o documento..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-12 h-12 text-lg focus-ring"
@@ -270,7 +265,7 @@ export function DriversClientUI({
                 <div className="flex justify-between items-start">
                   <div className="flex-1">
                     <CardTitle className="text-xl font-bold bg-gradient-to-r from-foreground to-muted-foreground bg-clip-text text-transparent">
-                      {driver.nombre}
+                      {driver.name}
                     </CardTitle>
                     <p className="text-sm text-muted-foreground mt-1 font-medium">
                       {driver.docId || "Sin documento"}
@@ -337,14 +332,14 @@ export function DriversClientUI({
           </DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-6 pt-4">
             <div className="space-y-2">
-              <Label htmlFor="nombre" className="font-semibold">
+              <Label htmlFor="name" className="font-semibold">
                 Nombre Completo *
               </Label>
               <Input
-                id="nombre"
-                value={formData.nombre}
+                id="name"
+                value={formData.name}
                 onChange={(e) =>
-                  setFormData({ ...formData, nombre: e.target.value })
+                  setFormData({ ...formData, name: e.target.value })
                 }
                 placeholder="Ej: Juan Pérez"
                 required
@@ -394,7 +389,7 @@ export function DriversClientUI({
               </Button>
               <GradientButton
                 type="submit"
-                disabled={isSubmitting || !formData.nombre}
+                disabled={isSubmitting || !formData.name}
               >
                 {isSubmitting ? (
                   <>

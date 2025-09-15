@@ -1,9 +1,9 @@
 // app/api/customers/route.ts
 import { NextResponse } from "next/server";
 import { executeQuery, TYPES } from "@/lib/db";
-import { revalidateTag } from 'next/cache';
+import { revalidateTag } from "next/cache";
 
-export const dynamic = 'force-dynamic'
+export const dynamic = "force-dynamic";
 
 // ---------- GET: lista de clientes que tu UI muestra ----------
 export async function GET() {
@@ -26,7 +26,7 @@ export async function GET() {
     // El mapeo ahora es más directo porque la vista ya tiene los nombres correctos.
     const out = rows.map((r: any) => ({
       id: r.id,
-      nombre: r.name ?? "",
+      name: r.name ?? "",
       rif: r.rfc ?? null,
       address: r.address ?? null,
       phone: r.phone ?? null,
@@ -47,14 +47,14 @@ export async function POST(req: Request) {
   try {
     const body = await req.json().catch(() => ({}));
 
-    const nombre = String(body?.nombre ?? "").trim();
+    const name = String(body?.name ?? "").trim();
     const rif = (body?.rif ?? "").toString().trim() || null;
     const address = (body?.address ?? "").toString().trim() || null;
     const phone = (body?.phone ?? "").toString().trim() || null;
     const email = (body?.email ?? "").toString().trim() || null;
 
-    if (!nombre) {
-      return new NextResponse("El campo nombre es obligatorio", {
+    if (!name) {
+      return new NextResponse("El campo name es obligatorio", {
         status: 400,
       });
     }
@@ -102,7 +102,7 @@ export async function POST(req: Request) {
       {
         name: "nombreCliente",
         type: TYPES.NVarChar,
-        value: nombre,
+        value: name,
         options: { length: 200 },
       },
       {
@@ -136,15 +136,15 @@ export async function POST(req: Request) {
 
     const saved = {
       id: r.CODCLIENTE,
-      nombre: r.NOMBRECLIENTE ?? "",
+      name: r.NOMBRECLIENTE ?? "",
       rif: r.NIF20 ?? null,
       address: r.DIRECCION1 ?? null,
       phone: r.TELEFONO1 ?? null,
       email: r.E_MAIL ?? null,
       is_active: (r.DESCATALOGADO ?? "F").toString().toUpperCase() !== "T",
     };
-    
-    revalidateTag('customers');
+
+    revalidateTag("customers");
 
     return NextResponse.json(saved, { status: 201 });
   } catch (e: any) {

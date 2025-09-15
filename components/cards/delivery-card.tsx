@@ -1,11 +1,23 @@
 // components/cards/delivery-card.tsx
-"use client"
+"use client";
 
-import { Truck, MapPin, Package, Clock, CheckCircle, Camera } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import type { Delivery } from "@/lib/types"
+import {
+  Truck,
+  MapPin,
+  Package,
+  Clock,
+  CheckCircle,
+  Camera,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardFooter,
+  CardHeader,
+} from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import type { Delivery } from "@/lib/types";
 import Image from "next/image";
 
 interface DeliveryCardProps {
@@ -23,7 +35,8 @@ const STATUS_CONFIG = {
   },
   EN_CARGA: {
     label: "En Carga",
-    color: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300",
+    color:
+      "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300",
     icon: Package,
   },
   CARGADA: {
@@ -33,7 +46,8 @@ const STATUS_CONFIG = {
   },
   SALIDA_OK: {
     label: "Salida OK",
-    color: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-300",
+    color:
+      "bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-300",
     icon: CheckCircle,
   },
   RECHAZADA: {
@@ -43,7 +57,12 @@ const STATUS_CONFIG = {
   },
 } as const;
 
-export function DeliveryCard({ delivery, onConfirmLoad, onViewDetails, showActions = true }: DeliveryCardProps) {
+export function DeliveryCard({
+  delivery,
+  onConfirmLoad,
+  onViewDetails,
+  showActions = true,
+}: DeliveryCardProps) {
   const statusConfig = STATUS_CONFIG[delivery.estado];
   const StatusIcon = statusConfig.icon;
 
@@ -63,7 +82,9 @@ export function DeliveryCard({ delivery, onConfirmLoad, onViewDetails, showActio
   return (
     <Card
       className={`transition-all duration-200 ${
-        isClickable ? "hover:shadow-lg hover:scale-[1.02] cursor-pointer hover:border-primary/50" : "hover:shadow-md"
+        isClickable
+          ? "hover:shadow-lg hover:scale-[1.02] cursor-pointer hover:border-primary/50"
+          : "hover:shadow-md"
       }`}
       onClick={isClickable ? handleCardClick : undefined}
     >
@@ -71,7 +92,9 @@ export function DeliveryCard({ delivery, onConfirmLoad, onViewDetails, showActio
         <div className="flex items-start justify-between">
           <div className="flex items-center gap-2">
             <Truck className="h-5 w-5 text-muted-foreground" />
-            <span className="font-semibold text-lg">{delivery.truck?.placa || "Sin placa"}</span>
+            <span className="font-semibold text-lg">
+              {delivery.truck?.placa || "Sin placa"}
+            </span>
           </div>
           <Badge className={statusConfig.color}>
             <StatusIcon className="h-3 w-3 mr-1" />
@@ -81,32 +104,36 @@ export function DeliveryCard({ delivery, onConfirmLoad, onViewDetails, showActio
       </CardHeader>
 
       <CardContent className="space-y-3">
-         {delivery.loadPhoto && (
-            <div className="relative h-40 w-full overflow-hidden rounded-md border group">
-                 <Image
-                    src={delivery.loadPhoto}
-                    alt={`Foto de carga para ${delivery.truck?.placa}`}
-                    layout="fill"
-                    objectFit="cover"
-                    className="transition-transform duration-300 group-hover:scale-105"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
-                <div className="absolute bottom-2 left-2 flex items-center gap-1 text-xs text-white bg-black/50 px-2 py-1 rounded">
-                    <Camera className="h-3 w-3" />
-                    <span>Foto de Caja</span>
-                </div>
+        {delivery.loadPhoto && (
+          <div className="relative h-40 w-full overflow-hidden rounded-md border group">
+            <Image
+              src={delivery.loadPhoto}
+              alt={`Foto de carga para ${delivery.truck?.placa}`}
+              layout="fill"
+              objectFit="cover"
+              className="transition-transform duration-300 group-hover:scale-105"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
+            <div className="absolute bottom-2 left-2 flex items-center gap-1 text-xs text-white bg-black/50 px-2 py-1 rounded">
+              <Camera className="h-3 w-3" />
+              <span>Foto de Caja</span>
             </div>
+          </div>
         )}
 
         <div className="space-y-2">
           <div className="flex items-center gap-2 text-sm">
             <span className="font-medium">Cliente:</span>
-            <span className="text-muted-foreground">{delivery.order?.client?.nombre || "Sin cliente"}</span>
+            <span className="text-muted-foreground">
+              {delivery.order?.client?.name || "Sin cliente"}
+            </span>
           </div>
           {delivery.order?.destination && (
             <div className="flex items-center gap-2 text-sm">
               <MapPin className="h-4 w-4 text-muted-foreground" />
-              <span className="text-muted-foreground">{delivery.order.destination.nombre}</span>
+              <span className="text-muted-foreground">
+                {delivery.order.destination.name}
+              </span>
             </div>
           )}
         </div>
@@ -118,9 +145,11 @@ export function DeliveryCard({ delivery, onConfirmLoad, onViewDetails, showActio
             <span className="font-medium text-sm">Material</span>
           </div>
           <div className="text-sm">
-            <div className="font-medium">{delivery.product?.nombre || "Sin producto"}</div>
+            <div className="font-medium">
+              {delivery.product?.name || "Sin producto"}
+            </div>
             <div className="text-muted-foreground">
-              {delivery.product?.unit || 'N/A'}
+              {delivery.product?.unit || "N/A"}
             </div>
           </div>
         </div>
@@ -134,11 +163,15 @@ export function DeliveryCard({ delivery, onConfirmLoad, onViewDetails, showActio
         </div>
 
         {delivery.loadedAt && (
-          <div className="text-xs text-muted-foreground">Cargado: {new Date(delivery.loadedAt).toLocaleString()}</div>
+          <div className="text-xs text-muted-foreground">
+            Cargado: {new Date(delivery.loadedAt).toLocaleString()}
+          </div>
         )}
 
         {delivery.exitedAt && (
-          <div className="text-xs text-muted-foreground">Salida: {new Date(delivery.exitedAt).toLocaleString()}</div>
+          <div className="text-xs text-muted-foreground">
+            Salida: {new Date(delivery.exitedAt).toLocaleString()}
+          </div>
         )}
       </CardContent>
 
@@ -148,7 +181,7 @@ export function DeliveryCard({ delivery, onConfirmLoad, onViewDetails, showActio
             <Button
               onClick={(e) => {
                 e.stopPropagation();
-                if(onConfirmLoad) onConfirmLoad(delivery.id);
+                if (onConfirmLoad) onConfirmLoad(delivery.id);
               }}
               className="flex-1"
               size="sm"
@@ -163,7 +196,7 @@ export function DeliveryCard({ delivery, onConfirmLoad, onViewDetails, showActio
               variant="outline"
               onClick={(e) => {
                 e.stopPropagation();
-                if(onViewDetails) onViewDetails(delivery.id);
+                if (onViewDetails) onViewDetails(delivery.id);
               }}
               size="sm"
             >
@@ -173,5 +206,5 @@ export function DeliveryCard({ delivery, onConfirmLoad, onViewDetails, showActio
         </CardFooter>
       )}
     </Card>
-  )
+  );
 }

@@ -170,9 +170,7 @@ export function UsersClientUI({ initialUsers }: { initialUsers: User[] }) {
               prevUsers.map((u) => (u.id === updatedUser.id ? updatedUser : u))
             );
             toast.success(
-              `Usuario ${
-                !is_active ? "activado" : "desactivado"
-              } exitosamente.`
+              `Usuario ${!is_active ? "activado" : "desactivado"} exitosamente.`
             );
           } catch (err: any) {
             toast.error("Error al cambiar el estado", {
@@ -229,7 +227,7 @@ export function UsersClientUI({ initialUsers }: { initialUsers: User[] }) {
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-5 w-5" />
             <Input
-              placeholder="Buscar por nombre o correo electrónico..."
+              placeholder="Buscar por name o correo electrónico..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-12 h-12 text-lg focus-ring"
@@ -285,9 +283,7 @@ export function UsersClientUI({ initialUsers }: { initialUsers: User[] }) {
                       </p>
                       <Badge
                         variant={user.is_active ? "default" : "secondary"}
-                        className={
-                          user.is_active ? "bg-gradient-primary" : ""
-                        }
+                        className={user.is_active ? "bg-gradient-primary" : ""}
                       >
                         {user.is_active ? "Activo" : "Inactivo"}
                       </Badge>

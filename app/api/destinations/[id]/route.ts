@@ -1,9 +1,9 @@
 // app/api/destinations/[id]/route.ts
 import { NextResponse } from "next/server";
 import { executeQuery, TYPES } from "@/lib/db";
-import { revalidateTag } from 'next/cache'; // Importamos revalidateTag
+import { revalidateTag } from "next/cache"; // Importamos revalidateTag
 
-export const dynamic = 'force-dynamic'
+export const dynamic = "force-dynamic";
 
 /**
  * @route GET /api/destinations/[id]
@@ -48,12 +48,12 @@ export async function PATCH(
     const queryParams: any[] = [{ name: "id", type: TYPES.Int, value: id }];
 
     // Construimos la consulta dinámicamente solo con los campos que vienen en el body
-    if (body.nombre !== undefined) {
+    if (body.name !== undefined) {
       updates.push("name = @name");
       queryParams.push({
         name: "name",
         type: TYPES.NVarChar,
-        value: body.nombre,
+        value: body.name,
       });
     }
     if (body.direccion !== undefined) {
@@ -101,7 +101,7 @@ export async function PATCH(
     }
 
     // ✨ INVALIDACIÓN DEL CACHÉ
-    revalidateTag('destinations');
+    revalidateTag("destinations");
 
     return NextResponse.json(result[0]);
   } catch (error) {
@@ -127,9 +127,9 @@ export async function DELETE(
     await executeQuery(query, [
       { name: "id", type: TYPES.Int, value: params.id },
     ]);
-    
+
     // ✨ INVALIDACIÓN DEL CACHÉ
-    revalidateTag('destinations');
+    revalidateTag("destinations");
 
     return NextResponse.json({ message: "Destino desactivado correctamente" });
   } catch (error) {

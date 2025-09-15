@@ -1,90 +1,114 @@
 // app/api/drivers/[id]/route.ts
-import { NextResponse } from 'next/server';
-import { executeQuery, TYPES } from '@/lib/db';
-import { revalidateTag } from 'next/cache'; // Importamos revalidateTag
+import { NextResponse } from "next/server";
+import { executeQuery, TYPES } from "@/lib/db";
+import { revalidateTag } from "next/cache"; // Importamos revalidateTag
 
 /**
  * @route PATCH /api/drivers/[id]
  * @desc Actualizar un chofer dinámicamente en la base de datos.
  */
-export async function PATCH(request: Request, { params }: { params: { id: string } }) {
-    try {
-        const id = parseInt(params.id, 10);
-        if (isNaN(id)) return new NextResponse('ID inválido', { status: 400 });
+export async function PATCH(
+  request: Request,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const id = parseInt(params.id, 10);
+    if (isNaN(id)) return new NextResponse("ID inválido", { status: 400 });
 
-        const body = await request.json();
-        
-        const updates: string[] = [];
-        const queryParams: any[] = [{ name: 'id', type: TYPES.Int, value: id }];
+    const body = await request.json();
 
-        if (body.nombre !== undefined) {
-            updates.push("nombre = @nombre");
-            queryParams.push({ name: 'nombre', type: TYPES.NVarChar, value: body.nombre });
-        }
-        if (body.docId !== undefined) {
-            updates.push("docId = @docId");
-            queryParams.push({ name: 'docId', type: TYPES.NVarChar, value: body.docId });
-        }
-        if (body.phone !== undefined) {
-            updates.push("phone = @phone");
-            queryParams.push({ name: 'phone', type: TYPES.NVarChar, value: body.phone });
-        }
-        if (body.is_active !== undefined) {
-            updates.push("is_active = @is_active");
-            queryParams.push({ name: 'is_active', type: TYPES.Bit, value: body.is_active });
-        }
+    const updates: string[] = [];
+    const queryParams: any[] = [{ name: "id", type: TYPES.Int, value: id }];
 
-        if (updates.length === 0) {
-            const currentDriver = await executeQuery("SELECT * FROM RIP.APP_CHOFERES WHERE id = @id", queryParams);
-            return NextResponse.json(currentDriver[0]);
-        }
-        
-        updates.push("updated_at = GETDATE()");
+    if (body.name !== undefined) {
+      updates.push("name = @name");
+      queryParams.push({
+        name: "name",
+        type: TYPES.NVarChar,
+        value: body.name,
+      });
+    }
+    if (body.docId !== undefined) {
+      updates.push("docId = @docId");
+      queryParams.push({
+        name: "docId",
+        type: TYPES.NVarChar,
+        value: body.docId,
+      });
+    }
+    if (body.phone !== undefined) {
+      updates.push("phone = @phone");
+      queryParams.push({
+        name: "phone",
+        type: TYPES.NVarChar,
+        value: body.phone,
+      });
+    }
+    if (body.is_active !== undefined) {
+      updates.push("is_active = @is_active");
+      queryParams.push({
+        name: "is_active",
+        type: TYPES.Bit,
+        value: body.is_active,
+      });
+    }
 
-        const query = `
-            UPDATE RIP.APP_CHOFERES SET ${updates.join(', ')}
-            OUTPUT INSERTED.id, INSERTED.nombre, INSERTED.docId, INSERTED.phone, INSERTED.is_active
+    if (updates.length === 0) {
+      const currentDriver = await executeQuery(
+        "SELECT * FROM RIP.APP_CHOFERES WHERE id = @id",
+        queryParams
+      );
+      return NextResponse.json(currentDriver[0]);
+    }
+
+    updates.push("updated_at = GETDATE()");
+
+    const query = `
+            UPDATE RIP.APP_CHOFERES SET ${updates.join(", ")}
+            OUTPUT INSERTED.id, INSERTED.name, INSERTED.docId, INSERTED.phone, INSERTED.is_active
             WHERE id = @id;
         `;
 
-        const result = await executeQuery(query, queryParams);
-        
-        // ✨ INVALIDACIÓN DEL CACHÉ
-        revalidateTag('drivers');
+    const result = await executeQuery(query, queryParams);
 
-        return NextResponse.json(result[0]);
+    // ✨ INVALIDACIÓN DEL CACHÉ
+    revalidateTag("drivers");
 
-    } catch (error) {
-        console.error('[API_DRIVERS_PATCH]', error);
-        return new NextResponse('Error al actualizar el chofer', { status: 500 });
-    }
+    return NextResponse.json(result[0]);
+  } catch (error) {
+    console.error("[API_DRIVERS_PATCH]", error);
+    return new NextResponse("Error al actualizar el chofer", { status: 500 });
+  }
 }
 
 /**
  * @route DELETE /api/drivers/[id]
  * @desc Desactivar un chofer (borrado lógico)
  */
-export async function DELETE(request: Request, { params }: { params: { id: string } }) {
-    try {
-        const id = parseInt(params.id, 10);
-        if (isNaN(id)) {
-            return new NextResponse('ID de chofer inválido', { status: 400 });
-        }
+export async function DELETE(
+  request: Request,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const id = parseInt(params.id, 10);
+    if (isNaN(id)) {
+      return new NextResponse("ID de chofer inválido", { status: 400 });
+    }
 
-        const query = `
+    const query = `
             UPDATE RIP.APP_CHOFERES
             SET is_active = 0, updated_at = GETDATE()
             WHERE id = @id;
         `;
-        
-        await executeQuery(query, [{ name: 'id', type: TYPES.Int, value: id }]);
-        
-        // ✨ INVALIDACIÓN DEL CACHÉ
-        revalidateTag('drivers');
 
-        return NextResponse.json({ message: 'Chofer desactivado correctamente' });
-    } catch (error) {
-        console.error(`[API_DRIVERS_DELETE]`, error);
-        return new NextResponse('Error al desactivar el chofer', { status: 500 });
-    }
+    await executeQuery(query, [{ name: "id", type: TYPES.Int, value: id }]);
+
+    // ✨ INVALIDACIÓN DEL CACHÉ
+    revalidateTag("drivers");
+
+    return NextResponse.json({ message: "Chofer desactivado correctamente" });
+  } catch (error) {
+    console.error(`[API_DRIVERS_DELETE]`, error);
+    return new NextResponse("Error al desactivar el chofer", { status: 500 });
+  }
 }

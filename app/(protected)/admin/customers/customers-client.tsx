@@ -7,12 +7,7 @@ import { useState, useCallback, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
@@ -55,7 +50,7 @@ export function CustomersClientUI({
     null
   );
   const [formData, setFormData] = useState({
-    nombre: "",
+    name: "",
     rif: "",
     address: "",
     email: "",
@@ -72,7 +67,7 @@ export function CustomersClientUI({
     () =>
       customers.filter(
         (customer) =>
-          customer.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          customer.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
           (customer.rif &&
             customer.rif.toLowerCase().includes(searchTerm.toLowerCase()))
       ),
@@ -82,7 +77,7 @@ export function CustomersClientUI({
   // 3. Envolver las funciones en `useCallback`
   const handleNewCustomer = useCallback(() => {
     setEditingCustomer(null);
-    setFormData({ nombre: "", rif: "", address: "", email: "", phone: "" });
+    setFormData({ name: "", rif: "", address: "", email: "", phone: "" });
     setApiError(null);
     setShowDialog(true);
   }, []);
@@ -90,7 +85,7 @@ export function CustomersClientUI({
   const handleEditCustomer = useCallback((customer: ClientType) => {
     setEditingCustomer(customer);
     setFormData({
-      nombre: customer.nombre,
+      name: customer.name,
       rif: customer.rif || "",
       address: customer.address || "",
       email: customer.email || "",
@@ -156,7 +151,7 @@ export function CustomersClientUI({
           title: `¿Estás seguro?`,
           description: `Esta acción ${
             is_active ? "desactivará" : "activará"
-          } al cliente "${customer.nombre}".`,
+          } al cliente "${customer.name}".`,
           confirmText: is_active ? "Desactivar" : "Activar",
           variant: is_active ? "destructive" : "default",
         },
@@ -175,9 +170,7 @@ export function CustomersClientUI({
               )
             );
             toast.success(
-              `Cliente ${
-                !is_active ? "activado" : "desactivado"
-              } exitosamente.`
+              `Cliente ${!is_active ? "activado" : "desactivado"} exitosamente.`
             );
           } catch (err: any) {
             toast.error("Error al cambiar el estado", {
@@ -234,7 +227,7 @@ export function CustomersClientUI({
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-5 w-5" />
             <Input
-              placeholder="Buscar por nombre o RIF..."
+              placeholder="Buscar por name o RIF..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-12 h-12 text-lg focus-ring"
@@ -279,7 +272,7 @@ export function CustomersClientUI({
                 <div className="flex justify-between items-start">
                   <div className="flex-1">
                     <CardTitle className="text-xl font-bold bg-gradient-to-r from-foreground to-muted-foreground bg-clip-text text-transparent">
-                      {customer.nombre}
+                      {customer.name}
                     </CardTitle>
                     <p className="text-sm text-muted-foreground mt-1 font-medium">
                       {customer.rif || "Sin RIF"}
@@ -361,14 +354,14 @@ export function CustomersClientUI({
           <form onSubmit={handleSubmit} className="space-y-6 pt-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="nombre" className="font-semibold">
+                <Label htmlFor="name" className="font-semibold">
                   Nombre / Razón Social *
                 </Label>
                 <Input
-                  id="nombre"
-                  value={formData.nombre}
+                  id="name"
+                  value={formData.name}
                   onChange={(e) =>
-                    setFormData({ ...formData, nombre: e.target.value })
+                    setFormData({ ...formData, name: e.target.value })
                   }
                   placeholder="Ej: Constructora XYZ C.A."
                   required
@@ -449,7 +442,7 @@ export function CustomersClientUI({
               </Button>
               <GradientButton
                 type="submit"
-                disabled={isSubmitting || !formData.nombre}
+                disabled={isSubmitting || !formData.name}
               >
                 {isSubmitting ? (
                   <>

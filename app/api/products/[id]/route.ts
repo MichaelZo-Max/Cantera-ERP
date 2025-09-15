@@ -2,7 +2,7 @@
 import { NextResponse } from "next/server";
 import { executeQuery, TYPES } from "@/lib/db";
 
-export const dynamic = 'force-dynamic'
+export const dynamic = "force-dynamic";
 
 async function getProductById(id: number) {
   const sql = `
@@ -20,7 +20,7 @@ async function getProductById(id: number) {
   const r = rows[0];
   return {
     id: r.id.toString(),
-    nombre: r.name ?? "",
+    name: r.name ?? "",
     refProveedor: r.codigo ?? "",
     description: r.name ?? "", // Usar 'name' también para 'description'
     price_per_unit: r.price_per_unit ? Number(r.price_per_unit) : 0,

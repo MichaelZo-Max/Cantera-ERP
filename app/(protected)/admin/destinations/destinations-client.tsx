@@ -7,12 +7,7 @@ import { useState, useCallback, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
@@ -62,9 +57,9 @@ export function DestinationsClientUI({
   const [editingDestination, setEditingDestination] =
     useState<Destination | null>(null);
   const [formData, setFormData] = useState({
-    nombre: "",
+    name: "",
     direccion: "",
-    clientId: "",
+    customer_id: "",
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
@@ -76,13 +71,13 @@ export function DestinationsClientUI({
     () =>
       destinations.filter(
         (destination) =>
-          destination.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          destination.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
           (destination.direccion &&
             destination.direccion
               .toLowerCase()
               .includes(searchTerm.toLowerCase())) ||
-          (destination.client?.nombre &&
-            destination.client.nombre
+          (destination.client?.name &&
+            destination.client.name
               .toLowerCase()
               .includes(searchTerm.toLowerCase()))
       ),
@@ -92,7 +87,7 @@ export function DestinationsClientUI({
   // 3. Envolver las funciones en `useCallback`
   const handleNewDestination = useCallback(() => {
     setEditingDestination(null);
-    setFormData({ nombre: "", direccion: "", clientId: "" });
+    setFormData({ name: "", direccion: "", customer_id: "" });
     setApiError(null);
     setShowDialog(true);
   }, []);
@@ -100,9 +95,9 @@ export function DestinationsClientUI({
   const handleEditDestination = useCallback((destination: Destination) => {
     setEditingDestination(destination);
     setFormData({
-      nombre: destination.nombre,
+      name: destination.name,
       direccion: destination.direccion || "",
-      clientId: destination.clientId || "",
+      customer_id: destination.customer_id || "",
     });
     setApiError(null);
     setShowDialog(true);
@@ -164,7 +159,7 @@ export function DestinationsClientUI({
           title: `¿Estás seguro?`,
           description: `Esta acción ${
             is_active ? "desactivará" : "activará"
-          } el destino "${destination.nombre}".`,
+          } el destino "${destination.name}".`,
           confirmText: is_active ? "Desactivar" : "Activar",
           variant: is_active ? "destructive" : "default",
         },
@@ -184,9 +179,7 @@ export function DestinationsClientUI({
               )
             );
             toast.success(
-              `Destino ${
-                !is_active ? "activado" : "desactivado"
-              } exitosamente.`
+              `Destino ${!is_active ? "activado" : "desactivado"} exitosamente.`
             );
           } catch (err: any) {
             toast.error("Error al cambiar el estado", {
@@ -243,7 +236,7 @@ export function DestinationsClientUI({
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-5 w-5" />
             <Input
-              placeholder="Buscar por nombre, dirección o cliente..."
+              placeholder="Buscar por name, dirección o cliente..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-12 h-12 text-lg focus-ring"
@@ -288,10 +281,10 @@ export function DestinationsClientUI({
                 <div className="flex justify-between items-start">
                   <div className="flex-1">
                     <p className="text-xs text-primary font-semibold">
-                      {destination.client?.nombre || "Cliente no asignado"}
+                      {destination.client?.name || "Cliente no asignado"}
                     </p>
                     <CardTitle className="text-xl font-bold bg-gradient-to-r from-foreground to-muted-foreground bg-clip-text text-transparent">
-                      {destination.nombre}
+                      {destination.name}
                     </CardTitle>
                   </div>
                   <Badge
@@ -319,9 +312,7 @@ export function DestinationsClientUI({
                     <span>Editar</span>
                   </Button>
                   <Button
-                    variant={
-                      destination.is_active ? "destructive" : "default"
-                    }
+                    variant={destination.is_active ? "destructive" : "default"}
                     size="sm"
                     onClick={() => handleToggleStatus(destination)}
                     className="flex items-center space-x-1 transition-smooth"
@@ -358,13 +349,13 @@ export function DestinationsClientUI({
           </DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-6 pt-4">
             <div className="space-y-2">
-              <Label htmlFor="clientId" className="font-semibold">
+              <Label htmlFor="customer_id" className="font-semibold">
                 Cliente *
               </Label>
               <Select
-                value={formData.clientId}
+                value={formData.customer_id}
                 onValueChange={(value) =>
-                  setFormData({ ...formData, clientId: value })
+                  setFormData({ ...formData, customer_id: value })
                 }
                 required
               >
@@ -374,21 +365,21 @@ export function DestinationsClientUI({
                 <SelectContent>
                   {clients.map((client) => (
                     <SelectItem key={client.id} value={String(client.id)}>
-                      {client.nombre}
+                      {client.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="nombre" className="font-semibold">
+              <Label htmlFor="name" className="font-semibold">
                 Nombre del Destino *
               </Label>
               <Input
-                id="nombre"
-                value={formData.nombre}
+                id="name"
+                value={formData.name}
                 onChange={(e) =>
-                  setFormData({ ...formData, nombre: e.target.value })
+                  setFormData({ ...formData, name: e.target.value })
                 }
                 placeholder="Ej: Obra principal, Sucursal Centro"
                 required
@@ -423,7 +414,7 @@ export function DestinationsClientUI({
               <GradientButton
                 type="submit"
                 disabled={
-                  isSubmitting || !formData.nombre || !formData.clientId
+                  isSubmitting || !formData.name || !formData.customer_id
                 }
               >
                 {isSubmitting ? (
@@ -434,9 +425,7 @@ export function DestinationsClientUI({
                 ) : (
                   <>
                     <Save className="h-4 w-4 mr-2" />
-                    {editingDestination
-                      ? "Guardar Cambios"
-                      : "Crear Destino"}
+                    {editingDestination ? "Guardar Cambios" : "Crear Destino"}
                   </>
                 )}
               </GradientButton>

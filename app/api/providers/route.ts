@@ -1,8 +1,8 @@
 // app/api/providers/route.ts
-import { NextResponse } from 'next/server';
-import { executeQuery } from '@/lib/db';
+import { NextResponse } from "next/server";
+import { executeQuery } from "@/lib/db";
 
-export const dynamic = 'force-dynamic'
+export const dynamic = "force-dynamic";
 
 /**
  * @route GET /api/providers
@@ -22,16 +22,16 @@ export async function GET() {
         NOMPROVEEDOR ASC;
     `;
     const providers = await executeQuery(query);
-    
+
     // Mapeamos a un formato más amigable para el frontend
     const out = providers.map((p: any) => ({
       id: p.CODPROVEEDOR,
-      nombre: p.NOMPROVEEDOR
+      name: p.NOMPROVEEDOR,
     }));
 
     return NextResponse.json(out);
   } catch (error) {
-    console.error('[API_PROVIDERS_GET]', error);
-    return new NextResponse('Error al obtener proveedores', { status: 500 });
+    console.error("[API_PROVIDERS_GET]", error);
+    return new NextResponse("Error al obtener proveedores", { status: 500 });
   }
 }

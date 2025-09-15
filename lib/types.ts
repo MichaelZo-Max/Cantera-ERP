@@ -41,7 +41,7 @@ export interface User {
 
 export interface Client {
   id: string;
-  nombre: string;
+  name: string;
   rif?: string;
   address?: string;
   phone?: string;
@@ -53,11 +53,11 @@ export interface Client {
 
 export interface Destination {
   id: string;
-  clientId: string;
+  customer_id: string;
   client?: {
-    nombre: string | null;
+    name: string | null;
   };
-  nombre: string;
+  name: string;
   direccion?: string;
   is_active: boolean;
   createdAt: Date;
@@ -67,7 +67,7 @@ export interface Destination {
 export interface Product {
   id: string;
   refProveedor: string;
-  nombre: string;
+  name: string;
   description?: string;
   price_per_unit?: number;
   unit?: UnitBase;
@@ -78,7 +78,7 @@ export interface Product {
 
 export interface Driver {
   id: string;
-  nombre: string;
+  name: string;
   docId?: string;
   phone?: string;
   is_active: boolean;
@@ -103,7 +103,7 @@ export interface Truck {
 export interface Order {
   id: string;
   orderNumber?: string;
-  clientId: string;
+  customer_id: string;
   client?: Client;
   destinationId?: string;
   destination?: Destination;
@@ -165,7 +165,7 @@ export interface DispatchGuide {
 }
 
 export interface CreateOrderForm {
-  clientId: string;
+  customer_id: string;
   destinationId?: string;
   items: {
     productId: string;

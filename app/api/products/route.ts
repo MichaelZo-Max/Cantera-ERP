@@ -1,9 +1,9 @@
 // app/api/products/route.ts
 import { NextResponse } from "next/server";
 import { executeQuery } from "@/lib/db";
-import { revalidateTag } from 'next/cache';
+import { revalidateTag } from "next/cache";
 
-export const dynamic = 'force-dynamic'
+export const dynamic = "force-dynamic";
 
 /**
  * @route   GET /api/products
@@ -27,7 +27,7 @@ export async function GET() {
 
     const out = rows.map((r: any) => ({
       id: r.id.toString(),
-      nombre: r.name ?? "",
+      name: r.name ?? "",
       refProveedor: r.codigo ?? null,
       description: r.name ?? null, // Usar 'name' también para 'description'
       price_per_unit: r.price_per_unit != null ? Number(r.price_per_unit) : 0,

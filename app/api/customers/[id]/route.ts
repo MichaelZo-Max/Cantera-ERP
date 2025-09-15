@@ -1,9 +1,9 @@
 // app/api/customers/[id]/route.ts
 import { NextResponse } from "next/server";
 import { executeQuery, TYPES } from "@/lib/db";
-import { revalidateTag } from 'next/cache'; // Importamos revalidateTag
+import { revalidateTag } from "next/cache"; // Importamos revalidateTag
 
-export const dynamic = 'force-dynamic'
+export const dynamic = "force-dynamic";
 
 // Utilidad para traer un cliente y mapearlo como lo espera el front
 async function fetchCustomerById(id: number) {
@@ -26,7 +26,7 @@ async function fetchCustomerById(id: number) {
   if (!r) return null;
   return {
     id: r.CODCLIENTE,
-    nombre: r.NOMBRECLIENTE ?? "",
+    name: r.NOMBRECLIENTE ?? "",
     rif: r.NIF20 ?? null,
     address: r.DIRECCION1 ?? null,
     phone: r.TELEFONO1 ?? null,
@@ -50,8 +50,8 @@ export async function PATCH(
 
     // La página manda el mismo objeto Client + is_active cuando hace toggle:
     // { ...customer, is_active: !is_active }
-    const nombre =
-      body?.nombre !== undefined ? String(body.nombre).trim() : undefined;
+    const name =
+      body?.name !== undefined ? String(body.name).trim() : undefined;
     const rif = body?.rif !== undefined ? String(body.rif).trim() : undefined;
     const address =
       body?.address !== undefined ? String(body.address).trim() : undefined;
@@ -70,12 +70,12 @@ export async function PATCH(
     const sets: string[] = [];
     const paramsArr: any[] = [{ name: "id", type: TYPES.Int, value: id }];
 
-    if (nombre !== undefined) {
+    if (name !== undefined) {
       sets.push("NOMBRECLIENTE = @nombreCliente");
       paramsArr.push({
         name: "nombreCliente",
         type: TYPES.NVarChar,
-        value: nombre || null,
+        value: name || null,
         options: { length: 200 },
       });
     }
@@ -156,16 +156,16 @@ export async function PATCH(
 
     const updated = {
       id: r.CODCLIENTE,
-      nombre: r.NOMBRECLIENTE ?? "",
+      name: r.NOMBRECLIENTE ?? "",
       rif: r.NIF20 ?? null,
       address: r.DIRECCION1 ?? null,
       phone: r.TELEFONO1 ?? null,
       email: r.E_MAIL ?? null,
       is_active: (r.DESCATALOGADO ?? "F").toString().toUpperCase() !== "T",
     };
-    
+
     // ✨ INVALIDACIÓN DEL CACHÉ
-    revalidateTag('customers');
+    revalidateTag("customers");
 
     return NextResponse.json(updated);
   } catch (e) {

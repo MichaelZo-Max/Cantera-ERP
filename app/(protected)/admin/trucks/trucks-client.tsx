@@ -79,8 +79,8 @@ export function TrucksClientUI({
             truck.brand.toLowerCase().includes(searchTerm.toLowerCase())) ||
           (truck.model &&
             truck.model.toLowerCase().includes(searchTerm.toLowerCase())) ||
-          (truck.driver?.nombre &&
-            truck.driver.nombre.toLowerCase().includes(searchTerm.toLowerCase()))
+          (truck.driver?.name &&
+            truck.driver.name.toLowerCase().includes(searchTerm.toLowerCase()))
       ),
     [trucks, searchTerm]
   );
@@ -185,9 +185,7 @@ export function TrucksClientUI({
               )
             );
             toast.success(
-              `Camión ${
-                !is_active ? "activado" : "desactivado"
-              } exitosamente.`
+              `Camión ${!is_active ? "activado" : "desactivado"} exitosamente.`
             );
           } catch (err: any) {
             toast.error("Error al cambiar el estado", {
@@ -317,7 +315,7 @@ export function TrucksClientUI({
                   )}
                   <div className="bg-gradient-to-r from-secondary/10 to-accent/10 border border-secondary/20 p-3 rounded-xl flex-1 ml-2">
                     <p className="text-lg font-bold bg-gradient-to-r from-secondary to-accent bg-clip-text text-transparent truncate">
-                      {truck.driver?.nombre || "Sin chofer"}
+                      {truck.driver?.name || "Sin chofer"}
                     </p>
                     <p className="text-sm text-secondary/80 font-medium">
                       Chofer
@@ -454,7 +452,7 @@ export function TrucksClientUI({
                   <SelectContent>
                     {drivers.map((driver) => (
                       <SelectItem key={driver.id} value={String(driver.id)}>
-                        {driver.nombre}
+                        {driver.name}
                       </SelectItem>
                     ))}
                   </SelectContent>
