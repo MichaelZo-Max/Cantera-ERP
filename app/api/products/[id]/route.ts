@@ -7,7 +7,7 @@ export const dynamic = 'force-dynamic'
 async function getProductById(id: number) {
   const sql = `
     SELECT
-      id, codigo, name, description,
+      id, codigo, name,
       price_per_unit, unit, is_active
     FROM RIP.VW_APP_PRODUCTOS
     WHERE id = @id;
@@ -22,7 +22,7 @@ async function getProductById(id: number) {
     id: r.id.toString(),
     nombre: r.name ?? "",
     refProveedor: r.codigo ?? "",
-    description: r.description ?? "",
+    description: r.name ?? "", // Usar 'name' también para 'description'
     price_per_unit: r.price_per_unit ? Number(r.price_per_unit) : 0,
     unit: r.unit,
     is_active: r.is_active,

@@ -16,7 +16,6 @@ export async function GET() {
         id,
         codigo,
         name,
-        description,
         price_per_unit,
         unit,
         is_active
@@ -30,7 +29,7 @@ export async function GET() {
       id: r.id.toString(),
       nombre: r.name ?? "",
       refProveedor: r.codigo ?? null,
-      description: r.description ?? null,
+      description: r.name ?? null, // Usar 'name' también para 'description'
       price_per_unit: r.price_per_unit != null ? Number(r.price_per_unit) : 0,
       unit: r.unit ?? null,
       is_active: r.is_active,
@@ -42,5 +41,3 @@ export async function GET() {
     return new NextResponse("Error al obtener productos", { status: 500 });
   }
 }
-
-// La función POST ha sido eliminada.
