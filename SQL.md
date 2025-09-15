@@ -391,3 +391,50 @@ DROP COLUMN truck_id;
 GO
 
 PRINT '¡Éxito! La clave foránea y la columna truck_id han sido eliminadas correctamente de RIP.APP_PEDIDOS.';
+-- =================================================================
+-- SCRIPT DE CORRECCIÓN FINAL Y ESTANDARIZACIÓN A INGLÉS
+-- Propósito: Renombrar la columna de nombre del chofer a 'name'
+-- y asegurar que la vista de despachos la use correctamente.
+-- =================================================================
+
+-- LOTE 1: ESTANDARIZAR LA COLUMNA DE NOMBRE A 'name'
+-- =================================================================
+-- Se renombra la columna 'nombre' a 'name' en la tabla de choferes
+-- solo si la columna 'nombre' existe.
+IF EXISTS (SELECT 1 FROM sys.columns WHERE Name = N'nombre' AND Object_ID = Object_ID(N'RIP.APP_CHOFERES'))
+BEGIN
+    EXEC sp_rename 'RIP.APP_CHOFERES.nombre', 'name', 'COLUMN';
+    PRINT 'Éxito: La columna ''nombre'' ha sido renombrada a ''name'' en la tabla RIP.APP_CHOFERES.';
+END
+GO -- Fin del lote
+
+-- LOTE 2: RECREAR LA VISTA DE DESPACHOS CON EL NOMBRE CORRECTO
+-- =================================================================
+-- Esta es la versión final que usa 'name' de la tabla de choferes.
+CREATE OR ALTER VIEW RIP.VW_APP_DESPACHOS
+AS
+SELECT
+    d.id,
+    d.order_id,
+    d.camion_id,
+    d.conductor_id,
+    d.status AS estado,
+    d.created_at,
+    d.updated_at,
+    d.notes,
+    d.loaded_at AS loadedAt,
+    d.load_photo_url AS loadPhoto,
+    d.exited_at AS exitedAt,
+    d.exit_photo_url AS exitPhoto,
+    -- JSON para el pedido (order)
+    (SELECT * FROM RIP.VW_APP_PEDIDOS p WHERE p.id = d.order_id FOR JSON PATH, WITHOUT_ARRAY_WRAPPER) AS [order],
+    -- JSON para el camión (truck)
+    (SELECT t.id, t.placa, t.brand, t.model, t.capacity FROM RIP.APP_CAMIONES t WHERE t.id = d.camion_id FOR JSON PATH, WITHOUT_ARRAY_WRAPPER) AS truck,
+    -- JSON para el conductor (driver) - CORREGIDO
+    (SELECT dr.id, dr.name, dr.docId FROM RIP.APP_CHOFERES dr WHERE dr.id = d.conductor_id FOR JSON PATH, WITHOUT_ARRAY_WRAPPER) AS driver
+FROM
+    RIP.APP_DESPACHOS d;
+GO -- Fin del lote
+
+PRINT 'Vista RIP.VW_APP_DESPACHOS creada/actualizada con el nombre de columna estandarizado.';
+PRINT '¡Listo! La base de datos está ahora completamente alineada y estandarizada.';

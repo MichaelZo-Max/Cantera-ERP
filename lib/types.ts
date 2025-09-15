@@ -118,7 +118,7 @@ export interface Order {
 }
 
 export interface Delivery {
-  id: number;
+  delivery_id: number;
   estado: DeliveryStatus;
   order: Order;
   truck: Truck;

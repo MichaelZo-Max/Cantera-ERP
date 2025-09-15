@@ -1,10 +1,10 @@
 "use client";
 
-import React, { useState, useMemo, useCallback, useEffect } from "react";
+import React, { useState, useMemo, useCallback } from "react";
 import Image from "next/image";
 import { toast } from "sonner";
 import { useAuth } from "@/components/auth-provider";
-import type { Delivery, Order, OrderItem as OrderItemType, Truck as TruckType, Driver } from "@/lib/types";
+import type { Delivery, Order, OrderItem as OrderItemType, Truck as TruckType, Driver, DeliveryItem } from "@/lib/types";
 
 // --- UI Components ---
 import { Button } from "@/components/ui/button";
@@ -24,6 +24,11 @@ interface LoadedItem {
   dispatched_quantity: number; // The quantity loaded in this specific trip
 }
 
+// **NUEVO TIPO para manejar las cantidades de forma más clara**
+interface DisplayOrderItem extends OrderItemType {
+  pending_quantity: number; // Cantidad que realmente falta por despachar
+}
+
 interface YardClientProps {
   initialDeliveries: Delivery[];
   initialActiveOrders: Order[];
@@ -38,10 +43,11 @@ const DeliveryCard = React.memo(({ delivery, onSelect }: { delivery: Delivery; o
             <div className="flex justify-between items-start">
                 <div>
                     <p className="font-bold text-lg flex items-center gap-2"><TruckIcon className="h-5 w-5" /> {delivery.truck.placa}</p>
-                    <p className="text-sm text-muted-foreground">Despacho ID: {delivery.id}</p>
+                    <p className="text-sm text-muted-foreground">Despacho ID: {delivery.delivery_id}</p>
                 </div>
                 <Badge variant={delivery.estado === "CARGADA" ? "default" : "secondary"}>
-                    Pedido #{delivery.order.orderNumber}
+                    {/* CORREGIDO: order_number en lugar de orderNumber */}
+                    Pedido #{delivery.order.order_number}
                 </Badge>
             </div>
         </CardHeader>
@@ -90,6 +96,7 @@ export function YardDeliveriesClientUI({
 
   // Confirm Load Modal State
   const [loadedItems, setLoadedItems] = useState<LoadedItem[]>([]);
+  const [displayOrderItems, setDisplayOrderItems] = useState<DisplayOrderItem[]>([]);
   const [notes, setNotes] = useState("");
   const [loadPhoto, setLoadPhoto] = useState<File | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -102,7 +109,7 @@ export function YardDeliveriesClientUI({
         (d.truck.placa?.toLowerCase() ?? "").includes(query) ||
         (d.driver.name?.toLowerCase() ?? "").includes(query) ||
         (d.order.client.name?.toLowerCase() ?? "").includes(query) ||
-        (d.id.toString() ?? "").includes(query)
+        (d.delivery_id.toString() ?? "").includes(query)
     );
   }, [searchQuery, deliveries]);
 
@@ -148,29 +155,54 @@ export function YardDeliveriesClientUI({
       return;
     }
     setSelectedDelivery(delivery);
-    // Pre-fill quantities based on parent order items
-    const initialItems = delivery.order.items?.map(item => ({
-        pedido_item_id: item.id,
-        dispatched_quantity: 0, // Start with 0
-    })) || [];
-    setLoadedItems(initialItems);
+    
+    const itemsWithPendingQty = delivery.order.items?.map(item => {
+        const dispatched = item.dispatchItems?.reduce((sum: number, di: DeliveryItem) => sum + di.dispatched_quantity, 0) || 0;
+        return {
+            ...item,
+            pending_quantity: item.quantity - dispatched,
+        };
+    }) || [];
+    
+    setDisplayOrderItems(itemsWithPendingQty);
+    
+    const initialLoadedItems = itemsWithPendingQty.map(item => ({
+        // CORREGIDO: convertir item.id (number) a string
+        pedido_item_id: item.id.toString(),
+        dispatched_quantity: 0,
+    }));
+    
+    setLoadedItems(initialLoadedItems);
     setNotes(delivery.notes || "");
     setLoadPhoto(null);
     setShowModal(true);
   }, []);
   
-  const handleLoadedQuantityChange = (pedido_item_id: string, quantity: number) => {
-      setLoadedItems((prev) => prev.map(item => item.pedido_item_id === pedido_item_id ? { ...item, dispatched_quantity: quantity } : item));
+  const handleLoadedQuantityChange = (pedido_item_id: string, newQuantity: number) => {
+      // CORREGIDO: comparación de string con string
+      const item = displayOrderItems.find(i => i.id.toString() === pedido_item_id);
+      if (!item) return;
+      
+      const validatedQuantity = Math.max(0, Math.min(newQuantity, item.pending_quantity));
+      
+      setLoadedItems((prev) => prev.map(li => 
+          li.pedido_item_id === pedido_item_id 
+              ? { ...li, dispatched_quantity: validatedQuantity } 
+              : li
+      ));
   };
 
   const handleConfirmLoad = useCallback(async () => {
-    if (!selectedDelivery) return;
+    if (!selectedDelivery || !user?.id) return;
     if (!loadPhoto) {
       toast.error("La foto de carga es obligatoria.");
       return;
     }
-    if (loadedItems.some(item => item.dispatched_quantity <= 0)) {
-        toast.warning("Debes ingresar una cantidad cargada mayor a cero para al menos un item.");
+    
+    const itemsToDispatch = loadedItems.filter(item => item.dispatched_quantity > 0);
+    
+    if (itemsToDispatch.length === 0) {
+        toast.warning("Debes ingresar una cantidad a cargar mayor a cero para al menos un item.");
         return;
     }
 
@@ -179,13 +211,11 @@ export function YardDeliveriesClientUI({
       const formData = new FormData();
       formData.append("status", "CARGADA");
       formData.append("notes", notes);
-      // Filter out items with 0 quantity before sending
-      const itemsToDispatch = loadedItems.filter(item => item.dispatched_quantity > 0);
-      formData.append("items", JSON.stringify(itemsToDispatch));
-      if (user?.id) formData.append("userId", user.id);
+      formData.append("itemsJson", JSON.stringify(itemsToDispatch));
+      formData.append("userId", user.id);
       formData.append("photoFile", loadPhoto);
 
-      const res = await fetch(`/api/deliveries/${selectedDelivery.id}`, {
+      const res = await fetch(`/api/deliveries/${selectedDelivery.delivery_id}`, {
         method: "PATCH",
         body: formData,
       });
@@ -193,7 +223,9 @@ export function YardDeliveriesClientUI({
       if (!res.ok) throw new Error(await res.text());
 
       const updatedDelivery = await res.json();
-      setDeliveries((prev) => prev.map((d) => (d.id === selectedDelivery.id ? updatedDelivery : d)));
+      
+      setDeliveries((prev) => prev.map((d) => (d.delivery_id === selectedDelivery.delivery_id ? updatedDelivery : d)));      
+      
       toast.success(`Carga confirmada para ${selectedDelivery.truck.placa}`);
       setShowModal(false);
     } catch (err: any) {
@@ -209,7 +241,6 @@ export function YardDeliveriesClientUI({
     <div className="space-y-6">
       <h2 className="text-2xl font-bold text-foreground">Gestión de Patio</h2>
       
-      {/* 1. Create New Trip Section */}
       <Card>
         <CardHeader>
           <CardTitle>Iniciar Nuevo Viaje</CardTitle>
@@ -220,7 +251,8 @@ export function YardDeliveriesClientUI({
             <Label htmlFor="order-select">Pedido Activo</Label>
             <Select onValueChange={setSelectedOrderId} value={selectedOrderId}>
               <SelectTrigger id="order-select"><SelectValue placeholder="Seleccionar Pedido..." /></SelectTrigger>
-              <SelectContent>{initialActiveOrders.map(o => <SelectItem key={o.id} value={o.id.toString()}>#{o.orderNumber} - {o.client.name}</SelectItem>)}</SelectContent>
+              {/* CORREGIDO: order_number en lugar de orderNumber */}
+              <SelectContent>{initialActiveOrders.map(o => <SelectItem key={o.id} value={o.id.toString()}>#{o.order_number} - {o.client.name}</SelectItem>)}</SelectContent>
             </Select>
           </div>
           <div className="space-y-2">
@@ -243,7 +275,6 @@ export function YardDeliveriesClientUI({
         </CardContent>
       </Card>
       
-      {/* 2. Search and Display Section */}
       <Card>
         <CardContent className="pt-6">
           <Input placeholder="Buscar por placa, conductor, cliente o ID de despacho..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
@@ -251,51 +282,74 @@ export function YardDeliveriesClientUI({
       </Card>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Pending Deliveries Column */}
         <div className="space-y-4">
           <h3 className="font-semibold flex items-center gap-2"><Clock className="h-5 w-5 text-blue-500" /> Pendientes por Cargar <Badge variant="secondary">{pendingDeliveries.length}</Badge></h3>
-          {pendingDeliveries.length > 0 ? pendingDeliveries.map((d) => <DeliveryCard key={d.id} delivery={d} onSelect={handleSelectDelivery} />) : <p className="text-sm text-muted-foreground pt-4">No hay viajes pendientes.</p>}
+          {pendingDeliveries.length > 0 ? pendingDeliveries.map((d) => <DeliveryCard key={d.delivery_id} delivery={d} onSelect={handleSelectDelivery} />) : <p className="text-sm text-muted-foreground pt-4">No hay viajes pendientes.</p>}
         </div>
-        {/* Loaded Deliveries Column */}
         <div className="space-y-4">
           <h3 className="font-semibold flex items-center gap-2"><CheckCircle className="h-5 w-5 text-green-500" /> Cargados (Listos para Salir) <Badge variant="secondary">{loadedDeliveries.length}</Badge></h3>
-          {loadedDeliveries.length > 0 ? loadedDeliveries.map((d) => <DeliveryCard key={d.id} delivery={d} onSelect={() => {}} />) : <p className="text-sm text-muted-foreground pt-4">No hay viajes cargados.</p>}
+          {loadedDeliveries.length > 0 ? loadedDeliveries.map((d) => <DeliveryCard key={d.delivery_id} delivery={d} onSelect={() => toast.info(`El despacho #${d.delivery_id} ya está cargado y listo para salir.`)} />) : <p className="text-sm text-muted-foreground pt-4">No hay viajes cargados.</p>}
         </div>
       </div>
 
-      {/* 3. Confirm Load Modal */}
       <Dialog open={showModal} onOpenChange={setShowModal}>
         <DialogContent className="sm:max-w-3xl max-h-[90vh] overflow-y-auto">
           {selectedDelivery && (
             <>
               <DialogHeader>
                 <DialogTitle>Confirmar Carga: {selectedDelivery.truck.placa}</DialogTitle>
-                <DialogDescription>Ingresa la cantidad real cargada para cada producto de la orden #{selectedDelivery.order.orderNumber}.</DialogDescription>
+                {/* CORREGIDO: order_number en lugar de orderNumber */}
+                <DialogDescription>Ingresa la cantidad real cargada para cada producto de la orden #{selectedDelivery.order.order_number}.</DialogDescription>
               </DialogHeader>
               <div className="space-y-4 py-2">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="p-3 bg-muted rounded-lg text-sm space-y-2">
-                        <p><strong>Cliente:</strong> {selectedDelivery.order.client.name}</p>
-                        <p><strong>Conductor:</strong> {selectedDelivery.driver.name}</p>
-                    </div>
-                    <PhotoInput onSelect={setLoadPhoto} required={true} label="Foto de Carga (Obligatoria)" capture={true} />
+                  <div className="p-3 bg-muted rounded-lg text-sm space-y-2">
+                      <p><strong>Cliente:</strong> {selectedDelivery.order.client.name}</p>
+                      <p><strong>Conductor:</strong> {selectedDelivery.driver.name}</p>
+                  </div>
+                  <PhotoInput onSelect={setLoadPhoto} required={true} label="Foto de Carga (Obligatoria)" capture={true} />
                 </div>
 
                 <div className="space-y-2">
-                  <Label>Items del Pedido Original</Label>
+                  <Label>Items del Pedido</Label>
                   <div className="border rounded-lg">
-                    {selectedDelivery.order.items?.map((item: OrderItemType, index: number) => (
-                      <div key={item.id} className={`p-3 grid grid-cols-3 gap-4 items-center ${index > 0 ? "border-t" : ""}`}>
-                        <div className="col-span-1">
-                          <p className="font-medium">{item.product.name}</p>
-                          <p className="text-sm text-muted-foreground">Pedido Total: {item.cantidadSolicitada} {item.product.unit}</p>
+                    {displayOrderItems.map((item, index) => {
+                      // CORREGIDO: quantity en lugar de cantidadSolicitada
+                      const dispatched = item.quantity - item.pending_quantity;
+                      // CORREGIDO: comparación de string con string
+                      const loadedValue = loadedItems.find(li => li.pedido_item_id === item.id.toString())?.dispatched_quantity;
+                      
+                      return (
+                        <div key={item.id} className={`p-3 grid grid-cols-1 md:grid-cols-3 gap-4 items-center ${index > 0 ? "border-t" : ""}`}>
+                          <div className="col-span-1 md:col-span-1 space-y-1">
+                            <p className="font-medium">{item.product.name}</p>
+                            <div className="text-xs text-muted-foreground space-y-0.5">
+                                {/* CORREGIDO: quantity en lugar de cantidadSolicitada */}
+                                <p>Pedido: <span className="font-bold">{item.quantity}</span> {item.product.unit}</p>
+                                <p>Despachado: <span className="font-bold text-blue-600">{dispatched.toFixed(2)}</span> {item.product.unit}</p>
+                                <p>Pendiente: <span className="font-bold text-green-600">{item.pending_quantity.toFixed(2)}</span> {item.product.unit}</p>
+                            </div>
+                          </div>
+                          
+                          <div className="col-span-1 md:col-span-2">
+                            <Label htmlFor={`item-${item.id}`} className="text-xs mb-1">Cantidad a Cargar en este Viaje *</Label>
+                            <Input 
+                                id={`item-${item.id}`} 
+                                type="number" 
+                                value={loadedValue ?? 0}
+                                // CORREGIDO: convertir item.id (number) a string
+                                onChange={(e) => handleLoadedQuantityChange(item.id.toString(), parseFloat(e.target.value) || 0)} 
+                                max={item.pending_quantity}
+                                min={0}
+                                required 
+                                className="text-lg"
+                                disabled={item.pending_quantity <= 0}
+                            />
+                            {item.pending_quantity <= 0 && <p className="text-xs text-green-700 mt-1">Este item ya fue despachado por completo.</p>}
+                          </div>
                         </div>
-                        <div className="col-span-2">
-                          <Label htmlFor={`item-${item.id}`} className="text-xs mb-1">Cantidad a Cargar en este Viaje *</Label>
-                          <Input id={`item-${item.id}`} type="number" value={loadedItems.find(li => li.pedido_item_id === item.id)?.dispatched_quantity || ""} onChange={(e) => handleLoadedQuantityChange(item.id, parseFloat(e.target.value) || 0)} required />
-                        </div>
-                      </div>
-                    ))}
+                      )
+                    })}
                   </div>
                 </div>
 
