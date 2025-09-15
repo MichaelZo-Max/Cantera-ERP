@@ -12,12 +12,11 @@ export type OrderStatus =
   | "CERRADA"
   | "CANCELADA"
   // Nuevos estados del SQL.md
-  | 'AWAITING_PAYMENT'
-  | 'PAID'
-  | 'PARTIALLY_DISPATCHED'
-  | 'DISPATCHED_COMPLETE'
-  | 'CANCELLED';
-
+  | "AWAITING_PAYMENT"
+  | "PAID"
+  | "PARTIALLY_DISPATCHED"
+  | "DISPATCHED_COMPLETE"
+  | "CANCELLED";
 
 export type DeliveryStatus =
   | "ASIGNADA"
@@ -26,7 +25,7 @@ export type DeliveryStatus =
   | "SALIDA_OK"
   | "RECHAZADA"
   // Nuevo estado del SQL.md
-  | 'PENDING';
+  | "PENDING";
 
 // Core entity types
 export interface User {
@@ -91,8 +90,8 @@ export interface Truck {
   id: string;
   placa: string;
   transporterId?: string;
-  driverId?: string; 
-  driver?: Driver; 
+  driverId?: string;
+  driver?: Driver;
   brand?: string;
   model?: string;
   capacity?: number;
@@ -123,11 +122,11 @@ export interface Order {
 export interface OrderItem {
   id: string;
   orderId: string;
-  productId: string; 
+  productId: string;
   product?: Product;
   cantidadSolicitadaBase: number;
   cantidadPendienteBase: number;
-  precioUnitario?: number;
+  unit_price?: number;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -141,7 +140,7 @@ export interface Delivery {
   driverId?: string;
   driver?: Driver;
   client?: Client;
-  product?: Product; 
+  product?: Product;
   cantidadBase: number;
   loadedQuantity?: number;
   estado: DeliveryStatus;
