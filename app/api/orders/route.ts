@@ -5,6 +5,43 @@ import { revalidateTag } from "next/cache";
 import { createOrderSchema } from "@/lib/validations";
 
 /**
+ * @route   GET /api/orders
+ * @desc    Obtener una lista de todos los pedidos.
+ * @access  Private
+ */
+export async function GET() {
+  try {
+    // La consulta se ha corregido para usar la vista VW_APP_CLIENTES
+    const sql = `
+      SELECT
+          p.id,
+          p.order_number,
+          p.status,
+          p.created_at,
+          c.name AS client_name,
+          (SELECT SUM(pi.quantity * pi.price_per_unit)
+           FROM RIP.APP_PEDIDOS_ITEMS pi
+           WHERE pi.order_id = p.id) AS total
+      FROM
+          RIP.APP_PEDIDOS AS p
+      JOIN
+          RIP.VW_APP_CLIENTES AS c ON p.customer_id = c.id -- Corregido para usar la vista
+      ORDER BY
+          p.created_at DESC;
+    `;
+
+    const orders = await executeQuery(sql);
+
+    return NextResponse.json(orders);
+  } catch (error) {
+    console.error("[API_ORDERS_GET]", error);
+    return new NextResponse("Error interno al obtener los pedidos", {
+      status: 500,
+    });
+  }
+}
+
+/**
  * @route   POST /api/orders
  * @desc    Crear un nuevo pedido (sin asignación de camión).
  * @access  Private
