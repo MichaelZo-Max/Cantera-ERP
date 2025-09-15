@@ -1,176 +1,177 @@
-// app/(protected)/yard/deliveries/yard-deliveries-client.tsx
 "use client";
 
 import React, { useState, useMemo, useCallback, useEffect } from "react";
+import Image from "next/image";
+import { toast } from "sonner";
+import { useAuth } from "@/components/auth-provider";
+import type { Delivery, Order, OrderItem as OrderItemType, Truck as TruckType, Driver } from "@/lib/types";
+
+// --- UI Components ---
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { PhotoInput } from "@/components/forms/photo-input";
-import {
-  Search,
-  Truck,
-  User,
-  CheckCircle,
-  Clock,
-  Camera,
-  Eye,
-  Package,
-} from "lucide-react";
-import { toast } from "sonner";
-import type { Delivery, OrderItem as OrderItemType } from "@/lib/types";
-import { useAuth } from "@/components/auth-provider";
-import Image from "next/image";
+import { Plus, CheckCircle, Clock, User, Truck as TruckIcon } from "lucide-react";
 
-const DeliveryCard = React.memo(
-  ({
-    delivery,
-    onSelect,
-  }: {
-    delivery: Delivery;
-    onSelect: (delivery: Delivery) => void;
-  }) => (
-    <Card
-      className="cursor-pointer hover:shadow-lg transition-shadow"
-      onClick={() => onSelect(delivery)}
-    >
-      <CardHeader className="pb-3">
-        <div className="flex justify-between items-start">
-          <div>
-            <p className="font-bold text-lg">{delivery.truck?.placa}</p>
-            <p className="text-sm text-muted-foreground">
-              Despacho ID: {delivery.id}
-            </p>
-          </div>
-          <Badge
-            variant={delivery.estado === "CARGADA" ? "default" : "secondary"}
-          >
-            {delivery.order?.items?.length || 1} item(s)
-          </Badge>
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        {delivery.loadPhoto && (
-          <div className="relative h-40 w-full overflow-hidden rounded-md border group">
-            <Image
-              src={delivery.loadPhoto}
-              alt={`Foto de carga para ${delivery.truck?.placa}`}
-              fill
-              style={{ objectFit: "cover" }}
-              className="transition-transform duration-300 group-hover:scale-105"
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
-          </div>
-        )}
-        <div className="space-y-1 text-sm">
-          <div className="flex items-center gap-2">
-            <User className="h-4 w-4 text-muted-foreground" />
-            <span className="truncate">{delivery.order?.client?.name}</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-muted-foreground">Chofer:</span>
-            <span>{delivery.truck?.driver?.name || "N/A"}</span>
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-  )
-);
-DeliveryCard.displayName = "DeliveryCard";
-
+// --- Type Definitions ---
 interface LoadedItem {
-  pedido_item_id: string;
-  dispatched_quantity: number;
+  pedido_item_id: string; // Corresponds to APP_PEDIDOS_ITEMS.id
+  dispatched_quantity: number; // The quantity loaded in this specific trip
 }
 
+interface YardClientProps {
+  initialDeliveries: Delivery[];
+  initialActiveOrders: Order[];
+  initialTrucks: TruckType[];
+  initialDrivers: Driver[];
+}
+
+// --- Reusable Sub-Components ---
+const DeliveryCard = React.memo(({ delivery, onSelect }: { delivery: Delivery; onSelect: (delivery: Delivery) => void; }) => (
+    <Card className="cursor-pointer hover:shadow-lg transition-shadow" onClick={() => onSelect(delivery)}>
+        <CardHeader className="pb-3">
+            <div className="flex justify-between items-start">
+                <div>
+                    <p className="font-bold text-lg flex items-center gap-2"><TruckIcon className="h-5 w-5" /> {delivery.truck.placa}</p>
+                    <p className="text-sm text-muted-foreground">Despacho ID: {delivery.id}</p>
+                </div>
+                <Badge variant={delivery.estado === "CARGADA" ? "default" : "secondary"}>
+                    Pedido #{delivery.order.orderNumber}
+                </Badge>
+            </div>
+        </CardHeader>
+        <CardContent className="space-y-3 text-sm">
+            <div className="flex items-center gap-2">
+                <User className="h-4 w-4 text-muted-foreground" />
+                <span className="font-medium">Conductor:</span>
+                <span className="truncate">{delivery.driver.name}</span>
+            </div>
+            <div className="flex items-center gap-2">
+                <User className="h-4 w-4 text-muted-foreground" />
+                <span className="font-medium">Cliente:</span>
+                <span className="truncate">{delivery.order.client.name}</span>
+            </div>
+            {delivery.loadPhoto && (
+                <div className="relative h-40 w-full overflow-hidden rounded-md border group mt-2">
+                    <Image src={delivery.loadPhoto} alt={`Foto de carga`} fill style={{ objectFit: "cover" }} className="transition-transform duration-300 group-hover:scale-105" />
+                </div>
+            )}
+        </CardContent>
+    </Card>
+));
+DeliveryCard.displayName = "DeliveryCard";
+
+
+// --- Main Client Component ---
 export function YardDeliveriesClientUI({
   initialDeliveries,
-}: {
-  initialDeliveries: Delivery[];
-}) {
+  initialActiveOrders,
+  initialTrucks,
+  initialDrivers,
+}: YardClientProps) {
   const { user } = useAuth();
+  
+  // --- State Management ---
   const [deliveries, setDeliveries] = useState<Delivery[]>(initialDeliveries);
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedDelivery, setSelectedDelivery] = useState<Delivery | null>(
-    null
-  );
+  const [selectedDelivery, setSelectedDelivery] = useState<Delivery | null>(null);
   const [showModal, setShowModal] = useState(false);
+  
+  // Create Trip Form State
+  const [selectedOrderId, setSelectedOrderId] = useState<string>('');
+  const [selectedTruckId, setSelectedTruckId] = useState<string>('');
+  const [selectedDriverId, setSelectedDriverId] = useState<string>('');
+  const [isCreatingTrip, setIsCreatingTrip] = useState(false);
+
+  // Confirm Load Modal State
   const [loadedItems, setLoadedItems] = useState<LoadedItem[]>([]);
   const [notes, setNotes] = useState("");
   const [loadPhoto, setLoadPhoto] = useState<File | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  useEffect(() => {
-    if (selectedDelivery?.order?.items) {
-      const initialItems = selectedDelivery.order.items.map(
-        (item: OrderItemType) => ({
-          pedido_item_id: item.id,
-          dispatched_quantity: item.cantidadSolicitadaBase,
-        })
-      );
-      setLoadedItems(initialItems);
-    }
-  }, [selectedDelivery]);
-
-  const handleLoadedQuantityChange = (
-    pedido_item_id: string,
-    quantity: number
-  ) => {
-    setLoadedItems((prev) =>
-      prev.map((item) =>
-        item.pedido_item_id === pedido_item_id
-          ? { ...item, dispatched_quantity: quantity }
-          : item
-      )
-    );
-  };
-
+  // --- Derived State (Memoized for Performance) ---
   const filteredDeliveries = useMemo(() => {
     const query = searchQuery.toLowerCase();
     if (!query) return deliveries;
-    return deliveries.filter(
-      (d) =>
-        (d.truck?.placa?.toLowerCase() ?? "").includes(query) ||
-        (d.id?.toString() ?? "").includes(query) ||
-        (d.order?.client?.name?.toLowerCase() ?? "").includes(query)
+    return deliveries.filter(d =>
+        (d.truck.placa?.toLowerCase() ?? "").includes(query) ||
+        (d.driver.name?.toLowerCase() ?? "").includes(query) ||
+        (d.order.client.name?.toLowerCase() ?? "").includes(query) ||
+        (d.id.toString() ?? "").includes(query)
     );
   }, [searchQuery, deliveries]);
 
-  const pendingDeliveries = useMemo(
-    () => filteredDeliveries.filter((d) => d.estado === "PENDING"),
-    [filteredDeliveries]
-  );
-  const loadedDeliveries = useMemo(
-    () => filteredDeliveries.filter((d) => d.estado === "CARGADA"),
-    [filteredDeliveries]
-  );
+  const pendingDeliveries = useMemo(() => filteredDeliveries.filter((d) => d.estado === "PENDING"), [filteredDeliveries]);
+  const loadedDeliveries = useMemo(() => filteredDeliveries.filter((d) => d.estado === "CARGADA"), [filteredDeliveries]);
+
+  // --- Callbacks and Event Handlers ---
+  const handleCreateTrip = useCallback(async () => {
+    if (!selectedOrderId || !selectedTruckId || !selectedDriverId) {
+      toast.error("Debes seleccionar pedido, camión y conductor.");
+      return;
+    }
+    setIsCreatingTrip(true);
+    try {
+      const res = await fetch('/api/deliveries', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          orderId: parseInt(selectedOrderId),
+          truckId: parseInt(selectedTruckId),
+          driverId: parseInt(selectedDriverId),
+        }),
+      });
+
+      if (!res.ok) throw new Error(await res.text());
+
+      const newDelivery = await res.json();
+      setDeliveries((prev) => [newDelivery, ...prev]);
+      toast.success(`Nuevo viaje (Despacho #${newDelivery.id}) creado con éxito.`);
+      setSelectedOrderId('');
+      setSelectedTruckId('');
+      setSelectedDriverId('');
+    } catch (err: any) {
+      toast.error("Error al crear el viaje", { description: err.message });
+    } finally {
+      setIsCreatingTrip(false);
+    }
+  }, [selectedOrderId, selectedTruckId, selectedDriverId]);
 
   const handleSelectDelivery = useCallback((delivery: Delivery) => {
     if (delivery.estado !== "PENDING") {
-      toast.info("Este despacho ya fue procesado.", {
-        description: `Estado actual: ${delivery.estado}`,
-      });
+      toast.info("Este despacho ya fue procesado.", { description: `Estado actual: ${delivery.estado}` });
       return;
     }
     setSelectedDelivery(delivery);
+    // Pre-fill quantities based on parent order items
+    const initialItems = delivery.order.items?.map(item => ({
+        pedido_item_id: item.id,
+        dispatched_quantity: 0, // Start with 0
+    })) || [];
+    setLoadedItems(initialItems);
     setNotes(delivery.notes || "");
     setLoadPhoto(null);
     setShowModal(true);
   }, []);
+  
+  const handleLoadedQuantityChange = (pedido_item_id: string, quantity: number) => {
+      setLoadedItems((prev) => prev.map(item => item.pedido_item_id === pedido_item_id ? { ...item, dispatched_quantity: quantity } : item));
+  };
 
   const handleConfirmLoad = useCallback(async () => {
-    if (!selectedDelivery || !loadPhoto) {
+    if (!selectedDelivery) return;
+    if (!loadPhoto) {
       toast.error("La foto de carga es obligatoria.");
       return;
+    }
+    if (loadedItems.some(item => item.dispatched_quantity <= 0)) {
+        toast.warning("Debes ingresar una cantidad cargada mayor a cero para al menos un item.");
+        return;
     }
 
     setIsSubmitting(true);
@@ -178,7 +179,9 @@ export function YardDeliveriesClientUI({
       const formData = new FormData();
       formData.append("status", "CARGADA");
       formData.append("notes", notes);
-      formData.append("items", JSON.stringify(loadedItems));
+      // Filter out items with 0 quantity before sending
+      const itemsToDispatch = loadedItems.filter(item => item.dispatched_quantity > 0);
+      formData.append("items", JSON.stringify(itemsToDispatch));
       if (user?.id) formData.append("userId", user.id);
       formData.append("photoFile", loadPhoto);
 
@@ -190,11 +193,8 @@ export function YardDeliveriesClientUI({
       if (!res.ok) throw new Error(await res.text());
 
       const updatedDelivery = await res.json();
-      setDeliveries((prev) =>
-        prev.map((d) => (d.id === selectedDelivery.id ? updatedDelivery : d))
-      );
-
-      toast.success(`Carga confirmada para ${selectedDelivery.truck?.placa}`);
+      setDeliveries((prev) => prev.map((d) => (d.id === selectedDelivery.id ? updatedDelivery : d)));
+      toast.success(`Carga confirmada para ${selectedDelivery.truck.placa}`);
       setShowModal(false);
     } catch (err: any) {
       toast.error("Error al confirmar la carga", { description: err.message });
@@ -204,153 +204,112 @@ export function YardDeliveriesClientUI({
     }
   }, [selectedDelivery, loadedItems, loadPhoto, notes, user?.id]);
 
+  // --- Render Method ---
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold text-foreground">Gestión de Patio</h2>
-        <p className="text-muted-foreground">
-          Confirma la carga de los viajes asignados.
-        </p>
-      </div>
+      <h2 className="text-2xl font-bold text-foreground">Gestión de Patio</h2>
+      
+      {/* 1. Create New Trip Section */}
       <Card>
-        <CardContent className="pt-6">
-          <Input
-            placeholder="Buscar por placa, ID o cliente..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
+        <CardHeader>
+          <CardTitle>Iniciar Nuevo Viaje</CardTitle>
+          <CardDescription>Selecciona un pedido, camión y conductor para crear un nuevo despacho.</CardDescription>
+        </CardHeader>
+        <CardContent className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+          <div className="space-y-2">
+            <Label htmlFor="order-select">Pedido Activo</Label>
+            <Select onValueChange={setSelectedOrderId} value={selectedOrderId}>
+              <SelectTrigger id="order-select"><SelectValue placeholder="Seleccionar Pedido..." /></SelectTrigger>
+              <SelectContent>{initialActiveOrders.map(o => <SelectItem key={o.id} value={o.id.toString()}>#{o.orderNumber} - {o.client.name}</SelectItem>)}</SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="truck-select">Camión Disponible</Label>
+            <Select onValueChange={setSelectedTruckId} value={selectedTruckId} disabled={!selectedOrderId}>
+              <SelectTrigger id="truck-select"><SelectValue placeholder="Seleccionar Camión..." /></SelectTrigger>
+              <SelectContent>{initialTrucks.map(t => <SelectItem key={t.id} value={t.id.toString()}>{t.placa}</SelectItem>)}</SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="driver-select">Conductor</Label>
+            <Select onValueChange={setSelectedDriverId} value={selectedDriverId} disabled={!selectedOrderId}>
+              <SelectTrigger id="driver-select"><SelectValue placeholder="Seleccionar Conductor..." /></SelectTrigger>
+              <SelectContent>{initialDrivers.map(d => <SelectItem key={d.id} value={d.id.toString()}>{d.name}</SelectItem>)}</SelectContent>
+            </Select>
+          </div>
+          <Button onClick={handleCreateTrip} disabled={!selectedOrderId || !selectedTruckId || !selectedDriverId || isCreatingTrip}>
+            {isCreatingTrip ? "Creando..." : <><Plus className="h-4 w-4 mr-2" /> Crear Viaje</>}
+          </Button>
         </CardContent>
       </Card>
+      
+      {/* 2. Search and Display Section */}
+      <Card>
+        <CardContent className="pt-6">
+          <Input placeholder="Buscar por placa, conductor, cliente o ID de despacho..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
+        </CardContent>
+      </Card>
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* Pending Deliveries Column */}
         <div className="space-y-4">
-          <h3 className="font-semibold flex items-center gap-2">
-            <Clock className="h-5 w-5 text-blue-500" />
-            Pendientes por Cargar
-            <Badge variant="secondary">{pendingDeliveries.length}</Badge>
-          </h3>
-          {pendingDeliveries.map((d) => (
-            <DeliveryCard
-              key={d.id}
-              delivery={d}
-              onSelect={handleSelectDelivery}
-            />
-          ))}
+          <h3 className="font-semibold flex items-center gap-2"><Clock className="h-5 w-5 text-blue-500" /> Pendientes por Cargar <Badge variant="secondary">{pendingDeliveries.length}</Badge></h3>
+          {pendingDeliveries.length > 0 ? pendingDeliveries.map((d) => <DeliveryCard key={d.id} delivery={d} onSelect={handleSelectDelivery} />) : <p className="text-sm text-muted-foreground pt-4">No hay viajes pendientes.</p>}
         </div>
+        {/* Loaded Deliveries Column */}
         <div className="space-y-4">
-          <h3 className="font-semibold flex items-center gap-2">
-            <CheckCircle className="h-5 w-5 text-green-500" />
-            Cargados (Listos para Salir)
-            <Badge variant="secondary">{loadedDeliveries.length}</Badge>
-          </h3>
-          {loadedDeliveries.map((d) => (
-            <DeliveryCard key={d.id} delivery={d} onSelect={() => {}} />
-          ))}
+          <h3 className="font-semibold flex items-center gap-2"><CheckCircle className="h-5 w-5 text-green-500" /> Cargados (Listos para Salir) <Badge variant="secondary">{loadedDeliveries.length}</Badge></h3>
+          {loadedDeliveries.length > 0 ? loadedDeliveries.map((d) => <DeliveryCard key={d.id} delivery={d} onSelect={() => {}} />) : <p className="text-sm text-muted-foreground pt-4">No hay viajes cargados.</p>}
         </div>
       </div>
 
+      {/* 3. Confirm Load Modal */}
       <Dialog open={showModal} onOpenChange={setShowModal}>
         <DialogContent className="sm:max-w-3xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>
-              Confirmar Carga: {selectedDelivery?.truck?.placa}
-            </DialogTitle>
-            <DialogDescription>
-              Ingresa la cantidad real cargada para cada producto.
-            </DialogDescription>
-          </DialogHeader>
           {selectedDelivery && (
-            <div className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="p-3 bg-muted rounded-lg text-sm space-y-2">
-                  <div className="flex justify-between">
-                    <span>Cliente:</span>
-                    <span className="font-medium">
-                      {selectedDelivery.order?.client?.name}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Pedido N°:</span>
-                    <span className="font-medium">
-                      {selectedDelivery.order?.orderNumber}
-                    </span>
-                  </div>
+            <>
+              <DialogHeader>
+                <DialogTitle>Confirmar Carga: {selectedDelivery.truck.placa}</DialogTitle>
+                <DialogDescription>Ingresa la cantidad real cargada para cada producto de la orden #{selectedDelivery.order.orderNumber}.</DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4 py-2">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="p-3 bg-muted rounded-lg text-sm space-y-2">
+                        <p><strong>Cliente:</strong> {selectedDelivery.order.client.name}</p>
+                        <p><strong>Conductor:</strong> {selectedDelivery.driver.name}</p>
+                    </div>
+                    <PhotoInput onSelect={setLoadPhoto} required={true} label="Foto de Carga (Obligatoria)" capture={true} />
                 </div>
-                <div>
-                  <PhotoInput
-                    onSelect={setLoadPhoto}
-                    required={true}
-                    label="Foto de Carga (Obligatoria)"
-                    capture={true}
-                  />
-                </div>
-              </div>
 
-              <div className="space-y-2">
-                <Label>Items del Pedido</Label>
-                <div className="border rounded-lg">
-                  {selectedDelivery.order?.items?.map(
-                    (item: OrderItemType, index: number) => (
-                      <div
-                        key={item.id}
-                        className={`p-3 grid grid-cols-3 gap-4 items-center ${
-                          index > 0 ? "border-t" : ""
-                        }`}
-                      >
+                <div className="space-y-2">
+                  <Label>Items del Pedido Original</Label>
+                  <div className="border rounded-lg">
+                    {selectedDelivery.order.items?.map((item: OrderItemType, index: number) => (
+                      <div key={item.id} className={`p-3 grid grid-cols-3 gap-4 items-center ${index > 0 ? "border-t" : ""}`}>
                         <div className="col-span-1">
-                          <p className="font-medium">{item.product?.name}</p>
-                          <p className="text-sm text-muted-foreground">
-                            Pedido: {item.cantidadSolicitadaBase}{" "}
-                            {item.product?.unit}
-                          </p>
+                          <p className="font-medium">{item.product.name}</p>
+                          <p className="text-sm text-muted-foreground">Pedido Total: {item.cantidadSolicitada} {item.product.unit}</p>
                         </div>
                         <div className="col-span-2">
-                          <Label
-                            htmlFor={`item-${item.id}`}
-                            className="text-xs mb-1"
-                          >
-                            Cantidad Real Cargada *
-                          </Label>
-                          <Input
-                            id={`item-${item.id}`}
-                            type="number"
-                            value={
-                              loadedItems.find(
-                                (li) => li.pedido_item_id === item.id
-                              )?.dispatched_quantity || ""
-                            }
-                            onChange={(e) =>
-                              handleLoadedQuantityChange(
-                                item.id,
-                                parseFloat(e.target.value) || 0
-                              )
-                            }
-                            required
-                          />
+                          <Label htmlFor={`item-${item.id}`} className="text-xs mb-1">Cantidad a Cargar en este Viaje *</Label>
+                          <Input id={`item-${item.id}`} type="number" value={loadedItems.find(li => li.pedido_item_id === item.id)?.dispatched_quantity || ""} onChange={(e) => handleLoadedQuantityChange(item.id, parseFloat(e.target.value) || 0)} required />
                         </div>
                       </div>
-                    )
-                  )}
+                    ))}
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Notas (Opcional)</Label>
+                  <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Observaciones de la carga..." />
+                </div>
+
+                <div className="flex justify-end gap-3 pt-4">
+                  <Button variant="outline" onClick={() => setShowModal(false)}>Cancelar</Button>
+                  <Button onClick={handleConfirmLoad} disabled={isSubmitting}>{isSubmitting ? "Procesando..." : "Confirmar Carga"}</Button>
                 </div>
               </div>
-
-              <div className="space-y-2">
-                <Label>Notas (Opcional)</Label>
-                <Textarea
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  placeholder="Observaciones de la carga..."
-                />
-              </div>
-
-              <div className="flex justify-end gap-3 pt-4">
-                <Button variant="outline" onClick={() => setShowModal(false)}>
-                  Cancelar
-                </Button>
-                <Button onClick={handleConfirmLoad} disabled={isSubmitting}>
-                  {isSubmitting ? "Procesando..." : "Confirmar Carga"}
-                </Button>
-              </div>
-            </div>
+            </>
           )}
         </DialogContent>
       </Dialog>
