@@ -376,3 +376,18 @@ LEFT JOIN ULTIMOS_PRECIOS P ON A.CODARTICULO = P.CODARTICULO AND P.RN = 1;
 GO
 
 PRINT '¡Despliegue completado\! El esquema, las tablas y las vistas han sido creados/actualizados.';
+-- =================================================================
+-- SCRIPT CORREGIDO para eliminar la columna truck_id de APP_PEDIDOS
+-- =================================================================
+
+-- Paso 1: Eliminar la clave foránea (CONSTRAINT) usando el nombre del error.
+ALTER TABLE RIP.APP_PEDIDOS
+DROP CONSTRAINT FK__APP_PEDID__truck__13739E55;
+GO
+
+-- Paso 2: Ahora que la columna está libre de dependencias, la eliminamos.
+ALTER TABLE RIP.APP_PEDIDOS
+DROP COLUMN truck_id;
+GO
+
+PRINT '¡Éxito! La clave foránea y la columna truck_id han sido eliminadas correctamente de RIP.APP_PEDIDOS.';
