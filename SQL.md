@@ -290,6 +290,8 @@ IF OBJECT_ID('RIP.APP_DESPACHOS', 'U') IS NULL
 CREATE TABLE RIP.APP_DESPACHOS (
 id INT IDENTITY(1,1) PRIMARY KEY,
 order_id INT NOT NULL,
+truck_id INT NULL, -- Columna añadida
+driver_id INT NULL, -- Columna añadida
 loaded_quantity DECIMAL(18, 2),
 loaded_by INT,
 loaded_at DATETIME,
@@ -302,6 +304,8 @@ status NVARCHAR(50) NOT NULL DEFAULT 'PENDING',
 created_at DATETIME NOT NULL DEFAULT GETDATE(),
 updated_at DATETIME NOT NULL DEFAULT GETDATE(),
 FOREIGN KEY (order_id) REFERENCES RIP.APP_PEDIDOS(id),
+FOREIGN KEY (truck_id) REFERENCES RIP.APP_CAMIONES(id), -- Clave foránea para camiones
+FOREIGN KEY (driver_id) REFERENCES RIP.APP_CHOFERES(id), -- Clave foránea para choferes
 FOREIGN KEY (loaded_by) REFERENCES RIP.APP_USUARIOS(id),
 FOREIGN KEY (exited_by) REFERENCES RIP.APP_USUARIOS(id)
 );
@@ -382,7 +386,7 @@ PRINT '¡Despliegue completado\! El esquema, las tablas y las vistas han sido cr
 
 -- Paso 1: Eliminar la clave foránea (CONSTRAINT) usando el nombre del error.
 ALTER TABLE RIP.APP_PEDIDOS
-DROP CONSTRAINT FK__APP_PEDID__truck__13739E55;
+DROP CONSTRAINT FK**APP_PEDID**truck\_\_13739E55;
 GO
 
 -- Paso 2: Ahora que la columna está libre de dependencias, la eliminamos.
@@ -403,8 +407,8 @@ PRINT '¡Éxito! La clave foránea y la columna truck_id han sido eliminadas cor
 -- solo si la columna 'nombre' existe.
 IF EXISTS (SELECT 1 FROM sys.columns WHERE Name = N'nombre' AND Object_ID = Object_ID(N'RIP.APP_CHOFERES'))
 BEGIN
-    EXEC sp_rename 'RIP.APP_CHOFERES.nombre', 'name', 'COLUMN';
-    PRINT 'Éxito: La columna ''nombre'' ha sido renombrada a ''name'' en la tabla RIP.APP_CHOFERES.';
+EXEC sp_rename 'RIP.APP_CHOFERES.nombre', 'name', 'COLUMN';
+PRINT 'Éxito: La columna ''nombre'' ha sido renombrada a ''name'' en la tabla RIP.APP_CHOFERES.';
 END
 GO -- Fin del lote
 
@@ -416,8 +420,8 @@ AS
 SELECT
     d.id,
     d.order_id,
-    d.camion_id,
-    d.conductor_id,
+    d.truck_id,
+    d.driver_id,
     d.status AS estado,
     d.created_at,
     d.updated_at,
@@ -426,15 +430,17 @@ SELECT
     d.load_photo_url AS loadPhoto,
     d.exited_at AS exitedAt,
     d.exit_photo_url AS exitPhoto,
-    -- JSON para el pedido (order)
-    (SELECT * FROM RIP.VW_APP_PEDIDOS p WHERE p.id = d.order_id FOR JSON PATH, WITHOUT_ARRAY_WRAPPER) AS [order],
+    -- CORRECCIÓN AQUÍ: Se cambió el alias de [order] a orderDetails
+    (SELECT * FROM RIP.VW_APP_PEDIDOS p WHERE p.id = d.order_id FOR JSON PATH, WITHOUT_ARRAY_WRAPPER) AS orderDetails,
+    
     -- JSON para el camión (truck)
-    (SELECT t.id, t.placa, t.brand, t.model, t.capacity FROM RIP.APP_CAMIONES t WHERE t.id = d.camion_id FOR JSON PATH, WITHOUT_ARRAY_WRAPPER) AS truck,
-    -- JSON para el conductor (driver) - CORREGIDO
-    (SELECT dr.id, dr.name, dr.docId FROM RIP.APP_CHOFERES dr WHERE dr.id = d.conductor_id FOR JSON PATH, WITHOUT_ARRAY_WRAPPER) AS driver
+    (SELECT t.id, t.placa, t.brand, t.model, t.capacity FROM RIP.APP_CAMIONES t WHERE t.id = d.truck_id FOR JSON PATH, WITHOUT_ARRAY_WRAPPER) AS truck,
+    
+    -- JSON para el conductor (driver)
+    (SELECT dr.id, dr.name, dr.docId FROM RIP.APP_CHOFERES dr WHERE dr.id = d.driver_id FOR JSON PATH, WITHOUT_ARRAY_WRAPPER) AS driver
 FROM
     RIP.APP_DESPACHOS d;
-GO -- Fin del lote
+GO
 
 PRINT 'Vista RIP.VW_APP_DESPACHOS creada/actualizada con el nombre de columna estandarizado.';
 PRINT '¡Listo! La base de datos está ahora completamente alineada y estandarizada.';

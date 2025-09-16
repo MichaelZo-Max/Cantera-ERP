@@ -120,7 +120,7 @@ export interface Order {
 export interface Delivery {
   delivery_id: number;
   estado: DeliveryStatus;
-  order: Order;
+  orderDetails: Order;
   truck: Truck;
   driver: Driver;
   loadedAt?: Date;

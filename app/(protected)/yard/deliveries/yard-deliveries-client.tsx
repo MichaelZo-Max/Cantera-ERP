@@ -20,13 +20,12 @@ import { Plus, CheckCircle, Clock, User, Truck as TruckIcon } from "lucide-react
 
 // --- Type Definitions ---
 interface LoadedItem {
-  pedido_item_id: string; // Corresponds to APP_PEDIDOS_ITEMS.id
-  dispatched_quantity: number; // The quantity loaded in this specific trip
+  pedido_item_id: string;
+  dispatched_quantity: number;
 }
 
-// **NUEVO TIPO para manejar las cantidades de forma más clara**
 interface DisplayOrderItem extends OrderItemType {
-  pending_quantity: number; // Cantidad que realmente falta por despachar
+  pending_quantity: number;
 }
 
 interface YardClientProps {
@@ -36,7 +35,6 @@ interface YardClientProps {
   initialDrivers: Driver[];
 }
 
-// --- Reusable Sub-Components ---
 const DeliveryCard = React.memo(({ delivery, onSelect }: { delivery: Delivery; onSelect: (delivery: Delivery) => void; }) => (
     <Card className="cursor-pointer hover:shadow-lg transition-shadow" onClick={() => onSelect(delivery)}>
         <CardHeader className="pb-3">
@@ -46,8 +44,7 @@ const DeliveryCard = React.memo(({ delivery, onSelect }: { delivery: Delivery; o
                     <p className="text-sm text-muted-foreground">Despacho ID: {delivery.delivery_id}</p>
                 </div>
                 <Badge variant={delivery.estado === "CARGADA" ? "default" : "secondary"}>
-                    {/* CORREGIDO: order_number en lugar de orderNumber */}
-                    Pedido #{delivery.order.order_number}
+                    Pedido #{delivery.orderDetails.order_number}
                 </Badge>
             </div>
         </CardHeader>
@@ -60,7 +57,7 @@ const DeliveryCard = React.memo(({ delivery, onSelect }: { delivery: Delivery; o
             <div className="flex items-center gap-2">
                 <User className="h-4 w-4 text-muted-foreground" />
                 <span className="font-medium">Cliente:</span>
-                <span className="truncate">{delivery.order.client.name}</span>
+                <span className="truncate">{delivery.orderDetails.client.name}</span>
             </div>
             {delivery.loadPhoto && (
                 <div className="relative h-40 w-full overflow-hidden rounded-md border group mt-2">
@@ -108,7 +105,7 @@ export function YardDeliveriesClientUI({
     return deliveries.filter(d =>
         (d.truck.placa?.toLowerCase() ?? "").includes(query) ||
         (d.driver.name?.toLowerCase() ?? "").includes(query) ||
-        (d.order.client.name?.toLowerCase() ?? "").includes(query) ||
+        (d.orderDetails.client.name?.toLowerCase() ?? "").includes(query) ||
         (d.delivery_id.toString() ?? "").includes(query)
     );
   }, [searchQuery, deliveries]);
@@ -128,9 +125,10 @@ export function YardDeliveriesClientUI({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          orderId: parseInt(selectedOrderId),
-          truckId: parseInt(selectedTruckId),
-          driverId: parseInt(selectedDriverId),
+          // El backend espera order_id, no orderId
+          order_id: parseInt(selectedOrderId),
+          truck_id: parseInt(selectedTruckId),
+          driver_id: parseInt(selectedDriverId),
         }),
       });
 
@@ -156,7 +154,7 @@ export function YardDeliveriesClientUI({
     }
     setSelectedDelivery(delivery);
     
-    const itemsWithPendingQty = delivery.order.items?.map(item => {
+    const itemsWithPendingQty = delivery.orderDetails.items?.map(item => {
         const dispatched = item.dispatchItems?.reduce((sum: number, di: DeliveryItem) => sum + di.dispatched_quantity, 0) || 0;
         return {
             ...item,
@@ -167,7 +165,6 @@ export function YardDeliveriesClientUI({
     setDisplayOrderItems(itemsWithPendingQty);
     
     const initialLoadedItems = itemsWithPendingQty.map(item => ({
-        // CORREGIDO: convertir item.id (number) a string
         pedido_item_id: item.id.toString(),
         dispatched_quantity: 0,
     }));
@@ -179,7 +176,6 @@ export function YardDeliveriesClientUI({
   }, []);
   
   const handleLoadedQuantityChange = (pedido_item_id: string, newQuantity: number) => {
-      // CORREGIDO: comparación de string con string
       const item = displayOrderItems.find(i => i.id.toString() === pedido_item_id);
       if (!item) return;
       
@@ -251,7 +247,6 @@ export function YardDeliveriesClientUI({
             <Label htmlFor="order-select">Pedido Activo</Label>
             <Select onValueChange={setSelectedOrderId} value={selectedOrderId}>
               <SelectTrigger id="order-select"><SelectValue placeholder="Seleccionar Pedido..." /></SelectTrigger>
-              {/* CORREGIDO: order_number en lugar de orderNumber */}
               <SelectContent>{initialActiveOrders.map(o => <SelectItem key={o.id} value={o.id.toString()}>#{o.order_number} - {o.client.name}</SelectItem>)}</SelectContent>
             </Select>
           </div>
@@ -298,13 +293,14 @@ export function YardDeliveriesClientUI({
             <>
               <DialogHeader>
                 <DialogTitle>Confirmar Carga: {selectedDelivery.truck.placa}</DialogTitle>
-                {/* CORREGIDO: order_number en lugar de orderNumber */}
-                <DialogDescription>Ingresa la cantidad real cargada para cada producto de la orden #{selectedDelivery.order.order_number}.</DialogDescription>
+                {/* ✅ CORREGIDO: Se usa orderDetails en lugar de order */}
+                <DialogDescription>Ingresa la cantidad real cargada para cada producto de la orden #{selectedDelivery.orderDetails.order_number}.</DialogDescription>
               </DialogHeader>
               <div className="space-y-4 py-2">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="p-3 bg-muted rounded-lg text-sm space-y-2">
-                      <p><strong>Cliente:</strong> {selectedDelivery.order.client.name}</p>
+                      {/* ✅ CORREGIDO: Se usa orderDetails en lugar de order */}
+                      <p><strong>Cliente:</strong> {selectedDelivery.orderDetails.client.name}</p>
                       <p><strong>Conductor:</strong> {selectedDelivery.driver.name}</p>
                   </div>
                   <PhotoInput onSelect={setLoadPhoto} required={true} label="Foto de Carga (Obligatoria)" capture={true} />
@@ -314,9 +310,7 @@ export function YardDeliveriesClientUI({
                   <Label>Items del Pedido</Label>
                   <div className="border rounded-lg">
                     {displayOrderItems.map((item, index) => {
-                      // CORREGIDO: quantity en lugar de cantidadSolicitada
                       const dispatched = item.quantity - item.pending_quantity;
-                      // CORREGIDO: comparación de string con string
                       const loadedValue = loadedItems.find(li => li.pedido_item_id === item.id.toString())?.dispatched_quantity;
                       
                       return (
@@ -324,7 +318,6 @@ export function YardDeliveriesClientUI({
                           <div className="col-span-1 md:col-span-1 space-y-1">
                             <p className="font-medium">{item.product.name}</p>
                             <div className="text-xs text-muted-foreground space-y-0.5">
-                                {/* CORREGIDO: quantity en lugar de cantidadSolicitada */}
                                 <p>Pedido: <span className="font-bold">{item.quantity}</span> {item.product.unit}</p>
                                 <p>Despachado: <span className="font-bold text-blue-600">{dispatched.toFixed(2)}</span> {item.product.unit}</p>
                                 <p>Pendiente: <span className="font-bold text-green-600">{item.pending_quantity.toFixed(2)}</span> {item.product.unit}</p>
@@ -337,7 +330,6 @@ export function YardDeliveriesClientUI({
                                 id={`item-${item.id}`} 
                                 type="number" 
                                 value={loadedValue ?? 0}
-                                // CORREGIDO: convertir item.id (number) a string
                                 onChange={(e) => handleLoadedQuantityChange(item.id.toString(), parseFloat(e.target.value) || 0)} 
                                 max={item.pending_quantity}
                                 min={0}
