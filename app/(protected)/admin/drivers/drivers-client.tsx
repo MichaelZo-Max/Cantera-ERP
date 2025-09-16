@@ -1,7 +1,6 @@
 "use client";
 
-import type React from "react";
-import { useState, useCallback, useMemo } from "react";
+import React, { useState, useCallback, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -57,89 +56,9 @@ import { cn } from "@/lib/utils";
 
 // =================================================================
 // Componente Reutilizable para Selección Múltiple de Clientes
+// NOTA: Este componente ahora está definido DENTRO del componente principal
+// para asegurar que se re-renderice correctamente con los cambios.
 // =================================================================
-function MultiSelectCustomers({
-  allCustomers,
-  selectedIds,
-  onChange,
-}: {
-  allCustomers: Client[];
-  selectedIds: number[];
-  onChange: (ids: number[]) => void;
-}) {
-  const [open, setOpen] = useState(false);
-
-  const handleSelect = (customerId: number) => {
-    const newSelectedIds = selectedIds.includes(customerId)
-      ? selectedIds.filter((id) => id !== customerId)
-      : [...selectedIds, customerId];
-    onChange(newSelectedIds);
-  };
-
-  const selectedCustomers = useMemo(
-    () => allCustomers.filter((c) => selectedIds.includes(c.id)),
-    [allCustomers, selectedIds]
-  );
-
-  return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <Button
-          variant="outline"
-          role="combobox"
-          aria-expanded={open}
-          className="w-full justify-between h-auto"
-        >
-          <div className="flex flex-wrap gap-1">
-            {selectedCustomers.length > 0 ? (
-              selectedCustomers.map((customer) => (
-                <Badge
-                  key={customer.id}
-                  variant="secondary"
-                  className="rounded-sm"
-                >
-                  {customer.name}
-                </Badge>
-              ))
-            ) : (
-              <span className="text-muted-foreground font-normal">
-                Seleccionar clientes...
-              </span>
-            )}
-          </div>
-          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
-        <Command>
-          <CommandInput placeholder="Buscar cliente..." />
-          <CommandList>
-            <CommandEmpty>No se encontraron clientes.</CommandEmpty>
-            <CommandGroup>
-              {allCustomers.map((customer) => (
-                <CommandItem
-                  key={customer.id}
-                  value={customer.name}
-                  onSelect={() => handleSelect(customer.id)}
-                >
-                  <Check
-                    className={cn(
-                      "mr-2 h-4 w-4",
-                      selectedIds.includes(customer.id)
-                        ? "opacity-100"
-                        : "opacity-0"
-                    )}
-                  />
-                  {customer.name}
-                </CommandItem>
-              ))}
-            </CommandGroup>
-          </CommandList>
-        </Command>
-      </PopoverContent>
-    </Popover>
-  );
-}
 
 // =================================================================
 // Componente Principal de la UI de Choferes
@@ -151,6 +70,92 @@ export function DriversClientUI({
   initialDrivers: Driver[];
   initialCustomers: Client[];
 }) {
+  // --- Componente MultiSelect definido aquí ---
+  const MultiSelectCustomers = React.forwardRef<
+    HTMLButtonElement,
+    {
+      allCustomers: Client[];
+      selectedIds: number[];
+      onChange: (ids: number[]) => void;
+    }
+  >(({ allCustomers, selectedIds, onChange }, ref) => {
+    const [open, setOpen] = useState(false);
+
+    const handleSelect = (customerId: number) => {
+      const newSelectedIds = selectedIds.includes(customerId)
+        ? selectedIds.filter((id) => id !== customerId)
+        : [...selectedIds, customerId];
+      onChange(newSelectedIds);
+    };
+
+    const selectedCustomers = useMemo(
+      () => allCustomers.filter((c) => selectedIds.includes(c.id)),
+      [allCustomers, selectedIds]
+    );
+
+    return (
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
+          <Button
+            ref={ref}
+            variant="outline"
+            role="combobox"
+            aria-expanded={open}
+            className="w-full justify-between h-auto"
+          >
+            <div className="flex flex-wrap gap-1">
+              {selectedCustomers.length > 0 ? (
+                selectedCustomers.map((customer) => (
+                  <Badge
+                    key={customer.id}
+                    variant="secondary"
+                    className="rounded-sm"
+                  >
+                    {customer.name}
+                  </Badge>
+                ))
+              ) : (
+                <span className="text-muted-foreground font-normal">
+                  Seleccionar clientes...
+                </span>
+              )}
+            </div>
+            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-[--radix-popover-trigger-width] p-0 z-[99]">
+          <Command>
+            <CommandInput placeholder="Buscar cliente..." />
+            <CommandList>
+              <CommandEmpty>No se encontraron clientes.</CommandEmpty>
+              <CommandGroup>
+                {allCustomers.map((customer) => (
+                  <CommandItem
+                    key={customer.id}
+                    value={customer.name}
+                    onSelect={() => handleSelect(customer.id)}
+                  >
+                    <Check
+                      className={cn(
+                        "mr-2 h-4 w-4",
+                        selectedIds.includes(customer.id)
+                          ? "opacity-100"
+                          : "opacity-0"
+                      )}
+                    />
+                    {customer.name}
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            </CommandList>
+          </Command>
+        </PopoverContent>
+      </Popover>
+    );
+  });
+  MultiSelectCustomers.displayName = "MultiSelectCustomers";
+  // --- Fin de la definición de MultiSelect ---
+
   const [drivers, setDrivers] = useState<Driver[]>(initialDrivers);
   const [customers, setCustomers] = useState<Client[]>(initialCustomers);
   const [apiError, setApiError] = useState<string | null>(null);
@@ -211,20 +216,25 @@ export function DriversClientUI({
         ? `/api/drivers/${editingDriver.id}`
         : "/api/drivers";
 
+      const { client_ids, ...restOfData } = formData;
+      const body = {
+        ...restOfData,
+        customer_ids: client_ids,
+      };
+
       try {
         const res = await fetch(url, {
           method,
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(formData),
+          body: JSON.stringify(body),
         });
 
         if (!res.ok) {
           const errorText = await res.text();
           throw new Error(errorText || "Error al guardar el chofer");
         }
-        
-        // Recargamos la lista de choferes para tener los datos actualizados
-        const fetchResponse = await fetch('/api/drivers');
+
+        const fetchResponse = await fetch("/api/drivers");
         const updatedDrivers = await fetchResponse.json();
         setDrivers(updatedDrivers);
 
@@ -264,8 +274,8 @@ export function DriversClientUI({
               const errorText = await res.text();
               throw new Error(errorText || "Error al cambiar el estado");
             }
-            
-            const fetchResponse = await fetch('/api/drivers');
+
+            const fetchResponse = await fetch("/api/drivers");
             const updatedDrivers = await fetchResponse.json();
             setDrivers(updatedDrivers);
 
@@ -379,9 +389,15 @@ export function DriversClientUI({
                     onClick={() => handleToggleStatus(driver)}
                   >
                     {driver.is_active ? (
-                      <><Trash2 className="mr-2 h-4 w-4" />Desactivar</>
+                      <>
+                        <Trash2 className="mr-2 h-4 w-4" />
+                        Desactivar
+                      </>
                     ) : (
-                      <><CheckCircle className="mr-2 h-4 w-4" />Activar</>
+                      <>
+                        <CheckCircle className="mr-2 h-4 w-4" />
+                        Activar
+                      </>
                     )}
                   </Button>
                 </div>
@@ -411,24 +427,42 @@ export function DriversClientUI({
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-6 pt-4">
-            {/* ... (campos del formulario como antes) ... */}
             <div className="space-y-2">
               <Label htmlFor="name" className="font-semibold">
                 Nombre Completo
               </Label>
-              <Input id="name" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} required />
+              <Input
+                id="name"
+                value={formData.name}
+                onChange={(e) =>
+                  setFormData({ ...formData, name: e.target.value })
+                }
+                required
+              />
             </div>
             <div className="space-y-2">
               <Label htmlFor="docId" className="font-semibold">
                 Documento de Identidad
               </Label>
-              <Input id="docId" value={formData.docId} onChange={(e) => setFormData({ ...formData, docId: e.target.value })}/>
+              <Input
+                id="docId"
+                value={formData.docId}
+                onChange={(e) =>
+                  setFormData({ ...formData, docId: e.target.value })
+                }
+              />
             </div>
             <div className="space-y-2">
               <Label htmlFor="phone" className="font-semibold">
                 Teléfono
               </Label>
-              <Input id="phone" value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })}/>
+              <Input
+                id="phone"
+                value={formData.phone}
+                onChange={(e) =>
+                  setFormData({ ...formData, phone: e.target.value })
+                }
+              />
             </div>
             <div className="space-y-2">
               <Label htmlFor="customers" className="font-semibold">
@@ -437,31 +471,44 @@ export function DriversClientUI({
               <MultiSelectCustomers
                 allCustomers={customers}
                 selectedIds={formData.client_ids}
-                onChange={(ids) => setFormData({ ...formData, client_ids: ids })}
+                onChange={(ids) =>
+                  setFormData({ ...formData, client_ids: ids })
+                }
               />
             </div>
             {apiError && <p className="text-sm text-red-500">{apiError}</p>}
             <DialogFooter className="pt-4">
-              <Button type="button" variant="ghost" onClick={() => setShowDialog(false)}>
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => setShowDialog(false)}
+              >
                 Cancelar
               </Button>
               <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting ? "Guardando..." : <><Save className="mr-2 h-4 w-4" />Guardar Cambios</>}
+                {isSubmitting ? (
+                  "Guardando..."
+                ) : (
+                  <>
+                    <Save className="mr-2 h-4 w-4" />
+                    Guardar Cambios
+                  </>
+                )}
               </Button>
             </DialogFooter>
           </form>
         </DialogContent>
       </Dialog>
-      
+
       {options && (
-          <ConfirmationDialog
-            open={isOpen}
-            onOpenChange={(open) => !open && handleCancel()}
-            title={options.title}
-            description={options.description}
-            onConfirm={handleConfirm}
-            variant={options.variant}
-          />
+        <ConfirmationDialog
+          open={isOpen}
+          onOpenChange={(open) => !open && handleCancel()}
+          title={options.title}
+          description={options.description}
+          onConfirm={handleConfirm}
+          variant={options.variant}
+        />
       )}
     </div>
   );
