@@ -444,3 +444,31 @@ GO
 
 PRINT 'Vista RIP.VW_APP_DESPACHOS creada/actualizada con el nombre de columna estandarizado.';
 PRINT '¡Listo! La base de datos está ahora completamente alineada y estandarizada.';
+-- LOTE 1: CREAR LA TABLA DE UNIÓN PARA LA RELACIÓN MUCHOS-A-MUCHOS
+-- =================================================================
+-- Propósito: Crear la tabla que permite que un chofer esté asociado a múltiples clientes.
+IF OBJECT_ID('RIP.APP_CLIENTES_CHOFERES', 'U') IS NULL
+BEGIN
+    CREATE TABLE RIP.APP_CLIENTES_CHOFERES (
+        -- Columna para el ID del cliente, apunta a la tabla original.
+        cliente_id INT NOT NULL,
+        -- Columna para el ID del chofer de nuestra aplicación.
+        chofer_id INT NOT NULL,
+
+        -- Llave foránea que apunta a la tabla REAL de clientes (dbo.CLIENTES).
+        CONSTRAINT FK_CLIENTES_CHOFERES_CLIENTES FOREIGN KEY (cliente_id) REFERENCES dbo.CLIENTES(CODCLIENTE),
+
+        -- Llave foránea que apunta a la tabla de choferes de la aplicación.
+        CONSTRAINT FK_CLIENTES_CHOFERES_CHOFERES FOREIGN KEY (chofer_id) REFERENCES RIP.APP_CHOFERES(id),
+
+        -- Llave primaria compuesta para asegurar que no se dupliquen las relaciones.
+        -- (Un chofer no puede estar asignado dos veces al mismo cliente).
+        CONSTRAINT PK_APP_CLIENTES_CHOFERES PRIMARY KEY (cliente_id, chofer_id)
+    );
+    PRINT '¡Éxito! La tabla RIP.APP_CLIENTES_CHOFERES ha sido creada.';
+END
+ELSE
+BEGIN
+    PRINT 'Información: La tabla RIP.APP_CLIENTES_CHOFERES ya existe.';
+END
+GO -- Fin del lote

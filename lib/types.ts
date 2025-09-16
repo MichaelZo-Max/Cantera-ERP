@@ -73,6 +73,7 @@ export interface Driver {
   is_active?: boolean;
   createdAt?: Date;
   updatedAt?: Date;
+  clients?: Client[]; 
 }
 
 export interface Truck {

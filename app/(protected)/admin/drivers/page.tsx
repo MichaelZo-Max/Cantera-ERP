@@ -3,41 +3,54 @@
 export const dynamic = "force-dynamic";
 
 import { AppLayout } from "@/components/app-layout";
-import type { Driver } from "@/lib/types";
-import { DriversClientUI } from "./drivers-client"; // Importamos el componente de cliente
+// Asegúrate de importar ambos tipos
+import type { Driver, Client } from "@/lib/types"; 
+import { DriversClientUI } from "./drivers-client";
 
-// Función para obtener los datos en el servidor
-async function getDrivers(): Promise<{ drivers: Driver[] }> {
+// Función para obtener los choferes
+async function getDrivers(): Promise<Driver[]> {
   try {
     const baseUrl = process.env.NEXT_PUBLIC_API_URL;
-
     const res = await fetch(`${baseUrl}/api/drivers`, {
-      next: {
-        revalidate: 60,
-        tags: ["drivers"],
-      },
+      next: { tags: ["drivers"] },
     });
-
-    if (!res.ok) {
-      throw new Error("Failed to fetch drivers");
-    }
-
-    const drivers = await res.json();
-    return { drivers };
+    if (!res.ok) throw new Error("Failed to fetch drivers");
+    return res.json();
   } catch (error) {
-    console.error("Error cargando choferes en el servidor:", error);
-    return { drivers: [] };
+    console.error("Error cargando choferes:", error);
+    return []; // Devuelve un array vacío en caso de error
   }
 }
 
-// La página ahora es un Server Component, por eso es `async`
+// NUEVA FUNCIÓN: para obtener los clientes
+async function getClients(): Promise<Client[]> {
+  try {
+    const baseUrl = process.env.NEXT_PUBLIC_API_URL;
+    // La API de clientes se llama 'customers' según la estructura del proyecto
+    const res = await fetch(`${baseUrl}/api/customers`, {
+      next: { tags: ["customers"] },
+    });
+    if (!res.ok) throw new Error("Failed to fetch clients");
+    return res.json();
+  } catch (error) {
+    console.error("Error cargando clientes:", error);
+    return [];
+  }
+}
+
 export default async function DriversPage() {
-  const { drivers } = await getDrivers();
+  // Llamamos a ambas funciones para obtener los datos en paralelo
+  const [drivers, clients] = await Promise.all([
+    getDrivers(),
+    getClients(),
+  ]);
 
   return (
     <AppLayout title="Gestión de Choferes">
-      {/* Pasamos los datos iniciales al componente de cliente para que los renderice */}
-      <DriversClientUI initialDrivers={drivers} />
+      <DriversClientUI 
+        initialDrivers={drivers} 
+        initialCustomers={clients} // Pasamos la nueva prop con los clientes
+      />
     </AppLayout>
   );
 }
