@@ -22,12 +22,10 @@ export async function GET(request: Request, { params }: { params: { id: string }
         SELECT
             p.id, p.order_number, p.status, p.created_at, p.notes,
             c.id AS customer_id, c.name AS client_name, c.rfc,
-            d.name AS destino_name,
-            t.placa AS truck_placa
+            d.name AS destino_name
         FROM RIP.APP_PEDIDOS p
         JOIN RIP.VW_APP_CLIENTES c ON c.id = p.customer_id
         LEFT JOIN RIP.APP_DESTINOS d ON d.id = p.destination_id
-        LEFT JOIN RIP.APP_CAMIONES t ON t.id = p.truck_id
         WHERE p.id = @id;
     `
     const orderResult = await executeQuery(orderQuery, [{ name: "id", type: TYPES.Int, value: id }])
