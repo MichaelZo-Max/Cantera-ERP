@@ -9,7 +9,7 @@ import util from 'util';
 
 export const dynamic = "force-dynamic";
 
-// --- Helpers (mapeos solo a nivel de DTO, sin tocar SQL) ---
+// --- Helpers ---
 function mapDbStatusToUi(status: string): "PENDING" | "CARGADA" | "EXITED" {
   if (!status) return "PENDING";
   const s = status.toUpperCase();
@@ -19,11 +19,7 @@ function mapDbStatusToUi(status: string): "PENDING" | "CARGADA" | "EXITED" {
   return "PENDING";
 }
 
-function coalesce<T>(v: T | null | undefined, fallback: T): T {
-  return v == null ? fallback : v;
-}
-
-// --- PATCH (Función Corregida y Robustecida) ---
+// --- PATCH ---
 export async function PATCH(
   request: Request,
   { params }: { params: { id: string } }
@@ -45,12 +41,10 @@ export async function PATCH(
         return NextResponse.json({ error: "Faltan parámetros 'status' o 'userId'." }, { status: 400 });
     }
     
-    // Si el estado es CARGADA, los items y la foto son obligatorios
     if (status === 'CARGADA' && (!itemsJson || !photoFile)) {
         return NextResponse.json({ error: "Para marcar como 'CARGADA', se requieren los items y la foto." }, { status: 400 });
     }
 
-    // Procesar la foto si existe
     let photoUrl: string | null = null;
     if (photoFile) {
       const buffer = Buffer.from(await photoFile.arrayBuffer());
@@ -61,11 +55,9 @@ export async function PATCH(
       photoUrl = `/uploads/${filename}`;
     }
 
-    // Lógica para el estado CARGADA
     if (status === "CARGADA") {
         const parsedItems: Array<{ pedido_item_id: string | number; dispatched_quantity: number; }> = JSON.parse(itemsJson!);
         
-        // 1. Actualizar el encabezado del despacho
         const updateDespachoSql = `
             UPDATE RIP.APP_DESPACHOS
             SET 
@@ -84,7 +76,6 @@ export async function PATCH(
             { name: "photoUrl", type: TYPES.NVarChar, value: photoUrl },
         ]);
 
-        // 2. Insertar los items despachados
         const insertItemSql = `
             INSERT INTO RIP.APP_DESPACHOS_ITEMS (despacho_id, pedido_item_id, dispatched_quantity)
             VALUES (@despachoId, @pedidoItemId, @quantity);
@@ -97,7 +88,6 @@ export async function PATCH(
             ]);
         }
     } 
-    // Aquí puedes añadir la lógica para otros estados como "EXITED" si es necesario
     else {
         return NextResponse.json({ error: `Estado '${status}' no manejado.` }, { status: 400 });
     }
@@ -105,45 +95,111 @@ export async function PATCH(
     revalidateTag("deliveries");
     revalidateTag("orders");
     
-    // --- Devolver el despacho actualizado (Consulta Corregida) ---
     const getUpdatedDeliveryQuery = `
       SELECT
-          d.id as delivery_id, d.status as estado, d.notes, d.load_photo_url as loadPhoto,
-          d.exit_photo_url as exitPhoto,
-          p.id as order_id, p.order_number, p.status as orderStatus, p.created_at as orderCreatedAt, p.customer_id,
-          c.id as client_id, c.name as client_name,
-          t.id as truck_id, t.placa,
-          dr.id as driver_id, dr.name as driver_name, dr.phone as driver_phone
+        d.id                          AS delivery_id,
+        d.status                      AS estado,
+        d.notes                       AS notes,
+        d.load_photo_url              AS loadPhoto,
+        d.exit_photo_url              AS exitPhoto,
+        p.id                          AS order_id,
+        p.order_number                AS order_number,
+        p.customer_id                 AS customer_id,
+        p.status                      AS order_status,
+        p.created_at                  AS order_created_at,
+        c.id                          AS client_id,
+        c.name                        AS client_name,
+        t.id                          AS truck_id,
+        t.placa                       AS placa,
+        dr.id                         AS driver_id,
+        dr.name                       AS driver_name,
+        dr.phone                      AS driver_phone,
+        oi.id                         AS pedido_item_id,
+        oi.product_id                 AS product_id,
+        oi.quantity                   AS cantidadSolicitada,
+        oi.unit                       AS unit,
+        oi.price_per_unit             AS price_per_unit,
+        prod.name                     AS product_name,
+        di.id                         AS dispatch_item_id,
+        di.dispatched_quantity        AS dispatched_quantity
       FROM RIP.APP_DESPACHOS d
-      JOIN RIP.APP_PEDIDOS p ON p.id = d.order_id
-      JOIN RIP.VW_APP_CLIENTES c ON c.id = p.customer_id
-      JOIN RIP.APP_CAMIONES t ON t.id = d.truck_id
-      JOIN RIP.APP_CHOFERES dr ON dr.id = d.driver_id
+      JOIN RIP.APP_PEDIDOS p              ON p.id = d.order_id
+      JOIN RIP.VW_APP_CLIENTES c          ON c.id = p.customer_id
+      JOIN RIP.APP_CAMIONES t             ON t.id = d.truck_id
+      JOIN RIP.APP_CHOFERES dr            ON dr.id = d.driver_id
+      LEFT JOIN RIP.APP_PEDIDOS_ITEMS oi  ON oi.order_id = p.id
+      LEFT JOIN RIP.VW_APP_PRODUCTOS prod ON prod.id = oi.product_id
+      LEFT JOIN RIP.APP_DESPACHOS_ITEMS di ON di.pedido_item_id = oi.id
       WHERE d.id = @id
+      ORDER BY oi.id ASC
     `;
-    const updatedDeliveryRows = await executeQuery(getUpdatedDeliveryQuery, [
-      { name: "id", type: TYPES.Int, value: despachoId },
-    ]);
 
-    if (!updatedDeliveryRows || updatedDeliveryRows.length === 0) {
+    const rows = await executeQuery(getUpdatedDeliveryQuery, [{ name: "id", type: TYPES.Int, value: despachoId }]);
+
+    if (!rows || rows.length === 0) {
       return NextResponse.json({ error: "No se encontró el despacho después de la actualización." }, { status: 404 });
     }
 
-    // Para la respuesta, no necesitamos todos los joins, solo el estado actualizado del despacho
-    const finalDeliveryState = {
-        ...updatedDeliveryRows[0],
-        estado: mapDbStatusToUi(updatedDeliveryRows[0].estado),
-        // Aquí puedes re-hidratar el objeto 'Delivery' completo si es necesario para la UI
-    };
+    const deliveryMap = new Map<number, Delivery>();
+    for (const row of rows) {
+        if (!deliveryMap.has(row.delivery_id)) {
+            deliveryMap.set(row.delivery_id, {
+                delivery_id: row.delivery_id,
+                estado: mapDbStatusToUi(row.estado),
+                notes: row.notes ?? undefined,
+                loadPhoto: row.loadPhoto ?? undefined,
+                exitPhoto: row.exitPhoto ?? undefined,
+                orderDetails: {
+                    id: row.order_id,
+                    order_number: row.order_number,
+                    customer_id: row.customer_id,
+                    status: row.order_status,
+                    created_at: row.order_created_at,
+                    client: { id: row.client_id, name: row.client_name },
+                    items: [],
+                },
+                truck: { id: row.truck_id, placa: row.placa },
+                driver: { id: row.driver_id, name: row.driver_name, phone: row.driver_phone ?? undefined },
+            });
+        }
 
-    return NextResponse.json(finalDeliveryState);
+        const delivery = deliveryMap.get(row.delivery_id)!;
+        
+        if (row.pedido_item_id && !delivery.orderDetails.items.some(i => i.id === row.pedido_item_id)) {
+            delivery.orderDetails.items.push({
+                id: row.pedido_item_id,
+                order_id: row.order_id,
+                product_id: row.product_id,
+                quantity: row.cantidadSolicitada,
+                unit: row.unit,
+                price_per_unit: row.price_per_unit,
+                product: { id: row.product_id, name: row.product_name, unit: row.unit },
+                dispatchItems: [], 
+            });
+        }
+
+        if (row.dispatch_item_id) {
+            const orderItem = delivery.orderDetails.items.find(i => i.id === row.pedido_item_id);
+            // --- INICIO DE LA CORRECCIÓN ---
+            // Añadimos una comprobación para asegurar que `dispatchItems` es un array
+            if (orderItem && Array.isArray(orderItem.dispatchItems) && !orderItem.dispatchItems.some(di => di.id === row.dispatch_item_id)) {
+                orderItem.dispatchItems.push({
+                    id: row.dispatch_item_id,
+                    despacho_id: despachoId,
+                    pedido_item_id: row.pedido_item_id,
+                    dispatched_quantity: row.dispatched_quantity,
+                });
+            }
+            // --- FIN DE LA CORRECCIÓN ---
+        }
+    }
+    
+    const finalPayload = Array.from(deliveryMap.values())[0];
+
+    return NextResponse.json(finalPayload);
 
   } catch (e) {
-    // --- MANEJO DE ERRORES MEJORADO ---
-    // Imprimimos el error completo en el servidor para un diagnóstico detallado
     console.error("[API_DELIVERIES_PATCH_ERROR]", util.inspect(e, { depth: null }));
-    
-    // Devolvemos siempre una respuesta JSON con el mensaje de error
     const errorMessage = e instanceof Error ? e.message : "Ocurrió un error inesperado en el servidor.";
     return NextResponse.json({ error: "Error al actualizar el despacho", details: errorMessage }, { status: 500 });
   }

@@ -6,6 +6,7 @@ import Image from "next/image";
 import { toast } from "sonner";
 import { useAuth } from "@/components/auth-provider";
 import type { Delivery, Order, OrderItem as OrderItemType, Truck as TruckType, Driver, DeliveryItem } from "@/lib/types";
+import { useRouter } from "next/navigation"; // --- 1. Importar el router
 
 // --- UI Components ---
 import { Button } from "@/components/ui/button";
@@ -79,13 +80,14 @@ export function YardDeliveriesClientUI({
   initialDrivers,
 }: YardClientProps) {
   const { user } = useAuth();
-  
+  const router = useRouter(); // --- 2. Inicializar el router ---
+
   // --- State Management ---
   const [deliveries, setDeliveries] = useState<Delivery[]>(initialDeliveries);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedDelivery, setSelectedDelivery] = useState<Delivery | null>(null);
   const [showModal, setShowModal] = useState(false);
-  
+
   // Create Trip Form State
   const [selectedOrderId, setSelectedOrderId] = useState<string>('');
   const [selectedTruckId, setSelectedTruckId] = useState<string>('');
@@ -126,7 +128,6 @@ export function YardDeliveriesClientUI({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          // El backend espera order_id, no orderId
           order_id: parseInt(selectedOrderId),
           truck_id: parseInt(selectedTruckId),
           driver_id: parseInt(selectedDriverId),
@@ -136,8 +137,14 @@ export function YardDeliveriesClientUI({
       if (!res.ok) throw new Error(await res.text());
 
       const newDelivery = await res.json();
+      // Actualización local opcional, router.refresh() se encargará de la verdad
       setDeliveries((prev) => [newDelivery, ...prev]);
-      toast.success(`Nuevo viaje (Despacho #${newDelivery.id}) creado con éxito.`);
+      toast.success(`Nuevo viaje (Despacho #${newDelivery.delivery_id}) creado con éxito.`);
+      
+      // --- 3. Refrescar datos después de crear ---
+      router.refresh(); 
+
+      // Limpiar formulario
       setSelectedOrderId('');
       setSelectedTruckId('');
       setSelectedDriverId('');
@@ -146,7 +153,7 @@ export function YardDeliveriesClientUI({
     } finally {
       setIsCreatingTrip(false);
     }
-  }, [selectedOrderId, selectedTruckId, selectedDriverId]);
+  }, [selectedOrderId, selectedTruckId, selectedDriverId, router]); // Añadir router a las dependencias
 
   const handleSelectDelivery = useCallback((delivery: Delivery) => {
     if (delivery.estado !== "PENDING") {
@@ -221,17 +228,24 @@ export function YardDeliveriesClientUI({
 
       const updatedDelivery = await res.json();
       
+      // Actualización local opcional, router.refresh() se encargará de la verdad
       setDeliveries((prev) => prev.map((d) => (d.delivery_id === selectedDelivery.delivery_id ? updatedDelivery : d)));      
       
       toast.success(`Carga confirmada para ${selectedDelivery.truck.placa}`);
+      
+      // --- 4. Refrescar datos después de actualizar ---
+      router.refresh();
+
+      // Cerrar modal y limpiar estado
       setShowModal(false);
+      setSelectedDelivery(null);
+
     } catch (err: any) {
       toast.error("Error al confirmar la carga", { description: err.message });
     } finally {
       setIsSubmitting(false);
-      setSelectedDelivery(null);
     }
-  }, [selectedDelivery, loadedItems, loadPhoto, notes, user?.id]);
+  }, [selectedDelivery, loadedItems, loadPhoto, notes, user?.id, router]); // Añadir router a las dependencias
 
   // --- Render Method ---
   return (

@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { executeQuery, TYPES } from "@/lib/db";
 import { revalidateTag } from "next/cache";
 import { z } from "zod";
-import { Delivery } from "@/lib/types";
+import { Delivery, OrderItem } from "@/lib/types"; // Importar OrderItem
 
 export const dynamic = "force-dynamic";
 
@@ -23,41 +23,41 @@ export async function GET(_request: Request) {
     // Listado de despachos + info relacionada (SIN WHERE)
     const listQuery = `
       SELECT
-          d.id                              AS delivery_id,
-          d.status                          AS estado,
-          d.notes                           AS notes,
-          d.load_photo_url                  AS loadPhoto,
-          d.exit_photo_url                  AS exitPhoto,
+          d.id                                AS delivery_id,
+          d.status                            AS estado,
+          d.notes                             AS notes,
+          d.load_photo_url                    AS loadPhoto,
+          d.exit_photo_url                    AS exitPhoto,
 
-          p.id                              AS order_id,
-          p.order_number                    AS order_number,
-          p.customer_id                     AS customer_id,
-          p.status                          AS order_status,
-          p.created_at                      AS order_created_at,
+          p.id                                AS order_id,
+          p.order_number                      AS order_number,
+          p.customer_id                       AS customer_id,
+          p.status                            AS order_status,
+          p.created_at                        AS order_created_at,
 
-          c.id                              AS client_id,
-          c.name                            AS client_name,
+          c.id                                AS client_id,
+          c.name                              AS client_name,
 
-          t.id                              AS truck_id,
-          t.placa                           AS placa,
+          t.id                                AS truck_id,
+          t.placa                             AS placa,
 
-          dr.id                             AS driver_id,
-          dr.name                           AS driver_name,
-          dr.phone                          AS driver_phone,
+          dr.id                               AS driver_id,
+          dr.name                             AS driver_name,
+          dr.phone                            AS driver_phone,
 
-          oi.id                             AS pedido_item_id,
-          oi.product_id                     AS product_id,
-          oi.quantity                       AS cantidadSolicitada,
-          oi.unit                           AS unit,
-          oi.price_per_unit                 AS price_per_unit,
+          oi.id                               AS pedido_item_id,
+          oi.product_id                       AS product_id,
+          oi.quantity                         AS cantidadSolicitada,
+          oi.unit                             AS unit,
+          oi.price_per_unit                   AS price_per_unit,
 
-          prod.id                           AS product_id_from_prod,
-          prod.name                         AS product_name
+          prod.id                             AS product_id_from_prod,
+          prod.name                           AS product_name
       FROM RIP.APP_DESPACHOS d
-      JOIN RIP.APP_PEDIDOS p          ON p.id = d.order_id
-      JOIN RIP.VW_APP_CLIENTES c      ON c.id = p.customer_id
-      JOIN RIP.APP_CAMIONES t         ON t.id = d.truck_id
-      JOIN RIP.APP_CHOFERES dr        ON dr.id = d.driver_id
+      JOIN RIP.APP_PEDIDOS p        ON p.id = d.order_id
+      JOIN RIP.VW_APP_CLIENTES c    ON c.id = p.customer_id
+      JOIN RIP.APP_CAMIONES t       ON t.id = d.truck_id
+      JOIN RIP.APP_CHOFERES dr      ON dr.id = d.driver_id
       LEFT JOIN RIP.APP_PEDIDOS_ITEMS oi ON oi.order_id = p.id
       LEFT JOIN RIP.VW_APP_PRODUCTOS prod ON prod.id = oi.product_id
       ORDER BY d.id DESC, oi.id ASC
@@ -150,7 +150,7 @@ export async function POST(request: Request) {
     const truckId = parsed.truck_id ?? parsed.truckId!;
     const driverId = parsed.driver_id ?? parsed.driverId!;
 
-    // ⚠️ Sin aliases dentro del OUTPUT. Usamos tabla temporal para capturar el id.
+    // 1. Insertar el despacho y obtener su información básica
     const insertAndSelectQuery = `
       DECLARE @new TABLE (id INT);
       INSERT INTO RIP.APP_DESPACHOS (order_id, truck_id, driver_id, status, created_at)
@@ -158,43 +158,76 @@ export async function POST(request: Request) {
       VALUES (@orderId, @truckId, @driverId, 'PENDIENTE', GETDATE());
 
       SELECT 
-        d.id                               AS delivery_id,
-        d.status                           AS estado,
-        d.notes                            AS notes,
-        d.load_photo_url                   AS loadPhoto,
-        d.exit_photo_url                   AS exitPhoto,
-
-        p.id                               AS order_id,
-        p.order_number                     AS order_number,
-        p.customer_id                      AS customer_id,
-        p.status                           AS order_status,
-        p.created_at                       AS order_created_at,
-
-        c.id                               AS client_id,
-        c.name                             AS client_name,
-
-        t.id                               AS truck_id,
-        t.placa                            AS placa,
-
-        dr.id                              AS driver_id,
-        dr.name                            AS driver_name,
-        dr.phone                           AS driver_phone
+        d.id                          AS delivery_id,
+        d.status                      AS estado,
+        d.notes                       AS notes,
+        d.load_photo_url              AS loadPhoto,
+        d.exit_photo_url              AS exitPhoto,
+        p.id                          AS order_id,
+        p.order_number                AS order_number,
+        p.customer_id                 AS customer_id,
+        p.status                      AS order_status,
+        p.created_at                  AS order_created_at,
+        c.id                          AS client_id,
+        c.name                        AS client_name,
+        t.id                          AS truck_id,
+        t.placa                       AS placa,
+        dr.id                         AS driver_id,
+        dr.name                       AS driver_name,
+        dr.phone                      AS driver_phone
       FROM RIP.APP_DESPACHOS d
-      JOIN RIP.APP_PEDIDOS p            ON p.id = d.order_id
-      JOIN RIP.VW_APP_CLIENTES c        ON c.id = p.customer_id
-      LEFT JOIN RIP.APP_CAMIONES t      ON t.id = d.truck_id
-      LEFT JOIN RIP.APP_CHOFERES dr     ON dr.id = d.driver_id
+      JOIN RIP.APP_PEDIDOS p          ON p.id = d.order_id
+      JOIN RIP.VW_APP_CLIENTES c      ON c.id = p.customer_id
+      LEFT JOIN RIP.APP_CAMIONES t    ON t.id = d.truck_id
+      LEFT JOIN RIP.APP_CHOFERES dr   ON dr.id = d.driver_id
       WHERE d.id = (SELECT TOP 1 id FROM @new);
     `;
 
-    const rows = await executeQuery(insertAndSelectQuery, [
+    const deliveryRows = await executeQuery(insertAndSelectQuery, [
       { name: "orderId", type: TYPES.Int, value: orderId },
       { name: "truckId", type: TYPES.Int, value: truckId },
       { name: "driverId", type: TYPES.Int, value: driverId },
     ]);
 
-    const r = rows[0];
-    // Mapeo al contrato del front (Delivery con orderDetails) — coincide con tu UI:contentReference[oaicite:2]{index=2}:contentReference[oaicite:3]{index=3}
+    if (deliveryRows.length === 0) {
+        throw new Error("No se pudo crear el despacho en la base de datos.");
+    }
+    const r = deliveryRows[0];
+    
+    // --- INICIO DE LA CORRECCIÓN ---
+
+    // 2. Obtener los items del pedido por separado
+    const itemsQuery = `
+        SELECT
+            oi.id                   AS pedido_item_id,
+            oi.product_id           AS product_id,
+            oi.quantity             AS cantidadSolicitada,
+            oi.unit                 AS unit,
+            oi.price_per_unit       AS price_per_unit,
+            prod.name               AS product_name
+        FROM RIP.APP_PEDIDOS_ITEMS oi
+        JOIN RIP.VW_APP_PRODUCTOS prod ON prod.id = oi.product_id
+        WHERE oi.order_id = @orderId
+        ORDER BY oi.id ASC
+    `;
+    const itemRows = await executeQuery(itemsQuery, [{ name: "orderId", type: TYPES.Int, value: orderId }]);
+
+    const orderItems: OrderItem[] = itemRows.map(itemRow => ({
+        id: itemRow.pedido_item_id,
+        order_id: orderId,
+        product_id: itemRow.product_id,
+        quantity: itemRow.cantidadSolicitada,
+        unit: itemRow.unit,
+        price_per_unit: itemRow.price_per_unit,
+        product: {
+            id: itemRow.product_id,
+            name: itemRow.product_name,
+            unit: itemRow.unit,
+        },
+        dispatchItems: [],
+    }));
+
+    // 3. Construir el payload completo
     const payload: Delivery = {
       delivery_id: r.delivery_id,
       estado: mapDbStatusToUi(r.estado),
@@ -208,14 +241,17 @@ export async function POST(request: Request) {
         status: r.order_status,
         created_at: r.order_created_at,
         client: { id: r.client_id, name: r.client_name },
-        items: [], // si necesitas, puedes cargar items aparte
+        items: orderItems, // <--- Aquí incluimos los items
       },
       truck: { id: r.truck_id, placa: r.placa },
       driver: { id: r.driver_id, name: r.driver_name, phone: r.driver_phone ?? undefined },
     };
 
+    // --- FIN DE LA CORRECCIÓN ---
+
     revalidateTag("deliveries");
     return NextResponse.json(payload, { status: 201 });
+
   } catch (e) {
     if (e instanceof z.ZodError) {
       return new NextResponse(JSON.stringify(e.errors), { status: 400 });
