@@ -24,6 +24,8 @@ export const createOrderItemSchema = z.object({
  */
 export const createOrderSchema = z.object({
   customer_id: z.number({ required_error: "El cliente es requerido." }),
+  
+  total: z.number(),
 
   // 'destination_id' es opcional y puede ser nulo, tal como lo maneja la API.
   destination_id: z.number().nullable().optional(),

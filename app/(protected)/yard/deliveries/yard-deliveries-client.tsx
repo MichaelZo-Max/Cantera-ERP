@@ -1,3 +1,4 @@
+// app/(protected)/yard/deliveries/yard-deliveries-client.tsx
 "use client";
 
 import React, { useState, useMemo, useCallback } from "react";
@@ -293,13 +294,11 @@ export function YardDeliveriesClientUI({
             <>
               <DialogHeader>
                 <DialogTitle>Confirmar Carga: {selectedDelivery.truck.placa}</DialogTitle>
-                {/* ✅ CORREGIDO: Se usa orderDetails en lugar de order */}
                 <DialogDescription>Ingresa la cantidad real cargada para cada producto de la orden #{selectedDelivery.orderDetails.order_number}.</DialogDescription>
               </DialogHeader>
               <div className="space-y-4 py-2">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="p-3 bg-muted rounded-lg text-sm space-y-2">
-                      {/* ✅ CORREGIDO: Se usa orderDetails en lugar de order */}
                       <p><strong>Cliente:</strong> {selectedDelivery.orderDetails.client.name}</p>
                       <p><strong>Conductor:</strong> {selectedDelivery.driver.name}</p>
                   </div>

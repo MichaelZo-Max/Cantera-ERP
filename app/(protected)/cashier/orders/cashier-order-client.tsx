@@ -137,7 +137,6 @@ export function CashierOrderClientUI({
     setIsSubmitting(true);
 
     try {
-      // 1. Construir el objeto de datos que la API espera (sin truck_id ni total)
       const orderData = {
         customer_id: parseInt(selectedcustomer_id, 10),
         destination_id: selectedDestinationId
@@ -149,6 +148,7 @@ export function CashierOrderClientUI({
           price_per_unit: item.pricePerUnit,
           unit: item.product.unit || "UNIDAD",
         })),
+        total: total,
       };
 
       // 2. Enviar la solicitud como JSON
@@ -170,7 +170,7 @@ export function CashierOrderClientUI({
       }
 
       const result = await res.json();
-      toast.success(`Pedido #${result.id} creado exitosamente.`);
+      toast.success(`Pedido #${result.orderId} creado exitosamente.`);
       router.push("/cashier/orders/list"); // Redirigir
     } catch (err: any) {
       toast.error("Error al crear el pedido", { description: err?.message });

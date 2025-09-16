@@ -55,78 +55,63 @@ export async function GET() {
  */
 export async function POST(req: Request) {
   try {
-    const { user } = await getUser()
-    if (!user) {
-      return new NextResponse("No autorizado. Inicia sesión para continuar.", {
-        status: 401,
-      })
+    const { user } = await getUser();
+    if (!user || !user.id) {
+      return NextResponse.json({ error: "No autorizado. Inicia sesión para continuar." }, { status: 401 });
     }
 
-    const body = await req.json()
+    const body = await req.json();
 
-    // Validar con el esquema corregido
-    const validation = createOrderSchema.safeParse(body)
+    const validation = createOrderSchema.safeParse(body);
     if (!validation.success) {
-      return new NextResponse(JSON.stringify(validation.error.errors), {
-        status: 400,
-      })
+      return NextResponse.json({ error: "Datos de la orden inválidos.", details: validation.error.flatten() }, { status: 400 });
     }
 
-    // Se extraen los datos validados. Ahora 'destination_id' está disponible.
-    const { customer_id, destination_id, items } = validation.data
+    // Ahora, gracias al cambio en validations.ts, 'total' será reconocido aquí
+    const { customer_id, items, total } = validation.data;
 
-    // Insertar el encabezado del pedido
-    const pedidoSql = `
-      INSERT INTO CANTERA.rip.APP_PEDIDOS (customer_id, destination_id, created_by, status)
-      OUTPUT INSERTED.id
-      VALUES (@customer_id, @destination_id, @created_by, 'AWAITING_PAYMENT');
-    `
+    const orderHeaderSql = `
+        INSERT INTO RIP.APP_PEDIDOS (customer_id, total, status, created_by)
+        OUTPUT INSERTED.id
+        VALUES (@customer_id, @total, 'PAID', @created_by);
+    `;
 
-    const pedidoParams = [
-      { name: "customer_id", type: TYPES.Int, value: customer_id },
-      { name: "destination_id", type: TYPES.Int, value: destination_id },
-      { name: "created_by", type: TYPES.Int, value: user.id },
-    ]
+    const headerResult = await executeQuery(orderHeaderSql, [
+      { name: 'customer_id', type: TYPES.Int, value: customer_id },
+      { name: 'total', type: TYPES.Decimal, value: total },
+      { name: 'created_by', type: TYPES.Int, value: user.id },
+    ]);
 
-    const pedidoResult = await executeQuery<any>(pedidoSql, pedidoParams)
-    const pedido_id = pedidoResult[0].id
+    if (!headerResult || headerResult.length === 0 || !headerResult[0].id) {
+      throw new Error("Falló la creación del encabezado de la orden en la base de datos.");
+    }
 
-    // Insertar los items del pedido
+    const newOrderId = headerResult[0].id;
+
     for (const item of items) {
       const itemSql = `
-        INSERT INTO CANTERA.rip.APP_PEDIDOS_ITEMS (order_id, product_id, quantity, price_per_unit, unit)
-        VALUES (@order_id, @product_id, @quantity, @price_per_unit, @unit);
-      `
-      const itemParams = [
-        { name: "order_id", type: TYPES.Int, value: pedido_id },
-        // Ahora 'item.product_id' coincide con el esquema corregido.
+          INSERT INTO RIP.APP_PEDIDOS_ITEMS (order_id, product_id, quantity, unit, price_per_unit)
+          VALUES (@order_id, @product_id, @quantity, @unit, @price_per_unit);
+      `;
+      await executeQuery(itemSql, [
+        { name: "order_id", type: TYPES.Int, value: newOrderId },
         { name: "product_id", type: TYPES.Int, value: item.product_id },
         { name: "quantity", type: TYPES.Decimal, value: item.quantity },
-        {
-          name: "price_per_unit",
-          type: TYPES.Decimal,
-          value: item.price_per_unit,
-        },
-        { name: "unit", type: TYPES.VarChar, value: item.unit },
-      ]
-      await executeQuery(itemSql, itemParams)
+        { name: "unit", type: TYPES.NVarChar, value: item.unit },
+        { name: "price_per_unit", type: TYPES.Decimal, value: item.price_per_unit },
+      ]);
     }
 
-    revalidateTag("orders")
+    revalidateTag("orders");
 
     return NextResponse.json({
-      id: pedido_id,
-      message: "Pedido creado con éxito",
-    })
+      message: "Orden creada con éxito",
+      orderId: newOrderId,
+    }, { status: 201 });
+
   } catch (error) {
-    if (error instanceof SyntaxError) {
-      return new NextResponse("JSON inválido en el cuerpo de la solicitud.", {
-        status: 400,
-      })
-    }
-    console.error("[API_ORDERS_POST]", error)
-    return new NextResponse("Error interno al crear el pedido", {
-      status: 500,
-    })
+    console.error("[API_ORDERS_POST_ERROR]", error);
+    const errorMessage = error instanceof Error ? error.message : "Ocurrió un error desconocido";
+    return NextResponse.json({ error: "Error interno al crear la orden", details: errorMessage }, { status: 500 });
   }
 }

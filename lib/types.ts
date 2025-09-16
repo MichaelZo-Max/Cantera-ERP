@@ -96,6 +96,7 @@ export interface OrderItem {
   quantity: number;
   price_per_unit: number;
   unit: string;
+  totalDispatched?: number;
   created_at?: Date;
   updated_at?: Date;
   dispatchItems?: DeliveryItem[];
