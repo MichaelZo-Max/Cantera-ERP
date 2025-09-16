@@ -7,16 +7,37 @@ export const dynamic = "force-dynamic";
 
 /**
  * @route   GET /api/drivers
- * @desc    Obtener todos los choferes desde la tabla RIP.APP_CHOFERES.
+ * @desc    Obtener todos los choferes y sus clientes asociados.
  */
 export async function GET() {
   try {
+    // Consulta mejorada con LEFT JOIN y agregación JSON
     const query = `
-      SELECT id, name, docId, phone, is_active 
-      FROM RIP.APP_CHOFERES 
-      ORDER BY name;
+      SELECT
+        d.id,
+        d.name,
+        d.docId,
+        d.phone,
+        d.is_active,
+        -- Usamos JSON_QUERY para construir un array de los clientes asociados
+        (
+          SELECT c.id, c.name
+          FROM RIP.VW_APP_CLIENTES c
+          JOIN RIP.APP_CLIENTES_CHOFERES cc ON c.id = cc.cliente_id
+          WHERE cc.chofer_id = d.id
+          FOR JSON PATH
+        ) AS clients
+      FROM RIP.APP_CHOFERES d
+      ORDER BY d.name;
     `;
-    const drivers = await executeQuery(query);
+    const driversData = await executeQuery(query);
+
+    // Parseamos el string JSON a un objeto
+    const drivers = driversData.map((driver: any) => ({
+      ...driver,
+      clients: driver.clients ? JSON.parse(driver.clients) : [],
+    }));
+
     return NextResponse.json(drivers);
   } catch (error) {
     console.error("[API_DRIVERS_GET]", error);

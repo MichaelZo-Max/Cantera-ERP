@@ -1,11 +1,17 @@
 "use client";
 
 import type React from "react";
-import { useState, useCallback, useMemo, useEffect } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
@@ -28,9 +34,7 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
-import { AnimatedCard } from "@/components/ui/animated-card";
-import { GradientButton } from "@/components/ui/gradient-button";
-import type { Driver, Client } from "@/lib/types"; // Asegúrate de tener Customer en tus tipos
+import type { Driver, Client } from "@/lib/types";
 import {
   UserCheck,
   Plus,
@@ -41,14 +45,14 @@ import {
   Save,
   Phone,
   ChevronsUpDown,
-  X,
   Check,
 } from "lucide-react";
 import { toast } from "sonner";
-import { LoadingSkeleton } from "@/components/ui/loading-skeleton";
-import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
 import { useConfirmation } from "@/hooks/use-confirmation";
 import { EmptyState } from "@/components/ui/empty-state";
+import { AnimatedCard } from "@/components/ui/animated-card";
+import { PageHeader } from "@/components/page-header";
+import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
 import { cn } from "@/lib/utils";
 
 // =================================================================
@@ -137,13 +141,12 @@ function MultiSelectCustomers({
   );
 }
 
-
 // =================================================================
 // Componente Principal de la UI de Choferes
 // =================================================================
 export function DriversClientUI({
   initialDrivers,
-  initialCustomers, // Recibimos la lista de clientes
+  initialCustomers,
 }: {
   initialDrivers: Driver[];
   initialCustomers: Client[];
@@ -154,13 +157,12 @@ export function DriversClientUI({
   const [searchTerm, setSearchTerm] = useState("");
   const [showDialog, setShowDialog] = useState(false);
   const [editingDriver, setEditingDriver] = useState<Driver | null>(null);
-  
-  // Adaptamos el estado del formulario
+
   const [formData, setFormData] = useState({
     name: "",
     docId: "",
     phone: "",
-    customer_ids: [] as number[], // Array para los IDs de clientes
+    client_ids: [] as number[],
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -181,31 +183,21 @@ export function DriversClientUI({
 
   const handleNewDriver = useCallback(() => {
     setEditingDriver(null);
-    setFormData({ name: "", docId: "", phone: "", customer_ids: [] });
+    setFormData({ name: "", docId: "", phone: "", client_ids: [] });
     setApiError(null);
     setShowDialog(true);
   }, []);
 
-  const handleEditDriver = useCallback(async (driver: Driver) => {
-    // Al editar, buscamos los datos completos del chófer para obtener sus clientes
-    try {
-        const res = await fetch(`/api/drivers/${driver.id}`);
-        if (!res.ok) throw new Error("No se pudo obtener la información del chófer.");
-        const fullDriverData = await res.json();
-        
-        setEditingDriver(fullDriverData);
-        setFormData({
-            name: fullDriverData.name,
-            docId: fullDriverData.docId || "",
-            phone: fullDriverData.phone || "",
-            // Extraemos los IDs de los clientes asociados
-            customer_ids: fullDriverData.customers?.map((c: Client) => c.id) || [],
-        });
-        setApiError(null);
-        setShowDialog(true);
-    } catch (error: any) {
-        toast.error("Error al cargar datos", { description: error.message });
-    }
+  const handleEditDriver = useCallback((driver: Driver) => {
+    setEditingDriver(driver);
+    setFormData({
+      name: driver.name,
+      docId: driver.docId || "",
+      phone: driver.phone || "",
+      client_ids: driver.clients?.map((c) => c.id) || [],
+    });
+    setApiError(null);
+    setShowDialog(true);
   }, []);
 
   const handleSubmit = useCallback(
@@ -223,7 +215,6 @@ export function DriversClientUI({
         const res = await fetch(url, {
           method,
           headers: { "Content-Type": "application/json" },
-          // El formData ahora incluye `customer_ids`
           body: JSON.stringify(formData),
         });
 
@@ -231,19 +222,15 @@ export function DriversClientUI({
           const errorText = await res.text();
           throw new Error(errorText || "Error al guardar el chofer");
         }
+        
+        // Recargamos la lista de choferes para tener los datos actualizados
+        const fetchResponse = await fetch('/api/drivers');
+        const updatedDrivers = await fetchResponse.json();
+        setDrivers(updatedDrivers);
 
-        const savedDriver = await res.json();
-
-        if (editingDriver) {
-          setDrivers((prevDrivers) =>
-            prevDrivers.map((d) => (d.id === savedDriver.id ? savedDriver : d))
-          );
-          toast.success("Chofer actualizado exitosamente.");
-        } else {
-          setDrivers((prev) => [...prev, savedDriver]);
-          toast.success("Chofer creado exitosamente.");
-        }
-
+        toast.success(
+          `Chofer ${editingDriver ? "actualizado" : "creado"} exitosamente.`
+        );
         setShowDialog(false);
       } catch (err: any) {
         setApiError(err.message);
@@ -257,49 +244,225 @@ export function DriversClientUI({
 
   const handleToggleStatus = useCallback(
     (driver: Driver) => {
-      // (La lógica de este manejador no necesita cambios)
-      // ...
+      confirm(
+        {
+          title: `¿${driver.is_active ? "Desactivar" : "Activar"} Chofer?`,
+          description: `¿Estás seguro de que quieres ${
+            driver.is_active ? "desactivar" : "activar"
+          } a ${driver.name}?`,
+          variant: driver.is_active ? "destructive" : "default",
+        },
+        async () => {
+          try {
+            const res = await fetch(`/api/drivers/${driver.id}`, {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ is_active: !driver.is_active }),
+            });
+
+            if (!res.ok) {
+              const errorText = await res.text();
+              throw new Error(errorText || "Error al cambiar el estado");
+            }
+            
+            const fetchResponse = await fetch('/api/drivers');
+            const updatedDrivers = await fetchResponse.json();
+            setDrivers(updatedDrivers);
+
+            toast.success("Estado del chofer actualizado correctamente.");
+          } catch (err: any) {
+            toast.error("Error al actualizar", { description: err.message });
+          }
+        }
+      );
     },
     [confirm]
   );
 
   return (
     <div className="space-y-8 animate-fade-in">
-        {/* ... (Header y barra de búsqueda sin cambios) ... */}
+      <PageHeader
+        title="Choferes"
+        description="Gestiona los choferes de la empresa."
+        actions={
+          <Button onClick={handleNewDriver}>
+            <Plus className="mr-2 h-4 w-4" />
+            Nuevo Chofer
+          </Button>
+        }
+      />
 
-        {/* ... (Grilla de Choferes sin cambios) ... */}
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+        <Input
+          placeholder="Buscar por nombre o documento..."
+          className="pl-10"
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+        />
+      </div>
 
-        {/* Dialog de Crear/Editar (MODIFICADO) */}
-        <Dialog open={showDialog} onOpenChange={setShowDialog}>
-            <DialogContent className="sm:max-w-lg">
-                <DialogHeader>
-                    {/* ... (Título y descripción del diálogo sin cambios) ... */}
-                </DialogHeader>
-                <form onSubmit={handleSubmit} className="space-y-6 pt-4">
-                    {/* ... (Campos de Nombre, Documento, Teléfono sin cambios) ... */}
-                    
-                    {/* NUEVO CAMPO: Selector Múltiple de Clientes */}
-                    <div className="space-y-2">
-                        <Label htmlFor="customers" className="font-semibold">
-                            Clientes Asociados
-                        </Label>
-                        <MultiSelectCustomers
-                            allCustomers={customers}
-                            selectedIds={formData.customer_ids}
-                            onChange={(ids) =>
-                                setFormData({ ...formData, customer_ids: ids })
-                            }
-                        />
+      {filteredDrivers.length > 0 ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+          {filteredDrivers.map((driver, index) => (
+            <AnimatedCard
+              key={driver.id}
+              hoverEffect="lift"
+              animateIn
+              delay={index * 100}
+              className="glass overflow-hidden flex flex-col"
+            >
+              <CardHeader className="pb-3">
+                <div className="flex justify-between items-start">
+                  <CardTitle className="text-lg font-bold">
+                    {driver.name}
+                  </CardTitle>
+                  <Badge variant={driver.is_active ? "default" : "destructive"}>
+                    {driver.is_active ? "Activo" : "Inactivo"}
+                  </Badge>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-4 flex-grow">
+                <div className="space-y-2 text-sm text-muted-foreground">
+                  {driver.docId && (
+                    <div className="flex items-center space-x-2">
+                      <UserCheck className="h-4 w-4" />
+                      <span>{driver.docId}</span>
                     </div>
+                  )}
+                  {driver.phone && (
+                    <div className="flex items-center space-x-2">
+                      <Phone className="h-4 w-4" />
+                      <span>{driver.phone}</span>
+                    </div>
+                  )}
+                </div>
 
-                    {apiError && <p className="text-sm text-red-500">{apiError}</p>}
+                <div className="space-y-2 pt-2 border-t">
+                  <Label className="font-semibold text-xs text-foreground">
+                    Clientes Asociados:
+                  </Label>
+                  <div className="flex flex-wrap gap-1">
+                    {driver.clients && driver.clients.length > 0 ? (
+                      driver.clients.map((client) => (
+                        <Badge
+                          key={client.id}
+                          variant="secondary"
+                          className="font-normal"
+                        >
+                          {client.name}
+                        </Badge>
+                      ))
+                    ) : (
+                      <p className="text-xs text-muted-foreground italic">
+                        No tiene clientes asignados.
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </CardContent>
+              <CardFooter className="pt-4 border-t mt-auto">
+                <div className="flex space-x-2 w-full">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="flex-1"
+                    onClick={() => handleEditDriver(driver)}
+                  >
+                    <Edit className="mr-2 h-4 w-4" />
+                    Editar
+                  </Button>
+                  <Button
+                    variant={driver.is_active ? "destructive" : "default"}
+                    size="sm"
+                    className="flex-1"
+                    onClick={() => handleToggleStatus(driver)}
+                  >
+                    {driver.is_active ? (
+                      <><Trash2 className="mr-2 h-4 w-4" />Desactivar</>
+                    ) : (
+                      <><CheckCircle className="mr-2 h-4 w-4" />Activar</>
+                    )}
+                  </Button>
+                </div>
+              </CardFooter>
+            </AnimatedCard>
+          ))}
+        </div>
+      ) : (
+        <EmptyState
+          icon={<Search />}
+          title="No se encontraron choferes"
+          description="Prueba con otro término de búsqueda o crea un nuevo chofer."
+        />
+      )}
 
-                    <DialogFooter className="pt-4">
-                        {/* ... (Botones de Cancelar y Guardar sin cambios) ... */}
-                    </DialogFooter>
-                </form>
-            </DialogContent>
-        </Dialog>
+      {/* DIALOG PARA CREAR/EDITAR CHOFER */}
+      <Dialog open={showDialog} onOpenChange={setShowDialog}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>
+              {editingDriver ? "Editar Chofer" : "Crear Nuevo Chofer"}
+            </DialogTitle>
+            <DialogDescription>
+              {editingDriver
+                ? "Actualiza los datos del chofer."
+                : "Completa el formulario para añadir un nuevo chofer."}
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleSubmit} className="space-y-6 pt-4">
+            {/* ... (campos del formulario como antes) ... */}
+            <div className="space-y-2">
+              <Label htmlFor="name" className="font-semibold">
+                Nombre Completo
+              </Label>
+              <Input id="name" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} required />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="docId" className="font-semibold">
+                Documento de Identidad
+              </Label>
+              <Input id="docId" value={formData.docId} onChange={(e) => setFormData({ ...formData, docId: e.target.value })}/>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="phone" className="font-semibold">
+                Teléfono
+              </Label>
+              <Input id="phone" value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })}/>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="customers" className="font-semibold">
+                Clientes Asociados
+              </Label>
+              <MultiSelectCustomers
+                allCustomers={customers}
+                selectedIds={formData.client_ids}
+                onChange={(ids) => setFormData({ ...formData, client_ids: ids })}
+              />
+            </div>
+            {apiError && <p className="text-sm text-red-500">{apiError}</p>}
+            <DialogFooter className="pt-4">
+              <Button type="button" variant="ghost" onClick={() => setShowDialog(false)}>
+                Cancelar
+              </Button>
+              <Button type="submit" disabled={isSubmitting}>
+                {isSubmitting ? "Guardando..." : <><Save className="mr-2 h-4 w-4" />Guardar Cambios</>}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+      
+      {options && (
+          <ConfirmationDialog
+            open={isOpen}
+            onOpenChange={(open) => !open && handleCancel()}
+            title={options.title}
+            description={options.description}
+            onConfirm={handleConfirm}
+            variant={options.variant}
+          />
+      )}
     </div>
   );
 }
