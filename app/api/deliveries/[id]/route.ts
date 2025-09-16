@@ -1,4 +1,3 @@
-// app/api/deliveries/[id]/route.ts
 import { NextResponse } from "next/server";
 import { executeQuery, TYPES } from "@/lib/db";
 import path from "path";
@@ -41,23 +40,86 @@ export async function PATCH(
         return NextResponse.json({ error: "Faltan parámetros 'status' o 'userId'." }, { status: 400 });
     }
     
-    if (status === 'CARGADA' && (!itemsJson || !photoFile)) {
-        return NextResponse.json({ error: "Para marcar como 'CARGADA', se requieren los items y la foto." }, { status: 400 });
-    }
+    if (status === 'CARGADA') {
+        if (!itemsJson || !photoFile) {
+            return NextResponse.json({ error: "Para marcar como 'CARGADA', se requieren los items y la foto." }, { status: 400 });
+        }
 
-    let photoUrl: string | null = null;
-    if (photoFile) {
-      const buffer = Buffer.from(await photoFile.arrayBuffer());
-      const filename = `${Date.now()}_${photoFile.name.replace(/\s/g, "_")}`;
-      const uploadDir = path.join(process.cwd(), "public/uploads");
-      await mkdir(uploadDir, { recursive: true });
-      await writeFile(path.join(uploadDir, filename), buffer);
-      photoUrl = `/uploads/${filename}`;
-    }
+        const parsedItems: Array<{ pedido_item_id: number; dispatched_quantity: number; }> = JSON.parse(itemsJson);
 
-    if (status === "CARGADA") {
-        const parsedItems: Array<{ pedido_item_id: string | number; dispatched_quantity: number; }> = JSON.parse(itemsJson!);
+        // --- VALIDACIÓN DE CANTIDADES EN BACKEND (LA SOLUCIÓN CRÍTICA) ---
+        for (const item of parsedItems) {
+            const { pedido_item_id, dispatched_quantity } = item;
+
+            if (dispatched_quantity < 0) {
+                 return NextResponse.json({ error: `La cantidad para el producto no puede ser negativa.` }, { status: 400 });
+            }
+            if (dispatched_quantity === 0) continue; 
+
+            const validationSql = `
+                DECLARE @totalOrdered FLOAT = (
+                    SELECT quantity 
+                    FROM RIP.APP_PEDIDOS_ITEMS 
+                    WHERE id = @pedidoItemId
+                );
+
+                DECLARE @totalDispatched FLOAT = (
+                    SELECT SUM(ISNULL(di.dispatched_quantity, 0))
+                    FROM RIP.APP_DESPACHOS_ITEMS di
+                    JOIN RIP.APP_DESPACHOS d ON di.despacho_id = d.id
+                    WHERE di.pedido_item_id = @pedidoItemId AND d.id != @despachoId
+                );
+
+                SELECT 
+                    @totalOrdered as totalOrdered, 
+                    ISNULL(@totalDispatched, 0) as totalDispatched;
+            `;
+
+            const validationResult = await executeQuery(validationSql, [
+                { name: "pedidoItemId", type: TYPES.Int, value: pedido_item_id },
+                { name: "despachoId", type: TYPES.Int, value: despachoId },
+            ]);
+            
+            if (!validationResult || validationResult.length === 0) {
+                 return NextResponse.json({ error: `No se pudo validar el producto con ID de item ${pedido_item_id}.`}, { status: 404 });
+            }
+
+            const { totalOrdered, totalDispatched } = validationResult[0];
+            const pendingQuantity = totalOrdered - totalDispatched;
+
+            if (dispatched_quantity > pendingQuantity) {
+                const productInfoSql = `
+                    SELECT p.name 
+                    FROM RIP.VW_APP_PRODUCTOS p 
+                    JOIN RIP.APP_PEDIDOS_ITEMS pi ON p.id = pi.product_id 
+                    WHERE pi.id = @pedidoItemId
+                `;
+                const productInfoResult = await executeQuery(productInfoSql, [
+                    { name: "pedidoItemId", type: TYPES.Int, value: pedido_item_id },
+                ]);
+                const productName = productInfoResult[0]?.name || "un producto";
+
+                // Este es el mensaje de error que verá el usuario en el patio
+                return NextResponse.json(
+                    { error: `La cantidad para ${productName} (${dispatched_quantity}) supera lo pendiente (${pendingQuantity.toFixed(2)}). Refresca la página.` },
+                    { status: 400 } // Bad Request
+                );
+            }
+        }
+        // --- FIN DE LA VALIDACIÓN ---
+
+        // Si todo es válido, procede a guardar la foto y actualizar la BD
+        let photoUrl: string | null = null;
+        if (photoFile) {
+            const buffer = Buffer.from(await photoFile.arrayBuffer());
+            const filename = `${Date.now()}_${photoFile.name.replace(/\s/g, "_")}`;
+            const uploadDir = path.join(process.cwd(), "public/uploads");
+            await mkdir(uploadDir, { recursive: true });
+            await writeFile(path.join(uploadDir, filename), buffer);
+            photoUrl = `/uploads/${filename}`;
+        }
         
+        // 1. Actualizar el despacho
         const updateDespachoSql = `
             UPDATE RIP.APP_DESPACHOS
             SET 
@@ -76,16 +138,23 @@ export async function PATCH(
             { name: "photoUrl", type: TYPES.NVarChar, value: photoUrl },
         ]);
 
-        const insertItemSql = `
-            INSERT INTO RIP.APP_DESPACHOS_ITEMS (despacho_id, pedido_item_id, dispatched_quantity)
-            VALUES (@despachoId, @pedidoItemId, @quantity);
-        `;
+        // 2. Borrar items viejos para evitar duplicados al editar
+        const deleteItemsSql = "DELETE FROM RIP.APP_DESPACHOS_ITEMS WHERE despacho_id = @despachoId;";
+        await executeQuery(deleteItemsSql, [{ name: "despachoId", type: TYPES.Int, value: despachoId }]);
+
+        // 3. Insertar los items nuevos
         for (const item of parsedItems) {
-            await executeQuery(insertItemSql, [
-            { name: "despachoId", type: TYPES.Int, value: despachoId },
-            { name: "pedidoItemId", type: TYPES.Int, value: parseInt(String(item.pedido_item_id), 10) },
-            { name: "quantity", type: TYPES.Decimal, value: item.dispatched_quantity },
-            ]);
+             if (item.dispatched_quantity > 0) {
+                const insertItemSql = `
+                    INSERT INTO RIP.APP_DESPACHOS_ITEMS (despacho_id, pedido_item_id, dispatched_quantity)
+                    VALUES (@despachoId, @pedidoItemId, @quantity);
+                `;
+                await executeQuery(insertItemSql, [
+                    { name: "despachoId", type: TYPES.Int, value: despachoId },
+                    { name: "pedidoItemId", type: TYPES.Int, value: item.pedido_item_id },
+                    { name: "quantity", type: TYPES.Decimal, value: item.dispatched_quantity },
+                ]);
+            }
         }
     } 
     else {
@@ -95,33 +164,34 @@ export async function PATCH(
     revalidateTag("deliveries");
     revalidateTag("orders");
     
+    // El resto de tu código para obtener y devolver el despacho actualizado
     const getUpdatedDeliveryQuery = `
       SELECT
-        d.id                          AS delivery_id,
-        d.status                      AS estado,
-        d.notes                       AS notes,
-        d.load_photo_url              AS loadPhoto,
-        d.exit_photo_url              AS exitPhoto,
-        p.id                          AS order_id,
-        p.order_number                AS order_number,
-        p.customer_id                 AS customer_id,
-        p.status                      AS order_status,
-        p.created_at                  AS order_created_at,
-        c.id                          AS client_id,
-        c.name                        AS client_name,
-        t.id                          AS truck_id,
-        t.placa                       AS placa,
-        dr.id                         AS driver_id,
-        dr.name                       AS driver_name,
-        dr.phone                      AS driver_phone,
-        oi.id                         AS pedido_item_id,
-        oi.product_id                 AS product_id,
-        oi.quantity                   AS cantidadSolicitada,
-        oi.unit                       AS unit,
-        oi.price_per_unit             AS price_per_unit,
-        prod.name                     AS product_name,
-        di.id                         AS dispatch_item_id,
-        di.dispatched_quantity        AS dispatched_quantity
+        d.id                       AS delivery_id,
+        d.status                   AS estado,
+        d.notes                    AS notes,
+        d.load_photo_url           AS loadPhoto,
+        d.exit_photo_url           AS exitPhoto,
+        p.id                       AS order_id,
+        p.order_number             AS order_number,
+        p.customer_id              AS customer_id,
+        p.status                   AS order_status,
+        p.created_at               AS order_created_at,
+        c.id                       AS client_id,
+        c.name                     AS client_name,
+        t.id                       AS truck_id,
+        t.placa                    AS placa,
+        dr.id                      AS driver_id,
+        dr.name                    AS driver_name,
+        dr.phone                   AS driver_phone,
+        oi.id                      AS pedido_item_id,
+        oi.product_id              AS product_id,
+        oi.quantity                AS cantidadSolicitada,
+        oi.unit                    AS unit,
+        oi.price_per_unit          AS price_per_unit,
+        prod.name                  AS product_name,
+        di.id                      AS dispatch_item_id,
+        di.dispatched_quantity     AS dispatched_quantity
       FROM RIP.APP_DESPACHOS d
       JOIN RIP.APP_PEDIDOS p              ON p.id = d.order_id
       JOIN RIP.VW_APP_CLIENTES c          ON c.id = p.customer_id
@@ -129,7 +199,7 @@ export async function PATCH(
       JOIN RIP.APP_CHOFERES dr            ON dr.id = d.driver_id
       LEFT JOIN RIP.APP_PEDIDOS_ITEMS oi  ON oi.order_id = p.id
       LEFT JOIN RIP.VW_APP_PRODUCTOS prod ON prod.id = oi.product_id
-      LEFT JOIN RIP.APP_DESPACHOS_ITEMS di ON di.pedido_item_id = oi.id
+      LEFT JOIN RIP.APP_DESPACHOS_ITEMS di ON di.pedido_item_id = oi.id AND di.despacho_id = d.id
       WHERE d.id = @id
       ORDER BY oi.id ASC
     `;
@@ -180,8 +250,6 @@ export async function PATCH(
 
         if (row.dispatch_item_id) {
             const orderItem = delivery.orderDetails.items.find(i => i.id === row.pedido_item_id);
-            // --- INICIO DE LA CORRECCIÓN ---
-            // Añadimos una comprobación para asegurar que `dispatchItems` es un array
             if (orderItem && Array.isArray(orderItem.dispatchItems) && !orderItem.dispatchItems.some(di => di.id === row.dispatch_item_id)) {
                 orderItem.dispatchItems.push({
                     id: row.dispatch_item_id,
@@ -190,7 +258,6 @@ export async function PATCH(
                     dispatched_quantity: row.dispatched_quantity,
                 });
             }
-            // --- FIN DE LA CORRECCIÓN ---
         }
     }
     
@@ -201,6 +268,7 @@ export async function PATCH(
   } catch (e) {
     console.error("[API_DELIVERIES_PATCH_ERROR]", util.inspect(e, { depth: null }));
     const errorMessage = e instanceof Error ? e.message : "Ocurrió un error inesperado en el servidor.";
+    // Aquí devolvemos el error como JSON para que el frontend pueda leerlo
     return NextResponse.json({ error: "Error al actualizar el despacho", details: errorMessage }, { status: 500 });
   }
 }

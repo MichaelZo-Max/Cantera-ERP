@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useMemo } from "react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -11,57 +11,22 @@ import { AnimatedCard } from "@/components/ui/animated-card"
 import { EmptyState } from "@/components/ui/empty-state"
 import Link from "next/link"
 
+// Objeto de configuración de estados simplificado y alineado con la app
 const statusConfig = {
-  ASIGNADA: {
-    label: "Asignada",
-    color: "bg-blue-500/10 text-blue-700 border-blue-200 dark:bg-blue-500/20 dark:text-blue-300 dark:border-blue-800",
-    icon: Clock,
-  },
   PENDING: {
     label: "Pendiente",
     color: "bg-gray-500/10 text-gray-700 border-gray-200 dark:bg-gray-500/20 dark:text-gray-300 dark:border-gray-800",
     icon: Clock,
   },
-  EN_CARGA: {
-    label: "En Carga",
-    color:
-      "bg-yellow-500/10 text-yellow-700 border-yellow-200 dark:bg-yellow-500/20 dark:text-yellow-300 dark:border-yellow-800",
-    icon: Package,
-  },
-  LOADING: {
-    label: "Cargando",
-    color:
-      "bg-yellow-500/10 text-yellow-700 border-yellow-200 dark:bg-yellow-500/20 dark:text-yellow-300 dark:border-yellow-800",
-    icon: Package,
-  },
   CARGADA: {
-    label: "Cargada",
-    color:
-      "bg-green-500/10 text-green-700 border-green-200 dark:bg-green-500/20 dark:text-green-300 dark:border-green-800",
-    icon: CheckCircle,
-  },
-  LOADED: {
-    label: "Cargada",
-    color:
-      "bg-green-500/10 text-green-700 border-green-200 dark:bg-green-500/20 dark:text-green-300 dark:border-green-800",
-    icon: CheckCircle,
-  },
-  SALIDA_OK: {
-    label: "Salida OK",
-    color:
-      "bg-emerald-500/10 text-emerald-700 border-emerald-200 dark:bg-emerald-500/20 dark:text-emerald-300 dark:border-emerald-800",
-    icon: CheckCircle,
+    label: "Cargada en Patio",
+    color: "bg-blue-500/10 text-blue-700 border-blue-200 dark:bg-blue-500/20 dark:text-blue-300 dark:border-blue-800",
+    icon: Package,
   },
   EXITED: {
     label: "Despachado",
-    color:
-      "bg-emerald-500/10 text-emerald-700 border-emerald-200 dark:bg-emerald-500/20 dark:text-emerald-300 dark:border-emerald-800",
+    color: "bg-emerald-500/10 text-emerald-700 border-emerald-200 dark:bg-emerald-500/20 dark:text-emerald-300 dark:border-emerald-800",
     icon: CheckCircle,
-  },
-  RECHAZADA: {
-    label: "Rechazada",
-    color: "bg-red-500/10 text-red-700 border-red-200 dark:bg-red-500/20 dark:text-red-300 dark:border-red-800",
-    icon: Clock,
   },
 } as const
 
@@ -70,52 +35,45 @@ export function CashierDeliveriesClientUI({
 }: {
   initialDeliveries: Delivery[]
 }) {
-  console.log("[v0] Initial deliveries received:", initialDeliveries)
-
   const [searchTerm, setSearchTerm] = useState("")
-  const [deliveries] = useState<Delivery[]>(initialDeliveries)
 
   const filteredDeliveries = useMemo(
     () =>
-      deliveries.filter((delivery) => {
+      initialDeliveries.filter((delivery) => {
         const q = searchTerm.toLowerCase()
         const placa = delivery.truck?.placa?.toLowerCase() ?? ""
-        const cliente = delivery.client?.name?.toLowerCase() ?? ""
-        const orderNumber = delivery.order?.orderNumber?.toLowerCase() ?? ""
-        const id = String(delivery.id)?.toLowerCase() ?? ""
+        // Corregido para acceder a los datos anidados
+        const cliente = delivery.orderDetails.client?.name?.toLowerCase() ?? ""
+        const orderNumber = delivery.orderDetails.order_number?.toLowerCase() ?? ""
+        const id = String(delivery.delivery_id)?.toLowerCase() ?? ""
         return placa.includes(q) || cliente.includes(q) || id.includes(q) || orderNumber.includes(q)
       }),
-    [deliveries, searchTerm],
+    [initialDeliveries, searchTerm],
   )
 
   const deliveriesByOrder = useMemo(() => {
     const grouped = new Map<string, Delivery[]>()
     filteredDeliveries.forEach((delivery) => {
-      const orderId = delivery.orderId
+      // Corregido para usar el ID de la orden
+      const orderId = String(delivery.orderDetails.id)
       if (!grouped.has(orderId)) {
         grouped.set(orderId, [])
       }
       grouped.get(orderId)!.push(delivery)
     })
+    // Ordenar viajes dentro de cada orden por ID de despacho
     grouped.forEach((orderDeliveries) => {
-      orderDeliveries.sort((a, b) => {
-        const dateA = new Date(a.createdAt as unknown as string).getTime()
-        const dateB = new Date(b.createdAt as unknown as string).getTime()
-        return dateA - dateB
-      })
+      orderDeliveries.sort((a, b) => a.delivery_id - b.delivery_id)
     })
     return grouped
   }, [filteredDeliveries])
 
   const completedDeliveriesCount = useMemo(
-    () => deliveries.filter((d) => d.estado === "SALIDA_OK" || d.estado === "EXITED").length,
-    [deliveries],
+    () => initialDeliveries.filter((d) => d.estado === "EXITED").length,
+    [initialDeliveries],
   )
 
-  const inProgressDeliveriesCount = useMemo(
-    () => deliveries.length - completedDeliveriesCount,
-    [deliveries, completedDeliveriesCount],
-  )
+  const inProgressDeliveriesCount = initialDeliveries.length - completedDeliveriesCount
 
   return (
     <div className="space-y-8 animate-fade-in">
@@ -140,12 +98,12 @@ export function CashierDeliveriesClientUI({
       </div>
 
       {/* Search Bar */}
-      <AnimatedCard hoverEffect="lift" className="glass">
+      <AnimatedCard hoverEffect="lift">
         <CardContent className="pt-6">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-5 w-5" />
             <Input
-              placeholder="Buscar por placa, cliente, orden o ID…"
+              placeholder="Buscar por placa, cliente, orden o ID de viaje…"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-12 h-12 text-lg focus-ring"
@@ -158,9 +116,7 @@ export function CashierDeliveriesClientUI({
         {Array.from(deliveriesByOrder.entries()).length > 0 ? (
           Array.from(deliveriesByOrder.entries()).map(([orderId, orderDeliveries], orderIndex) => {
             const firstDelivery = orderDeliveries[0]
-            const completedTrips = orderDeliveries.filter(
-              (d) => d.estado === "SALIDA_OK" || d.estado === "EXITED",
-            ).length
+            const completedTrips = orderDeliveries.filter(d => d.estado === "EXITED").length
 
             return (
               <AnimatedCard
@@ -168,15 +124,15 @@ export function CashierDeliveriesClientUI({
                 hoverEffect="lift"
                 animateIn
                 delay={orderIndex * 100}
-                className="glass overflow-hidden"
+                className="overflow-hidden"
               >
-                <CardHeader className="pb-3">
-                  <div className="flex items-start justify-between">
+                <CardHeader className="pb-3 bg-muted/30">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
                     <div>
                       <CardTitle className="text-xl font-bold">
-                        Orden {firstDelivery.order?.orderNumber || orderId}
+                        Orden {firstDelivery.orderDetails.order_number || orderId}
                       </CardTitle>
-                      <p className="text-muted-foreground mt-1">{firstDelivery.client?.name || "N/A"}</p>
+                      <p className="text-muted-foreground mt-1">{firstDelivery.orderDetails.client?.name || "N/A"}</p>
                     </div>
                     <div className="text-right">
                       <Badge variant="outline" className="mb-2">
@@ -186,88 +142,63 @@ export function CashierDeliveriesClientUI({
                         <Button variant="outline" size="sm" asChild>
                           <Link href={`/cashier/orders/${orderId}`}>
                             <Eye className="h-3 w-3 mr-1" />
-                            Ver Orden
+                            Ver Orden Completa
                           </Link>
                         </Button>
                       </div>
                     </div>
                   </div>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="p-4">
                   <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
-                    {orderDeliveries.map((delivery, deliveryIndex) => {
-                      const conf = statusConfig[delivery.estado as keyof typeof statusConfig]
-                      const StatusIcon = conf?.icon ?? Clock
-                      const statusStyle = conf?.color ?? ""
-                      const statusLabel = conf?.label ?? delivery.estado
+                    {orderDeliveries.map((delivery) => {
+                      const conf = statusConfig[delivery.estado as keyof typeof statusConfig] || statusConfig.PENDING;
+                      const StatusIcon = conf.icon;
 
-                      const createdAt = delivery.createdAt ? new Date(delivery.createdAt as unknown as string) : null
-                      const loadedAt = delivery.loadedAt ? new Date(delivery.loadedAt as unknown as string) : null
-                      const exitedAt = delivery.exitedAt ? new Date(delivery.exitedAt as unknown as string) : null
+                      // --- LÓGICA CLAVE: CALCULAR TOTAL CARGADO ---
+                      const totalLoadedQuantity = delivery.dispatchItems?.reduce(
+                        (sum, item) => sum + (item.dispatched_quantity || 0), 0
+                      ) ?? 0;
+                      
+                      const hasItemsLoaded = totalLoadedQuantity > 0;
 
                       return (
-                        <Card key={delivery.id} className="border-2">
+                        <Card key={delivery.delivery_id} className="border-2 flex flex-col">
                           <CardHeader className="pb-2">
                             <div className="flex items-center justify-between">
                               <div className="flex items-center gap-2">
                                 <Truck className="h-4 w-4 text-primary" />
-                                <span className="font-semibold text-sm">Viaje #{deliveryIndex + 1}</span>
+                                <span className="font-semibold text-sm">Viaje #{delivery.delivery_id}</span>
                               </div>
-                              <Badge className={`${statusStyle} text-xs`}>
+                              <Badge className={`${conf.color} text-xs`}>
                                 <StatusIcon className="h-3 w-3 mr-1" />
-                                {statusLabel}
+                                {conf.label}
                               </Badge>
                             </div>
-                            <p className="text-sm font-medium">{delivery.truck?.placa || "N/A"}</p>
+                            <p className="text-sm font-medium pt-1">{delivery.truck?.placa || "N/A"}</p>
                           </CardHeader>
-                          <CardContent className="space-y-2">
-                            {delivery.items && delivery.items.length > 0 && (
-                              <div className="bg-muted/30 rounded-lg p-2 space-y-1">
-                                <p className="text-xs font-medium text-muted-foreground">Items del viaje:</p>
-                                {delivery.items.map((item, itemIndex) => (
-                                  <div key={itemIndex} className="flex justify-between text-xs">
-                                    <span>{item.orderItem?.product?.name || "Producto"}</span>
-                                    <span className="font-medium">
-                                      {item.dispatched_quantity} {item.orderItem?.product?.unit || ""}
-                                    </span>
-                                  </div>
-                                ))}
-                              </div>
+                          <CardContent className="space-y-2 flex-grow">
+                            {/* --- VISUALIZACIÓN DEL TOTAL CARGADO --- */}
+                            {hasItemsLoaded ? (
+                                <div className="bg-muted/50 rounded-lg p-2 space-y-1">
+                                    <div className="flex justify-between items-center text-xs">
+                                    <span className="text-muted-foreground">Cantidad Cargada:</span>
+                                    <span className="font-semibold text-base text-foreground">{totalLoadedQuantity.toFixed(2)}</span>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="text-xs text-muted-foreground text-center italic py-2">
+                                    Pendiente por cargar
+                                </div>
                             )}
-
-                            <div className="bg-muted/30 rounded-lg p-2 space-y-1">
-                              <div className="flex justify-between items-center text-xs">
-                                <span className="text-muted-foreground">Cantidad Total:</span>
-                                <span className="font-semibold">{delivery.cantidadBase}</span>
-                              </div>
-                              {!!delivery.loadedQuantity && delivery.loadedQuantity > 0 && (
-                                <div className="flex justify-between items-center text-xs">
-                                  <span className="text-muted-foreground">Cargada:</span>
-                                  <span className="font-semibold text-green-600">{delivery.loadedQuantity}</span>
-                                </div>
-                              )}
-                            </div>
-
-                            <div className="text-xs text-muted-foreground space-y-1">
-                              {createdAt && (
-                                <div>
-                                  Creado:{" "}
-                                  {createdAt.toLocaleString("es-ES", { dateStyle: "short", timeStyle: "short" })}
-                                </div>
-                              )}
-                              {loadedAt && (
-                                <div>
-                                  Cargado:{" "}
-                                  {loadedAt.toLocaleString("es-ES", { dateStyle: "short", timeStyle: "short" })}
-                                </div>
-                              )}
-                              {exitedAt && (
-                                <div>
-                                  Salida: {exitedAt.toLocaleString("es-ES", { dateStyle: "short", timeStyle: "short" })}
-                                </div>
-                              )}
-                            </div>
                           </CardContent>
+                          <CardFooter className="pt-3 border-t">
+                             <Button variant="ghost" size="sm" className="w-full" asChild>
+                                <Link href={`/yard/deliveries?highlight=${delivery.delivery_id}`}>
+                                    Ver en Patio
+                                </Link>
+                             </Button>
+                          </CardFooter>
                         </Card>
                       )
                     })}
@@ -277,7 +208,7 @@ export function CashierDeliveriesClientUI({
             )
           })
         ) : (
-          <Card className="glass">
+          <Card>
             <CardContent className="pt-6">
               <EmptyState
                 icon={<Truck className="h-12 w-12" />}

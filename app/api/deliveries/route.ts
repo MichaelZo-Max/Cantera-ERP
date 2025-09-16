@@ -20,52 +20,53 @@ function mapDbStatusToUi(status: string): "PENDING" | "CARGADA" | "EXITED" {
 // ======================= GET /api/deliveries =======================
 export async function GET(_request: Request) {
   try {
-    // Listado de despachos + info relacionada (SIN WHERE)
+    // --- INICIO DE LA MODIFICACIÓN ---
+    // Consulta modificada para incluir los items de cada despacho (viaje)
     const listQuery = `
       SELECT
-          d.id                                AS delivery_id,
-          d.status                            AS estado,
-          d.notes                             AS notes,
-          d.load_photo_url                    AS loadPhoto,
-          d.exit_photo_url                    AS exitPhoto,
+          d.id                       AS delivery_id,
+          d.status                   AS estado,
+          d.notes                    AS notes,
+          d.load_photo_url           AS loadPhoto,
+          d.exit_photo_url           AS exitPhoto,
+          p.id                       AS order_id,
+          p.order_number,
+          p.customer_id,
+          p.status                   AS order_status,
+          p.created_at               AS order_created_at,
+          c.id                       AS client_id,
+          c.name                     AS client_name,
+          t.id                       AS truck_id,
+          t.placa,
+          dr.id                      AS driver_id,
+          dr.name                    AS driver_name,
+          dr.phone                   AS driver_phone,
+          oi.id                      AS pedido_item_id,
+          oi.product_id,
+          oi.quantity                AS cantidadSolicitada,
+          oi.unit,
+          oi.price_per_unit,
+          prod.name                  AS product_name,
+          
+          -- Campos de los items despachados
+          di.id                      AS dispatch_item_id,
+          di.dispatched_quantity,
+          di.pedido_item_id          AS dispatched_pedido_item_id
 
-          p.id                                AS order_id,
-          p.order_number                      AS order_number,
-          p.customer_id                       AS customer_id,
-          p.status                            AS order_status,
-          p.created_at                        AS order_created_at,
-
-          c.id                                AS client_id,
-          c.name                              AS client_name,
-
-          t.id                                AS truck_id,
-          t.placa                             AS placa,
-
-          dr.id                               AS driver_id,
-          dr.name                             AS driver_name,
-          dr.phone                            AS driver_phone,
-
-          oi.id                               AS pedido_item_id,
-          oi.product_id                       AS product_id,
-          oi.quantity                         AS cantidadSolicitada,
-          oi.unit                             AS unit,
-          oi.price_per_unit                   AS price_per_unit,
-
-          prod.id                             AS product_id_from_prod,
-          prod.name                           AS product_name
       FROM RIP.APP_DESPACHOS d
-      JOIN RIP.APP_PEDIDOS p        ON p.id = d.order_id
-      JOIN RIP.VW_APP_CLIENTES c    ON c.id = p.customer_id
-      JOIN RIP.APP_CAMIONES t       ON t.id = d.truck_id
-      JOIN RIP.APP_CHOFERES dr      ON dr.id = d.driver_id
-      LEFT JOIN RIP.APP_PEDIDOS_ITEMS oi ON oi.order_id = p.id
+      JOIN RIP.APP_PEDIDOS p              ON p.id = d.order_id
+      JOIN RIP.VW_APP_CLIENTES c          ON c.id = p.customer_id
+      JOIN RIP.APP_CAMIONES t             ON t.id = d.truck_id
+      JOIN RIP.APP_CHOFERES dr            ON dr.id = d.driver_id
+      LEFT JOIN RIP.APP_PEDIDOS_ITEMS oi  ON oi.order_id = p.id
       LEFT JOIN RIP.VW_APP_PRODUCTOS prod ON prod.id = oi.product_id
-      ORDER BY d.id DESC, oi.id ASC
+      -- Unimos los items del despacho directamente con el despacho
+      LEFT JOIN RIP.APP_DESPACHOS_ITEMS di ON di.despacho_id = d.id
+      ORDER BY d.id DESC, oi.id ASC;
     `;
 
-    const rows = await executeQuery(listQuery, []); // ✅ argumentos completos
+    const rows = await executeQuery(listQuery, []);
 
-    // Agrupar por delivery_id → Delivery (contrato del front)
     const deliveriesMap = new Map<number, Delivery>();
 
     for (const row of rows) {
@@ -82,10 +83,7 @@ export async function GET(_request: Request) {
             customer_id: row.customer_id,
             status: row.order_status,
             created_at: row.order_created_at,
-            client: {
-              id: row.client_id,
-              name: row.client_name,
-            },
+            client: { id: row.client_id, name: row.client_name },
             items: [],
           },
           truck: { id: row.truck_id, placa: row.placa },
@@ -94,13 +92,15 @@ export async function GET(_request: Request) {
             name: row.driver_name,
             phone: row.driver_phone ?? undefined,
           },
+          // Inicializamos el array para los items cargados en este viaje
+          dispatchItems: [], 
         });
       }
 
       const d = deliveriesMap.get(row.delivery_id)!;
 
-      // Agregar items del pedido (si hay)
-      if (row.pedido_item_id) {
+      // Poblar items DEL PEDIDO (evitando duplicados)
+      if (row.pedido_item_id && !d.orderDetails.items.some(i => i.id === row.pedido_item_id)) {
         d.orderDetails.items.push({
           id: row.pedido_item_id,
           order_id: row.order_id,
@@ -109,14 +109,25 @@ export async function GET(_request: Request) {
           unit: row.unit,
           price_per_unit: row.price_per_unit,
           product: {
-            id: row.product_id_from_prod ?? row.product_id,
+            id: row.product_id,
             name: row.product_name,
             unit: row.unit,
           },
-          dispatchItems: [], // (opcional) poblar en otra consulta si hace falta
+          dispatchItems: [], // Este se mantiene por consistencia del tipo OrderItem
+        });
+      }
+
+      // Poblar items DESPACHADOS EN ESTE VIAJE (evitando duplicados)
+      if (row.dispatch_item_id && !d.dispatchItems?.some(di => di.id === row.dispatch_item_id)) {
+        d.dispatchItems?.push({
+          id: row.dispatch_item_id,
+          despacho_id: row.delivery_id,
+          pedido_item_id: row.dispatched_pedido_item_id,
+          dispatched_quantity: row.dispatched_quantity,
         });
       }
     }
+    // --- FIN DE LA MODIFICACIÓN ---
 
     return NextResponse.json(Array.from(deliveriesMap.values()));
   } catch (e) {

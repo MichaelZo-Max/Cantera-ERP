@@ -129,6 +129,7 @@ export interface Delivery {
   notes?: string;
   loadPhoto?: string;
   exitPhoto?: string;
+  dispatchItems?: DeliveryItem[];
 }
 
 export interface DeliveryItem {

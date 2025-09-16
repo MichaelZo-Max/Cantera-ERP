@@ -1,13 +1,14 @@
-// components/cards/delivery-card.tsx
 "use client";
 
+import { useMemo } from "react";
 import {
   Truck,
-  MapPin,
   Package,
   Clock,
   CheckCircle,
-  Camera,
+  Eye,
+  User,
+  FileText,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -15,196 +16,119 @@ import {
   CardContent,
   CardFooter,
   CardHeader,
+  CardTitle, // Importado para el título
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import type { Delivery } from "@/lib/types";
+import Link from "next/link";
 import Image from "next/image";
 
 interface DeliveryCardProps {
   delivery: Delivery;
-  onConfirmLoad?: (deliveryId: string) => void;
-  onViewDetails?: (deliveryId: string) => void;
-  showActions?: boolean;
+  // Simplificamos las props, ya que la navegación se maneja con Link
 }
 
-const STATUS_CONFIG = {
-  ASIGNADA: {
-    label: "Asignada",
-    color: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300",
-    icon: Clock,
-  },
-  EN_CARGA: {
-    label: "En Carga",
-    color:
-      "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300",
-    icon: Package,
-  },
-  CARGADA: {
-    label: "Cargada",
-    color: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300",
-    icon: CheckCircle,
-  },
-  SALIDA_OK: {
-    label: "Salida OK",
-    color:
-      "bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-300",
-    icon: CheckCircle,
-  },
-  RECHAZADA: {
-    label: "Rechazada",
-    color: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300",
-    icon: Clock,
-  },
-} as const;
+// Mapeo de estados alineado con lib/types.ts y el resto de la app
+const getStatusConfig = (status: Delivery["estado"]) => {
+  const s = status?.toUpperCase() ?? "PENDING";
+  switch (s) {
+    case "PENDING":
+      return { label: "Pendiente", color: "bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-700 dark:text-gray-200", icon: Clock };
+    case "CARGADA":
+      return { label: "Cargada en Patio", color: "bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/40 dark:text-blue-300", icon: Package };
+    case "EXITED":
+      return { label: "Salió de Planta", color: "bg-green-100 text-green-800 border-green-200 dark:bg-green-900/40 dark:text-green-300", icon: CheckCircle };
+    default:
+      return { label: "Desconocido", color: "bg-muted text-muted-foreground", icon: Clock };
+  }
+};
 
-export function DeliveryCard({
-  delivery,
-  onConfirmLoad,
-  onViewDetails,
-  showActions = true,
-}: DeliveryCardProps) {
-  const statusConfig = STATUS_CONFIG[delivery.estado];
+export function DeliveryCard({ delivery }: DeliveryCardProps) {
+  const statusConfig = getStatusConfig(delivery.estado);
   const StatusIcon = statusConfig.icon;
 
-  const canConfirmLoad = delivery.estado === "ASIGNADA" && onConfirmLoad;
-  const canViewDetails = onViewDetails;
-
-  const handleCardClick = () => {
-    if (canConfirmLoad) {
-      onConfirmLoad(delivery.id);
-    } else if (canViewDetails) {
-      onViewDetails(delivery.id);
+  // Calculamos la cantidad total despachada para ESTE viaje específico.
+  // Esta es la lógica clave que soluciona tu problema.
+  const totalDispatchedQuantity = useMemo(() => {
+    if (!delivery.dispatchItems || delivery.dispatchItems.length === 0) {
+      return 0;
     }
-  };
+    // Sumamos la `dispatched_quantity` de cada item en el array
+    return delivery.dispatchItems.reduce(
+      (sum, item) => sum + (item.dispatched_quantity || 0),
+      0
+    );
+  }, [delivery.dispatchItems]);
 
-  const isClickable = canConfirmLoad || canViewDetails;
+  const hasItemsLoaded = totalDispatchedQuantity > 0;
 
   return (
-    <Card
-      className={`transition-all duration-200 ${
-        isClickable
-          ? "hover:shadow-lg hover:scale-[1.02] cursor-pointer hover:border-primary/50"
-          : "hover:shadow-md"
-      }`}
-      onClick={isClickable ? handleCardClick : undefined}
-    >
-      <CardHeader className="pb-3">
+    <Card className="flex flex-col transition-all duration-200 hover:shadow-md">
+      <CardHeader className="pb-4">
         <div className="flex items-start justify-between">
-          <div className="flex items-center gap-2">
-            <Truck className="h-5 w-5 text-muted-foreground" />
-            <span className="font-semibold text-lg">
-              {delivery.truck?.placa || "Sin placa"}
-            </span>
-          </div>
-          <Badge className={statusConfig.color}>
-            <StatusIcon className="h-3 w-3 mr-1" />
-            {statusConfig.label}
-          </Badge>
+            <CardTitle className="text-md font-semibold">
+                Viaje #{delivery.delivery_id}
+            </CardTitle>
+            <Badge className={statusConfig.color}>
+                <StatusIcon className="h-3 w-3 mr-1.5" />
+                {statusConfig.label}
+            </Badge>
         </div>
       </CardHeader>
 
-      <CardContent className="space-y-3">
+      <CardContent className="space-y-3 flex-grow">
+        {/* Información del Camión y Conductor */}
+        <div className="flex items-center gap-2 text-sm">
+            <Truck className="h-4 w-4 text-muted-foreground" />
+            <span className="font-medium">{delivery.truck?.placa || "Sin placa"}</span>
+        </div>
+        <div className="flex items-center gap-2 text-sm">
+            <User className="h-4 w-4 text-muted-foreground" />
+            <span className="text-muted-foreground">{delivery.driver?.name || "Sin conductor"}</span>
+        </div>
+         <div className="flex items-center gap-2 text-sm">
+            <FileText className="h-4 w-4 text-muted-foreground" />
+            <span className="text-muted-foreground">Pedido: {delivery.orderDetails.order_number}</span>
+        </div>
+
+        {/* Muestra la foto si existe */}
         {delivery.loadPhoto && (
-          <div className="relative h-40 w-full overflow-hidden rounded-md border group">
-            <Image
-              src={delivery.loadPhoto}
-              alt={`Foto de carga para ${delivery.truck?.placa}`}
-              layout="fill"
-              objectFit="cover"
-              className="transition-transform duration-300 group-hover:scale-105"
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
-            <div className="absolute bottom-2 left-2 flex items-center gap-1 text-xs text-white bg-black/50 px-2 py-1 rounded">
-              <Camera className="h-3 w-3" />
-              <span>Foto de Caja</span>
+            <div className="relative h-32 w-full overflow-hidden rounded-md border group mt-2">
+                <Image
+                    src={delivery.loadPhoto}
+                    alt={`Foto de carga para ${delivery.truck?.placa}`}
+                    layout="fill"
+                    objectFit="cover"
+                    className="transition-transform duration-300 group-hover:scale-105"
+                />
             </div>
-          </div>
         )}
 
-        <div className="space-y-2">
-          <div className="flex items-center gap-2 text-sm">
-            <span className="font-medium">Cliente:</span>
-            <span className="text-muted-foreground">
-              {delivery.order?.client?.name || "Sin cliente"}
-            </span>
-          </div>
-          {delivery.order?.destination && (
-            <div className="flex items-center gap-2 text-sm">
-              <MapPin className="h-4 w-4 text-muted-foreground" />
-              <span className="text-muted-foreground">
-                {delivery.order.destination.name}
-              </span>
+        {/* Muestra la cantidad total si el viaje está cargado o ya salió */}
+        {hasItemsLoaded && (
+            <div className="p-3 bg-muted/50 rounded-lg mt-3">
+                <div className="flex items-center justify-between text-sm">
+                    <div className="flex items-center gap-2">
+                        <Package className="h-4 w-4 text-muted-foreground" />
+                        <span className="font-medium">Cantidad Total Cargada:</span>
+                    </div>
+                    <span className="font-bold text-base text-foreground">
+                        {totalDispatchedQuantity.toFixed(2)}
+                    </span>
+                </div>
             </div>
-          )}
-        </div>
-
-        {/* CORRECCIÓN AQUÍ */}
-        <div className="p-3 bg-muted/50 rounded-lg">
-          <div className="flex items-center gap-2 mb-1">
-            <Package className="h-4 w-4 text-muted-foreground" />
-            <span className="font-medium text-sm">Material</span>
-          </div>
-          <div className="text-sm">
-            <div className="font-medium">
-              {delivery.product?.name || "Sin producto"}
-            </div>
-            <div className="text-muted-foreground">
-              {delivery.product?.unit || "N/A"}
-            </div>
-          </div>
-        </div>
-
-        {/* CORRECCIÓN AQUÍ */}
-        <div className="flex justify-between items-center text-sm">
-          <span className="text-muted-foreground">Cantidad solicitada:</span>
-          <span className="font-semibold">
-            {delivery.cantidadBase} {delivery.product?.unit}
-          </span>
-        </div>
-
-        {delivery.loadedAt && (
-          <div className="text-xs text-muted-foreground">
-            Cargado: {new Date(delivery.loadedAt).toLocaleString()}
-          </div>
         )}
 
-        {delivery.exitedAt && (
-          <div className="text-xs text-muted-foreground">
-            Salida: {new Date(delivery.exitedAt).toLocaleString()}
-          </div>
-        )}
       </CardContent>
 
-      {showActions && (canConfirmLoad || canViewDetails) && (
-        <CardFooter className="pt-3 gap-2">
-          {canConfirmLoad && (
-            <Button
-              onClick={(e) => {
-                e.stopPropagation();
-                if (onConfirmLoad) onConfirmLoad(delivery.id);
-              }}
-              className="flex-1"
-              size="sm"
-            >
-              <CheckCircle className="h-4 w-4 mr-2" />
-              Confirmar carga
-            </Button>
-          )}
-
-          {canViewDetails && (
-            <Button
-              variant="outline"
-              onClick={(e) => {
-                e.stopPropagation();
-                if (onViewDetails) onViewDetails(delivery.id);
-              }}
-              size="sm"
-            >
-              Ver detalles
-            </Button>
-          )}
-        </CardFooter>
-      )}
+      <CardFooter className="pt-4 border-t">
+        <Button variant="outline" size="sm" className="w-full" asChild>
+          {/* Este link es clave para la navegación. Te lleva a la página de patio y resalta el viaje seleccionado. */}
+          <Link href={`/yard/deliveries?highlight=${delivery.delivery_id}`}>
+            Ver Viaje <Eye className="h-4 w-4 ml-2" />
+          </Link>
+        </Button>
+      </CardFooter>
     </Card>
   );
 }
