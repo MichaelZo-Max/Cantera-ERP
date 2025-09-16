@@ -18,6 +18,147 @@ function mapDbStatusToUi(status: string): "PENDING" | "CARGADA" | "EXITED" {
   return "PENDING";
 }
 
+// --- GET ---
+export async function GET(
+  request: Request,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const despachoId = parseInt(params.id, 10);
+    if (isNaN(despachoId)) {
+      return NextResponse.json({ error: "ID de despacho inválido" }, { status: 400 });
+    }
+
+    const getDeliveryQuery = `
+      SELECT
+        d.id                       AS delivery_id,
+        d.status                   AS estado,
+        d.notes                    AS notes,
+        d.load_photo_url           AS loadPhoto,
+        d.exit_photo_url           AS exitPhoto,
+        p.id                       AS order_id,
+        p.order_number             AS order_number,
+        p.customer_id              AS customer_id,
+        p.status                   AS order_status,
+        p.created_at               AS order_created_at,
+        c.id                       AS client_id,
+        c.name                     AS client_name,
+        t.id                       AS truck_id,
+        t.placa                    AS placa,
+        dr.id                      AS driver_id,
+        dr.name                    AS driver_name,
+        dr.phone                   AS driver_phone,
+        oi.id                      AS pedido_item_id,
+        oi.product_id              AS product_id,
+        oi.quantity                AS cantidadSolicitada,
+        oi.unit                    AS unit,
+        oi.price_per_unit          AS price_per_unit,
+        prod.name                  AS product_name,
+        di.id                      AS dispatch_item_id,
+        di.dispatched_quantity     AS dispatched_quantity
+      FROM RIP.APP_DESPACHOS d
+      JOIN RIP.APP_PEDIDOS p              ON p.id = d.order_id
+      JOIN RIP.VW_APP_CLIENTES c          ON c.id = p.customer_id
+      JOIN RIP.APP_CAMIONES t             ON t.id = d.truck_id
+      JOIN RIP.APP_CHOFERES dr            ON dr.id = d.driver_id
+      LEFT JOIN RIP.APP_PEDIDOS_ITEMS oi  ON oi.order_id = p.id
+      LEFT JOIN RIP.VW_APP_PRODUCTOS prod ON prod.id = oi.product_id
+      LEFT JOIN RIP.APP_DESPACHOS_ITEMS di ON di.pedido_item_id = oi.id AND di.despacho_id = d.id
+      WHERE d.id = @id
+      ORDER BY oi.id ASC
+    `;
+    const rows = await executeQuery(getDeliveryQuery, [{ name: "id", type: TYPES.Int, value: despachoId }]);
+
+    if (!rows || rows.length === 0) {
+      return NextResponse.json({ error: "No se encontró el despacho." }, { status: 404 });
+    }
+
+    // Mapeo para construir el objeto de delivery anidado
+    const deliveryMap = new Map<number, Delivery>();
+    for (const row of rows) {
+      if (!deliveryMap.has(row.delivery_id)) {
+        deliveryMap.set(row.delivery_id, {
+          delivery_id: row.delivery_id,
+          estado: mapDbStatusToUi(row.estado),
+          notes: row.notes ?? undefined,
+          loadPhoto: row.loadPhoto ?? undefined,
+          exitPhoto: row.exitPhoto ?? undefined,
+          orderDetails: {
+            id: row.order_id,
+            order_number: row.order_number,
+            customer_id: row.customer_id,
+            status: row.order_status,
+            created_at: row.order_created_at,
+            client: { id: row.client_id, name: row.client_name },
+            items: [],
+          },
+          truck: { id: row.truck_id, placa: row.placa },
+          driver: { id: row.driver_id, name: row.driver_name, phone: row.driver_phone ?? undefined },
+        });
+      }
+
+      const delivery = deliveryMap.get(row.delivery_id)!;
+      if (row.pedido_item_id && !delivery.orderDetails.items.some(i => i.id === row.pedido_item_id)) {
+        delivery.orderDetails.items.push({
+          id: row.pedido_item_id,
+          order_id: row.order_id,
+          product_id: row.product_id,
+          quantity: row.cantidadSolicitada,
+          unit: row.unit,
+          price_per_unit: row.price_per_unit,
+          product: { id: row.product_id, name: row.product_name, unit: row.unit },
+          dispatchItems: [],
+        });
+      }
+
+      if (row.dispatch_item_id) {
+        const orderItem = delivery.orderDetails.items.find(i => i.id === row.pedido_item_id);
+        if (orderItem && Array.isArray(orderItem.dispatchItems) && !orderItem.dispatchItems.some(di => di.id === row.dispatch_item_id)) {
+          orderItem.dispatchItems.push({
+            id: row.dispatch_item_id,
+            despacho_id: despachoId,
+            pedido_item_id: row.pedido_item_id,
+            dispatched_quantity: row.dispatched_quantity,
+          });
+        }
+      }
+    }
+    
+    const finalPayload = Array.from(deliveryMap.values())[0];
+
+    // --- LÓGICA PARA CALCULAR EL TOTAL YA DESPACHADO ---
+    if (finalPayload && finalPayload.orderDetails.items.length > 0) {
+      const currentOrderItemId = finalPayload.orderDetails.items[0].id;
+      
+      const dispatchedSumSql = `
+        SELECT SUM(ISNULL(di.dispatched_quantity, 0)) as totalDispatched
+        FROM RIP.APP_DESPACHOS_ITEMS di
+        JOIN RIP.APP_DESPACHOS d ON di.despacho_id = d.id
+        WHERE di.pedido_item_id = @pedidoItemId AND d.id != @currentDespachoId
+      `;
+      
+      const sumResult = await executeQuery(dispatchedSumSql, [
+        { name: "pedidoItemId", type: TYPES.Int, value: currentOrderItemId },
+        { name: "currentDespachoId", type: TYPES.Int, value: despachoId }
+      ]);
+
+      // Añadimos el nuevo campo al objeto que se devolverá
+      (finalPayload as any).totalDispatched = sumResult[0]?.totalDispatched ?? 0;
+    } else {
+        (finalPayload as any).totalDispatched = 0;
+    }
+    // --- FIN DE LA LÓGICA ---
+
+    return NextResponse.json(finalPayload);
+
+  } catch (e) {
+    console.error("[API_DELIVERIES_GET_ERROR]", util.inspect(e, { depth: null }));
+    const errorMessage = e instanceof Error ? e.message : "Ocurrió un error inesperado en el servidor.";
+    return NextResponse.json({ error: "Error al obtener el despacho", details: errorMessage }, { status: 500 });
+  }
+}
+
+
 // --- PATCH ---
 export async function PATCH(
   request: Request,
@@ -52,7 +193,7 @@ export async function PATCH(
             const { pedido_item_id, dispatched_quantity } = item;
 
             if (dispatched_quantity < 0) {
-                 return NextResponse.json({ error: `La cantidad para el producto no puede ser negativa.` }, { status: 400 });
+                return NextResponse.json({ error: `La cantidad para el producto no puede ser negativa.` }, { status: 400 });
             }
             if (dispatched_quantity === 0) continue; 
 
@@ -81,7 +222,7 @@ export async function PATCH(
             ]);
             
             if (!validationResult || validationResult.length === 0) {
-                 return NextResponse.json({ error: `No se pudo validar el producto con ID de item ${pedido_item_id}.`}, { status: 404 });
+                return NextResponse.json({ error: `No se pudo validar el producto con ID de item ${pedido_item_id}.`}, { status: 404 });
             }
 
             const { totalOrdered, totalDispatched } = validationResult[0];

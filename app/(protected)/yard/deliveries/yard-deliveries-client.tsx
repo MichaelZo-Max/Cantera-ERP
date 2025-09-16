@@ -5,8 +5,10 @@ import React, { useState, useMemo, useCallback } from "react";
 import Image from "next/image";
 import { toast } from "sonner";
 import { useAuth } from "@/components/auth-provider";
-import type { Delivery, Order, OrderItem as OrderItemType, Truck as TruckType, Driver, DeliveryItem } from "@/lib/types";
-import { useRouter } from "next/navigation"; // --- 1. Importar el router
+// --- 1. ACTUALIZAR TIPO Delivery ---
+// Añadimos totalDispatched para que TypeScript lo reconozca.
+import type { Delivery as BaseDelivery, Order, OrderItem as OrderItemType, Truck as TruckType, Driver } from "@/lib/types";
+import { useRouter } from "next/navigation";
 
 // --- UI Components ---
 import { Button } from "@/components/ui/button";
@@ -21,13 +23,14 @@ import { PhotoInput } from "@/components/forms/photo-input";
 import { Plus, CheckCircle, Clock, User, Truck as TruckIcon } from "lucide-react";
 
 // --- Type Definitions ---
+// Extendemos el tipo base de Delivery
+type Delivery = BaseDelivery & {
+  totalDispatched?: number;
+};
+
 interface LoadedItem {
   pedido_item_id: string;
   dispatched_quantity: number;
-}
-
-interface DisplayOrderItem extends OrderItemType {
-  pending_quantity: number;
 }
 
 interface YardClientProps {
@@ -80,7 +83,7 @@ export function YardDeliveriesClientUI({
   initialDrivers,
 }: YardClientProps) {
   const { user } = useAuth();
-  const router = useRouter(); // --- 2. Inicializar el router ---
+  const router = useRouter();
 
   // --- State Management ---
   const [deliveries, setDeliveries] = useState<Delivery[]>(initialDeliveries);
@@ -96,7 +99,6 @@ export function YardDeliveriesClientUI({
 
   // Confirm Load Modal State
   const [loadedItems, setLoadedItems] = useState<LoadedItem[]>([]);
-  const [displayOrderItems, setDisplayOrderItems] = useState<DisplayOrderItem[]>([]);
   const [notes, setNotes] = useState("");
   const [loadPhoto, setLoadPhoto] = useState<File | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -134,17 +136,15 @@ export function YardDeliveriesClientUI({
         }),
       });
 
-      if (!res.ok) throw new Error(await res.text());
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.error || "Error desconocido del servidor");
+      }
 
       const newDelivery = await res.json();
-      // Actualización local opcional, router.refresh() se encargará de la verdad
-      setDeliveries((prev) => [newDelivery, ...prev]);
       toast.success(`Nuevo viaje (Despacho #${newDelivery.delivery_id}) creado con éxito.`);
-      
-      // --- 3. Refrescar datos después de crear ---
       router.refresh(); 
 
-      // Limpiar formulario
       setSelectedOrderId('');
       setSelectedTruckId('');
       setSelectedDriverId('');
@@ -153,41 +153,43 @@ export function YardDeliveriesClientUI({
     } finally {
       setIsCreatingTrip(false);
     }
-  }, [selectedOrderId, selectedTruckId, selectedDriverId, router]); // Añadir router a las dependencias
+  }, [selectedOrderId, selectedTruckId, selectedDriverId, router]);
 
-  const handleSelectDelivery = useCallback((delivery: Delivery) => {
+  const handleSelectDelivery = useCallback(async (delivery: Delivery) => {
     if (delivery.estado !== "PENDING") {
       toast.info("Este despacho ya fue procesado.", { description: `Estado actual: ${delivery.estado}` });
       return;
     }
-    setSelectedDelivery(delivery);
     
-    const itemsWithPendingQty = delivery.orderDetails.items?.map(item => {
-        const dispatched = item.dispatchItems?.reduce((sum: number, di: DeliveryItem) => sum + di.dispatched_quantity, 0) || 0;
-        return {
-            ...item,
-            pending_quantity: item.quantity - dispatched,
-        };
-    }) || [];
-    
-    setDisplayOrderItems(itemsWithPendingQty);
-    
-    const initialLoadedItems = itemsWithPendingQty.map(item => ({
-        pedido_item_id: item.id.toString(),
-        dispatched_quantity: 0,
-    }));
-    
-    setLoadedItems(initialLoadedItems);
-    setNotes(delivery.notes || "");
-    setLoadPhoto(null);
-    setShowModal(true);
+    // --- 2. OBTENER DATOS ACTUALIZADOS DE LA API ---
+    try {
+        const res = await fetch(`/api/deliveries/${delivery.delivery_id}`);
+        if (!res.ok) {
+            throw new Error("No se pudo obtener la información actualizada del despacho.");
+        }
+        const updatedDelivery: Delivery = await res.json();
+
+        setSelectedDelivery(updatedDelivery);
+        
+        // Inicializar los items a cargar a 0
+        const initialLoadedItems = updatedDelivery.orderDetails.items?.map(item => ({
+            pedido_item_id: item.id.toString(),
+            dispatched_quantity: 0,
+        })) || [];
+        
+        setLoadedItems(initialLoadedItems);
+        setNotes(updatedDelivery.notes || "");
+        setLoadPhoto(null);
+        setShowModal(true);
+
+    } catch (error: any) {
+        toast.error("Error de red", { description: error.message });
+        setSelectedDelivery(delivery); // Fallback to initial data on error
+    }
   }, []);
   
-  const handleLoadedQuantityChange = (pedido_item_id: string, newQuantity: number) => {
-      const item = displayOrderItems.find(i => i.id.toString() === pedido_item_id);
-      if (!item) return;
-      
-      const validatedQuantity = Math.max(0, Math.min(newQuantity, item.pending_quantity));
+  const handleLoadedQuantityChange = (pedido_item_id: string, newQuantity: number, maxQuantity: number) => {
+      const validatedQuantity = Math.max(0, Math.min(newQuantity, maxQuantity));
       
       setLoadedItems((prev) => prev.map(li => 
           li.pedido_item_id === pedido_item_id 
@@ -224,19 +226,14 @@ export function YardDeliveriesClientUI({
         body: formData,
       });
 
-      if (!res.ok) throw new Error(await res.text());
-
-      const updatedDelivery = await res.json();
-      
-      // Actualización local opcional, router.refresh() se encargará de la verdad
-      setDeliveries((prev) => prev.map((d) => (d.delivery_id === selectedDelivery.delivery_id ? updatedDelivery : d)));      
+      if (!res.ok) {
+        const errorData = await res.json(); // Leer el cuerpo del error como JSON
+        throw new Error(errorData.error || "Error desconocido");
+      }
       
       toast.success(`Carga confirmada para ${selectedDelivery.truck.placa}`);
-      
-      // --- 4. Refrescar datos después de actualizar ---
       router.refresh();
 
-      // Cerrar modal y limpiar estado
       setShowModal(false);
       setSelectedDelivery(null);
 
@@ -245,7 +242,7 @@ export function YardDeliveriesClientUI({
     } finally {
       setIsSubmitting(false);
     }
-  }, [selectedDelivery, loadedItems, loadPhoto, notes, user?.id, router]); // Añadir router a las dependencias
+  }, [selectedDelivery, loadedItems, loadPhoto, notes, user?.id, router]);
 
   // --- Render Method ---
   return (
@@ -322,8 +319,14 @@ export function YardDeliveriesClientUI({
                 <div className="space-y-2">
                   <Label>Items del Pedido</Label>
                   <div className="border rounded-lg">
-                    {displayOrderItems.map((item, index) => {
-                      const dispatched = item.quantity - item.pending_quantity;
+                    {/* --- 3. RENDERIZADO CON LA LÓGICA CORRECTA --- */}
+                    {selectedDelivery.orderDetails.items.map((item, index) => {
+                      const totalOrdered = item.quantity;
+                      // Usamos el valor que nos da la API
+                      const totalDispatchedPreviously = selectedDelivery.totalDispatched ?? 0;
+                      // Calculamos el pendiente real
+                      const pendingQuantity = totalOrdered - totalDispatchedPreviously;
+
                       const loadedValue = loadedItems.find(li => li.pedido_item_id === item.id.toString())?.dispatched_quantity;
                       
                       return (
@@ -331,9 +334,9 @@ export function YardDeliveriesClientUI({
                           <div className="col-span-1 md:col-span-1 space-y-1">
                             <p className="font-medium">{item.product.name}</p>
                             <div className="text-xs text-muted-foreground space-y-0.5">
-                                <p>Pedido: <span className="font-bold">{item.quantity}</span> {item.product.unit}</p>
-                                <p>Despachado: <span className="font-bold text-blue-600">{dispatched.toFixed(2)}</span> {item.product.unit}</p>
-                                <p>Pendiente: <span className="font-bold text-green-600">{item.pending_quantity.toFixed(2)}</span> {item.product.unit}</p>
+                                <p>Pedido: <span className="font-bold">{totalOrdered.toFixed(2)}</span> {item.product.unit}</p>
+                                <p>Despachado: <span className="font-bold text-blue-600">{totalDispatchedPreviously.toFixed(2)}</span> {item.product.unit}</p>
+                                <p>Pendiente: <span className="font-bold text-green-600">{pendingQuantity.toFixed(2)}</span> {item.product.unit}</p>
                             </div>
                           </div>
                           
@@ -343,14 +346,15 @@ export function YardDeliveriesClientUI({
                                 id={`item-${item.id}`} 
                                 type="number" 
                                 value={loadedValue ?? 0}
-                                onChange={(e) => handleLoadedQuantityChange(item.id.toString(), parseFloat(e.target.value) || 0)} 
-                                max={item.pending_quantity}
+                                // --- 4. USAR EL PENDIENTE REAL COMO MÁXIMO ---
+                                onChange={(e) => handleLoadedQuantityChange(item.id.toString(), parseFloat(e.target.value) || 0, pendingQuantity)} 
+                                max={pendingQuantity}
                                 min={0}
                                 required 
                                 className="text-lg"
-                                disabled={item.pending_quantity <= 0}
+                                disabled={pendingQuantity <= 0}
                             />
-                            {item.pending_quantity <= 0 && <p className="text-xs text-green-700 mt-1">Este item ya fue despachado por completo.</p>}
+                            {pendingQuantity <= 0 && <p className="text-xs text-green-700 mt-1">Este item ya fue despachado por completo.</p>}
                           </div>
                         </div>
                       )
