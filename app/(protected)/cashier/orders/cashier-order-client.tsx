@@ -274,7 +274,6 @@ export function CashierOrderClientUI({
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>Cantidad</Label>
                   <QuantityInput
                     unitBase={(selectedProduct?.unit as UnitBase) || "M3"}
                     value={currentQuantity}
