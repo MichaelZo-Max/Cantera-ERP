@@ -79,3 +79,13 @@ export const confirmLoadSchema = z.object({
         "Debes ingresar una cantidad a cargar mayor a cero para al menos un item.",
     }),
 });
+
+/**
+ * @description Esquema para la CONFIRMACIÓN de salida de un despacho por seguridad.
+ */
+export const confirmExitSchema = z.object({
+  notes: z.string().optional(),
+  exitPhoto: z
+    .any()
+    .refine((file) => file instanceof File, "La foto de salida es obligatoria."),
+});

@@ -7,7 +7,7 @@ import { writeFile, mkdir } from "fs/promises";
 import { revalidateTag } from "next/cache";
 import { Delivery } from "@/lib/types";
 import util from "util";
-import { confirmLoadSchema } from "@/lib/validations"; // ✨ IMPORTADO
+import { confirmExitSchema, confirmLoadSchema } from "@/lib/validations"; // ✨ IMPORTADO
 import { z } from "zod"; // ✨ IMPORTADO
 
 export const dynamic = "force-dynamic";
@@ -225,41 +225,40 @@ export async function PATCH(
     }
 
     if (status === "CARGADA") {
-        
-        // ✨ --- INICIO DE LA VALIDACIÓN CON ZOD --- ✨
-        
-        const parsedItems = itemsJson ? JSON.parse(itemsJson) : [];
-        const validation = confirmLoadSchema.safeParse({
-            notes: notes ?? undefined,
-            loadPhoto: photoFile,
-            loadedItems: parsedItems,
-        });
+      // ✨ --- INICIO DE LA VALIDACIÓN CON ZOD --- ✨
 
-        if (!validation.success) {
-            return NextResponse.json(
-                { 
-                    error: "Datos de confirmación de carga inválidos.", 
-                    details: validation.error.flatten() 
-                }, 
-                { status: 400 }
-            );
+      const parsedItems = itemsJson ? JSON.parse(itemsJson) : [];
+      const validation = confirmLoadSchema.safeParse({
+        notes: notes ?? undefined,
+        loadPhoto: photoFile,
+        loadedItems: parsedItems,
+      });
+
+      if (!validation.success) {
+        return NextResponse.json(
+          {
+            error: "Datos de confirmación de carga inválidos.",
+            details: validation.error.flatten(),
+          },
+          { status: 400 }
+        );
+      }
+
+      const { loadedItems } = validation.data;
+
+      // --- VALIDACIÓN DE CANTIDADES EN BACKEND ---
+      for (const item of loadedItems) {
+        const { pedido_item_id, dispatched_quantity } = item;
+
+        if (dispatched_quantity < 0) {
+          return NextResponse.json(
+            { error: `La cantidad para el producto no puede ser negativa.` },
+            { status: 400 }
+          );
         }
-        
-        const { loadedItems } = validation.data;
+        if (dispatched_quantity === 0) continue;
 
-        // --- VALIDACIÓN DE CANTIDADES EN BACKEND ---
-        for (const item of loadedItems) {
-            const { pedido_item_id, dispatched_quantity } = item;
-
-            if (dispatched_quantity < 0) {
-                return NextResponse.json(
-                    { error: `La cantidad para el producto no puede ser negativa.` },
-                    { status: 400 }
-                );
-            }
-            if (dispatched_quantity === 0) continue;
-
-            const validationSql = `
+        const validationSql = `
                 DECLARE @totalOrdered FLOAT = (
                     SELECT quantity 
                     FROM RIP.APP_PEDIDOS_ITEMS 
@@ -278,56 +277,66 @@ export async function PATCH(
                     ISNULL(@totalDispatched, 0) as totalDispatched;
             `;
 
-            const validationResult = await executeQuery(validationSql, [
-                { name: "pedidoItemId", type: TYPES.Int, value: parseInt(pedido_item_id, 10) },
-                { name: "despachoId", type: TYPES.Int, value: despachoId },
-            ]);
+        const validationResult = await executeQuery(validationSql, [
+          {
+            name: "pedidoItemId",
+            type: TYPES.Int,
+            value: parseInt(pedido_item_id, 10),
+          },
+          { name: "despachoId", type: TYPES.Int, value: despachoId },
+        ]);
 
-            if (!validationResult || validationResult.length === 0) {
-                return NextResponse.json(
-                    {
-                        error: `No se pudo validar el producto con ID de item ${pedido_item_id}.`,
-                    },
-                    { status: 404 }
-                );
-            }
+        if (!validationResult || validationResult.length === 0) {
+          return NextResponse.json(
+            {
+              error: `No se pudo validar el producto con ID de item ${pedido_item_id}.`,
+            },
+            { status: 404 }
+          );
+        }
 
-            const { totalOrdered, totalDispatched } = validationResult[0];
-            const pendingQuantity = totalOrdered - totalDispatched;
+        const { totalOrdered, totalDispatched } = validationResult[0];
+        const pendingQuantity = totalOrdered - totalDispatched;
 
-            if (dispatched_quantity > pendingQuantity) {
-                const productInfoSql = `
+        if (dispatched_quantity > pendingQuantity) {
+          const productInfoSql = `
                     SELECT p.name 
                     FROM RIP.VW_APP_PRODUCTOS p 
                     JOIN RIP.APP_PEDIDOS_ITEMS pi ON p.id = pi.product_id 
                     WHERE pi.id = @pedidoItemId
                 `;
-                const productInfoResult = await executeQuery(productInfoSql, [
-                    { name: "pedidoItemId", type: TYPES.Int, value: parseInt(pedido_item_id, 10) },
-                ]);
-                const productName = productInfoResult[0]?.name || "un producto";
+          const productInfoResult = await executeQuery(productInfoSql, [
+            {
+              name: "pedidoItemId",
+              type: TYPES.Int,
+              value: parseInt(pedido_item_id, 10),
+            },
+          ]);
+          const productName = productInfoResult[0]?.name || "un producto";
 
-                return NextResponse.json(
-                    {
-                        error: `La cantidad para ${productName} (${dispatched_quantity}) supera lo pendiente (${pendingQuantity.toFixed(2)}). Refresca la página.`,
-                    },
-                    { status: 400 }
-                );
-            }
+          return NextResponse.json(
+            {
+              error: `La cantidad para ${productName} (${dispatched_quantity}) supera lo pendiente (${pendingQuantity.toFixed(
+                2
+              )}). Refresca la página.`,
+            },
+            { status: 400 }
+          );
         }
-        
-        let photoUrl: string | null = null;
-        if (photoFile) {
-            const buffer = Buffer.from(await photoFile.arrayBuffer());
-            const filename = `${Date.now()}_${photoFile.name.replace(/\s/g, "_")}`;
-            const uploadDir = path.join(process.cwd(), "public/uploads");
-            await mkdir(uploadDir, { recursive: true });
-            await writeFile(path.join(uploadDir, filename), buffer);
-            photoUrl = `/uploads/${filename}`;
-        }
+      }
 
-        // 1. Actualizar el despacho
-        const updateDespachoSql = `
+      let photoUrl: string | null = null;
+      if (photoFile) {
+        const buffer = Buffer.from(await photoFile.arrayBuffer());
+        const filename = `${Date.now()}_${photoFile.name.replace(/\s/g, "_")}`;
+        const uploadDir = path.join(process.cwd(), "public/uploads");
+        await mkdir(uploadDir, { recursive: true });
+        await writeFile(path.join(uploadDir, filename), buffer);
+        photoUrl = `/uploads/${filename}`;
+      }
+
+      // 1. Actualizar el despacho
+      const updateDespachoSql = `
             UPDATE RIP.APP_DESPACHOS
             SET 
                 status = 'CARGADA',
@@ -338,44 +347,90 @@ export async function PATCH(
                 updated_at = GETDATE()
             WHERE id = @despachoId;
         `;
-        await executeQuery(updateDespachoSql, [
-            { name: "despachoId", type: TYPES.Int, value: despachoId },
-            { name: "userId", type: TYPES.Int, value: parseInt(userId, 10) },
-            { name: "notes", type: TYPES.NVarChar, value: notes },
-            { name: "photoUrl", type: TYPES.NVarChar, value: photoUrl },
-        ]);
+      await executeQuery(updateDespachoSql, [
+        { name: "despachoId", type: TYPES.Int, value: despachoId },
+        { name: "userId", type: TYPES.Int, value: parseInt(userId, 10) },
+        { name: "notes", type: TYPES.NVarChar, value: notes },
+        { name: "photoUrl", type: TYPES.NVarChar, value: photoUrl },
+      ]);
 
-        // 2. Borrar items viejos para evitar duplicados al editar
-        const deleteItemsSql =
-            "DELETE FROM RIP.APP_DESPACHOS_ITEMS WHERE despacho_id = @despachoId;";
-        await executeQuery(deleteItemsSql, [
-            { name: "despachoId", type: TYPES.Int, value: despachoId },
-        ]);
+      // 2. Borrar items viejos para evitar duplicados al editar
+      const deleteItemsSql =
+        "DELETE FROM RIP.APP_DESPACHOS_ITEMS WHERE despacho_id = @despachoId;";
+      await executeQuery(deleteItemsSql, [
+        { name: "despachoId", type: TYPES.Int, value: despachoId },
+      ]);
 
-        // 3. Insertar los items nuevos
-        for (const item of loadedItems) {
-            if (item.dispatched_quantity > 0) {
-                const insertItemSql = `
+      // 3. Insertar los items nuevos
+      for (const item of loadedItems) {
+        if (item.dispatched_quantity > 0) {
+          const insertItemSql = `
                     INSERT INTO RIP.APP_DESPACHOS_ITEMS (despacho_id, pedido_item_id, dispatched_quantity)
                     VALUES (@despachoId, @pedidoItemId, @quantity);
                 `;
-                await executeQuery(insertItemSql, [
-                    { name: "despachoId", type: TYPES.Int, value: despachoId },
-                    {
-                        name: "pedidoItemId",
-                        type: TYPES.Int,
-                        value: parseInt(item.pedido_item_id, 10),
-                    },
-                    {
-                        name: "quantity",
-                        type: TYPES.Decimal,
-                        value: item.dispatched_quantity,
-                    },
-                ]);
-            }
+          await executeQuery(insertItemSql, [
+            { name: "despachoId", type: TYPES.Int, value: despachoId },
+            {
+              name: "pedidoItemId",
+              type: TYPES.Int,
+              value: parseInt(item.pedido_item_id, 10),
+            },
+            {
+              name: "quantity",
+              type: TYPES.Decimal,
+              value: item.dispatched_quantity,
+            },
+          ]);
         }
-    } else if (status === 'EXITED') {
-        // ... (resto del código sin cambios)
+      }
+    } else if (status === "EXITED") {
+      const validation = confirmExitSchema.safeParse({
+        notes: notes ?? undefined,
+        exitPhoto: photoFile,
+      });
+
+      if (!validation.success) {
+        return NextResponse.json(
+          {
+            error: "Datos de confirmación de salida inválidos.",
+            details: validation.error.flatten(),
+          },
+          { status: 400 }
+        );
+      }
+
+      const { exitPhoto } = validation.data;
+
+      let photoUrl: string | null = null;
+      if (exitPhoto) {
+        const buffer = Buffer.from(await exitPhoto.arrayBuffer());
+        const filename = `${Date.now()}_exit_${exitPhoto.name.replace(
+          /\s/g,
+          "_"
+        )}`;
+        const uploadDir = path.join(process.cwd(), "public/uploads");
+        await mkdir(uploadDir, { recursive: true });
+        await writeFile(path.join(uploadDir, filename), buffer);
+        photoUrl = `/uploads/${filename}`;
+      }
+
+      const updateDespachoSql = `
+            UPDATE RIP.APP_DESPACHOS
+            SET
+                status = 'EXITED',
+                exited_by = @userId,
+                exited_at = GETDATE(),
+                notes = ISNULL(@notes, notes),
+                exit_photo_url = ISNULL(@photoUrl, exit_photo_url),
+                updated_at = GETDATE()
+            WHERE id = @despachoId;
+        `;
+      await executeQuery(updateDespachoSql, [
+        { name: "despachoId", type: TYPES.Int, value: despachoId },
+        { name: "userId", type: TYPES.Int, value: parseInt(userId, 10) },
+        { name: "notes", type: TYPES.NVarChar, value: notes },
+        { name: "photoUrl", type: TYPES.NVarChar, value: photoUrl },
+      ]);
     } else {
       return NextResponse.json(
         { error: `Estado '${status}' no manejado.` },
@@ -509,14 +564,14 @@ export async function PATCH(
     return NextResponse.json(finalPayload);
   } catch (e) {
     if (e instanceof z.ZodError) {
-        // ✨ MANEJO DE ERRORES DE ZOD
-        return NextResponse.json(
-            { 
-                error: "Error de validación.", 
-                details: e.flatten() 
-            }, 
-            { status: 400 }
-        );
+      // ✨ MANEJO DE ERRORES DE ZOD
+      return NextResponse.json(
+        {
+          error: "Error de validación.",
+          details: e.flatten(),
+        },
+        { status: 400 }
+      );
     }
     console.error(
       "[API_DELIVERIES_PATCH_ERROR]",
