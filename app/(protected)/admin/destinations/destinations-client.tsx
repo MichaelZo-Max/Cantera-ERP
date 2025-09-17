@@ -1,8 +1,7 @@
-// app/(protected)/admin/destinations/destinations-client.tsx
+// alexmgp7/cantera-erp/cantera-erp-nuevas-reglas/app/(protected)/admin/destinations/destinations-client.tsx
 "use client";
 
 import type React from "react";
-// 1. Importar `useCallback` y `useMemo`
 import { useState, useCallback, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,6 +16,8 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
+// 👇 **SE ELIMINA LA IMPORTACIÓN DEL SELECT ANTIGUO**
+/*
 import {
   Select,
   SelectContent,
@@ -24,6 +25,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+*/
+// 👇 **SE AÑADE LA IMPORTACIÓN DEL NUEVO SELECT**
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import { AnimatedCard } from "@/components/ui/animated-card";
 import { GradientButton } from "@/components/ui/gradient-button";
 import type { Destination, Client } from "@/lib/types";
@@ -66,7 +70,6 @@ export function DestinationsClientUI({
   const { isOpen, options, confirm, handleConfirm, handleCancel } =
     useConfirmation();
 
-  // 2. Memorizar el resultado del filtro
   const filteredDestinations = useMemo(
     () =>
       destinations.filter(
@@ -84,7 +87,6 @@ export function DestinationsClientUI({
     [destinations, searchTerm]
   );
 
-  // 3. Envolver las funciones en `useCallback`
   const handleNewDestination = useCallback(() => {
     setEditingDestination(null);
     setFormData({ name: "", direccion: "", customer_id: "" });
@@ -97,7 +99,7 @@ export function DestinationsClientUI({
     setFormData({
       name: destination.name,
       direccion: destination.direccion || "",
-      customer_id: destination.customer_id || "",
+      customer_id: destination.customer_id.toString(), // Asegurarse que es string
     });
     setApiError(null);
     setShowDialog(true);
@@ -118,15 +120,23 @@ export function DestinationsClientUI({
         const res = await fetch(url, {
           method,
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(formData),
+          body: JSON.stringify({
+            ...formData,
+            customer_id: parseInt(formData.customer_id, 10), // Convertir a número antes de enviar
+          }),
         });
 
         if (!res.ok) {
-          const errorText = await res.text();
-          throw new Error(errorText || "Error al guardar el destino");
+          const errorData = await res.json();
+          throw new Error(errorData.error || "Error al guardar el destino");
         }
 
         const savedDestination = await res.json();
+        
+        // Asignar el cliente completo para la UI
+        const client = clients.find(c => c.id.toString() === savedDestination.customer_id.toString());
+        savedDestination.client = client;
+
 
         if (editingDestination) {
           setDestinations((prevDestinations) =>
@@ -148,7 +158,7 @@ export function DestinationsClientUI({
         setIsSubmitting(false);
       }
     },
-    [editingDestination, formData]
+    [editingDestination, formData, clients]
   );
 
   const handleToggleStatus = useCallback(
@@ -173,6 +183,12 @@ export function DestinationsClientUI({
 
             if (!res.ok) throw new Error(await res.text());
             const updatedDestination = await res.json();
+
+             // Asignar el cliente completo para la UI
+            const client = clients.find(c => c.id.toString() === updatedDestination.customer_id.toString());
+            updatedDestination.client = client;
+
+
             setDestinations((prevDestinations) =>
               prevDestinations.map((d) =>
                 d.id === updatedDestination.id ? updatedDestination : d
@@ -189,7 +205,7 @@ export function DestinationsClientUI({
         }
       );
     },
-    [confirm]
+    [confirm, clients]
   );
 
   return (
@@ -352,24 +368,18 @@ export function DestinationsClientUI({
               <Label htmlFor="customer_id" className="font-semibold">
                 Cliente *
               </Label>
-              <Select
-                value={formData.customer_id}
-                onValueChange={(value) =>
-                  setFormData({ ...formData, customer_id: value })
-                }
-                required
-              >
-                <SelectTrigger className="focus-ring">
-                  <SelectValue placeholder="Seleccionar cliente..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {clients.map((client) => (
-                    <SelectItem key={client.id} value={String(client.id)}>
-                      {client.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              {/* 👇 **SELECT DE CLIENTE ACTUALIZADO** */}
+              <SearchableSelect
+                  value={formData.customer_id}
+                  onChange={(value) =>
+                    setFormData({ ...formData, customer_id: value })
+                  }
+                  placeholder="Seleccionar cliente..."
+                  options={clients.map((client) => ({
+                    value: client.id.toString(),
+                    label: client.name,
+                  }))}
+              />
             </div>
             <div className="space-y-2">
               <Label htmlFor="name" className="font-semibold">
