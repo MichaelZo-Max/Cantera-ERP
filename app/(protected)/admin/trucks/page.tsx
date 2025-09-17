@@ -53,7 +53,7 @@ export default async function TrucksPage() {
       {/* Renderizamos el componente de cliente y le pasamos los datos iniciales.
         El HTML de la lista de camiones ya viene pre-renderizado del servidor.
       */}
-      <TrucksClientUI initialTrucks={trucks} initialDrivers={drivers} />
+      <TrucksClientUI initialTrucks={trucks} />
     </AppLayout>
   );
 }

@@ -11,7 +11,6 @@ import { createOrderSchema } from "@/lib/validations";
  */
 export async function GET() {
   try {
-    console.log("[v0] Starting orders fetch...");
 
     const sql = `
       SELECT
@@ -43,9 +42,6 @@ export async function GET() {
         name: order.client_name,
       },
     }));
-
-    console.log("[v0] Orders fetched:", orders.length);
-    console.log("[v0] Sample order:", JSON.stringify(orders[0], null, 2));
 
     return NextResponse.json(orders);
   } catch (error) {

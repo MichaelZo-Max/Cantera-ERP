@@ -16,8 +16,6 @@ export async function GET(request: Request, { params }: { params: { id: string }
       return new NextResponse("ID de pedido inválido", { status: 400 })
     }
 
-    console.log("[v0] Fetching order details for ID:", id)
-
     const orderQuery = `
         SELECT
             p.id, p.order_number, p.status, p.created_at, p.notes,
@@ -125,8 +123,6 @@ export async function GET(request: Request, { params }: { params: { id: string }
       })),
       deliveries: deliveriesWithItems,
     }
-
-    console.log("[v0] Order data being returned:", JSON.stringify(populatedOrder, null, 2))
 
     return NextResponse.json(populatedOrder)
   } catch (error) {
