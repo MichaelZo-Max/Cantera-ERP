@@ -1,11 +1,14 @@
-// alexmgp7/cantera-erp/cantera-erp-nuevas-reglas/app/(protected)/yard/deliveries/yard-deliveries-client.tsx
 "use client";
 
-import React, { useState, useMemo, useCallback } from "react";
+import React, { useState, useMemo, useCallback, useEffect } from "react";
 import Image from "next/image";
 import { toast } from "sonner";
 import { useAuth } from "@/components/auth-provider";
-import type { Delivery as BaseDelivery, Order, OrderItem as OrderItemType, Truck as TruckType, Driver } from "@/lib/types";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useForm, useFieldArray, Controller } from "react-hook-form";
+import * as z from "zod";
+
+import type { Delivery as BaseDelivery, Order, Truck as TruckType, Driver } from "@/lib/types";
 
 // --- UI Components ---
 import { Button } from "@/components/ui/button";
@@ -14,20 +17,41 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
-import { SearchableSelect } from "@/components/ui/searchable-select";
+import { SearchableSelect, type SearchableSelectOption as Option } from "@/components/ui/searchable-select";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { PhotoInput } from "@/components/forms/photo-input";
-import { Plus, CheckCircle, Clock, User, Truck as TruckIcon } from "lucide-react";
+import { Plus, CheckCircle, Clock, User, Truck as TruckIcon, AlertCircle } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+
+
+// --- Zod Validation Schemas ---
+const createDeliverySchema = z.object({
+  orderId: z.string().min(1, "Debes seleccionar un pedido."),
+  truckId: z.string().min(1, "Debes seleccionar un camión."),
+  driverId: z.string().min(1, "Debes seleccionar un conductor."),
+});
+
+const confirmLoadSchema = z.object({
+  notes: z.string().optional(),
+  loadPhoto: z.instanceof(File, { message: "La foto de carga es obligatoria." }),
+  loadedItems: z.array(z.object({
+    pedido_item_id: z.string(),
+    dispatched_quantity: z.number().min(0, "La cantidad no puede ser negativa."),
+  })).min(1, "Debe haber al menos un item a despachar.")
+   .refine(items => items.some(item => item.dispatched_quantity > 0), {
+     message: "Debes ingresar una cantidad a cargar mayor a cero para al menos un item.",
+   }),
+});
+
 
 // --- Type Definitions ---
+type CreateDeliveryFormValues = z.infer<typeof createDeliverySchema>;
+type ConfirmLoadFormValues = z.infer<typeof confirmLoadSchema>;
+
 type Delivery = BaseDelivery & {
   totalDispatched?: number;
 };
-
-interface LoadedItem {
-  pedido_item_id: string;
-  dispatched_quantity: number;
-}
 
 interface YardClientProps {
   initialDeliveries: Delivery[];
@@ -35,6 +59,34 @@ interface YardClientProps {
   initialTrucks: TruckType[];
   initialDrivers: Driver[];
 }
+
+// --- Reusable RHF Controlled Component ---
+const RHFSearchableSelect = ({ control, name, label, options, placeholder, disabled }: {
+    control: any;
+    name: string;
+    label: string;
+    options: Option[];
+    placeholder: string;
+    disabled?: boolean;
+}) => (
+    <FormField
+        control={control}
+        name={name}
+        render={({ field }) => (
+            <FormItem>
+                <FormLabel>{label}</FormLabel>
+                <SearchableSelect
+                    value={field.value}
+                    onChange={field.onChange}
+                    options={options}
+                    placeholder={placeholder}
+                    disabled={disabled}
+                />
+                <FormMessage />
+            </FormItem>
+        )}
+    />
+);
 
 const DeliveryCard = React.memo(({ delivery, onSelect }: { delivery: Delivery; onSelect: (delivery: Delivery) => void; }) => (
     <Card className="cursor-pointer hover:shadow-lg transition-shadow" onClick={() => onSelect(delivery)}>
@@ -86,17 +138,28 @@ export function YardDeliveriesClientUI({
   const [selectedDelivery, setSelectedDelivery] = useState<Delivery | null>(null);
   const [showModal, setShowModal] = useState(false);
 
-  // Create Trip Form State
-  const [selectedOrderId, setSelectedOrderId] = useState<string>('');
-  const [selectedTruckId, setSelectedTruckId] = useState<string>('');
-  const [selectedDriverId, setSelectedDriverId] = useState<string>('');
-  const [isCreatingTrip, setIsCreatingTrip] = useState(false);
+  // --- React Hook Form Instances ---
+  const createTripForm = useForm<CreateDeliveryFormValues>({
+    resolver: zodResolver(createDeliverySchema),
+    defaultValues: {
+      orderId: "",
+      truckId: "",
+      driverId: "",
+    },
+  });
 
-  // Confirm Load Modal State
-  const [loadedItems, setLoadedItems] = useState<LoadedItem[]>([]);
-  const [notes, setNotes] = useState("");
-  const [loadPhoto, setLoadPhoto] = useState<File | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const confirmLoadForm = useForm<ConfirmLoadFormValues>({
+    resolver: zodResolver(confirmLoadSchema),
+    defaultValues: {
+      notes: "",
+      loadedItems: [],
+    },
+  });
+
+  const { fields: loadedItemsFields, replace: replaceLoadedItems } = useFieldArray({
+    control: confirmLoadForm.control,
+    name: "loadedItems",
+  });
 
   // --- Derived State (Memoized for Performance) ---
   const filteredDeliveries = useMemo(() => {
@@ -113,21 +176,16 @@ export function YardDeliveriesClientUI({
   const pendingDeliveries = useMemo(() => filteredDeliveries.filter((d) => d.estado === "PENDING"), [filteredDeliveries]);
   const loadedDeliveries = useMemo(() => filteredDeliveries.filter((d) => d.estado === "CARGADA"), [filteredDeliveries]);
 
-  // --- Callbacks and Event Handlers ---
-  const handleCreateTrip = useCallback(async () => {
-    if (!selectedOrderId || !selectedTruckId || !selectedDriverId) {
-      toast.error("Debes seleccionar pedido, camión y conductor.");
-      return;
-    }
-    setIsCreatingTrip(true);
+  // --- API Callbacks ---
+  const handleCreateTrip = async (values: CreateDeliveryFormValues) => {
     try {
       const res = await fetch('/api/deliveries', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          order_id: parseInt(selectedOrderId),
-          truck_id: parseInt(selectedTruckId),
-          driver_id: parseInt(selectedDriverId),
+          order_id: parseInt(values.orderId),
+          truck_id: parseInt(values.truckId),
+          driver_id: parseInt(values.driverId),
         }),
       });
 
@@ -139,18 +197,46 @@ export function YardDeliveriesClientUI({
       const newDelivery = await res.json();
       toast.success(`Nuevo viaje (Despacho #${newDelivery.delivery_id}) creado con éxito.`);
       
-      // ✨ **CAMBIO CLAVE: Actualización de estado local**
       setDeliveries(prev => [newDelivery, ...prev]);
-
-      setSelectedOrderId('');
-      setSelectedTruckId('');
-      setSelectedDriverId('');
+      createTripForm.reset();
     } catch (err: any) {
       toast.error("Error al crear el viaje", { description: err.message });
-    } finally {
-      setIsCreatingTrip(false);
     }
-  }, [selectedOrderId, selectedTruckId, selectedDriverId]);
+  };
+
+  const handleConfirmLoad = async (values: ConfirmLoadFormValues) => {
+    if (!selectedDelivery || !user?.id) return;
+    
+    try {
+      const formData = new FormData();
+      formData.append("status", "CARGADA");
+      formData.append("notes", values.notes || "");
+      formData.append("itemsJson", JSON.stringify(values.loadedItems));
+      formData.append("userId", user.id);
+      formData.append("photoFile", values.loadPhoto);
+
+      const res = await fetch(`/api/deliveries/${selectedDelivery.delivery_id}`, {
+        method: "PATCH",
+        body: formData,
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.error || "Error desconocido");
+      }
+      
+      const updatedDelivery = await res.json();
+      toast.success(`Carga confirmada para ${selectedDelivery.truck.placa}`);
+      
+      setDeliveries(prev => prev.map(d => d.delivery_id === updatedDelivery.delivery_id ? updatedDelivery : d));
+
+      setShowModal(false);
+      setSelectedDelivery(null);
+
+    } catch (err: any) {
+      toast.error("Error al confirmar la carga", { description: err.message });
+    }
+  };
 
   const handleSelectDelivery = useCallback(async (delivery: Delivery) => {
     if (delivery.estado !== "PENDING") {
@@ -172,75 +258,30 @@ export function YardDeliveriesClientUI({
             dispatched_quantity: 0,
         })) || [];
         
-        setLoadedItems(initialLoadedItems);
-        setNotes(updatedDelivery.notes || "");
-        setLoadPhoto(null);
+        replaceLoadedItems(initialLoadedItems);
+        confirmLoadForm.reset({
+            notes: updatedDelivery.notes || "",
+            loadedItems: initialLoadedItems,
+            loadPhoto: undefined,
+        });
+
         setShowModal(true);
 
     } catch (error: any) {
         toast.error("Error de red", { description: error.message });
-        setSelectedDelivery(delivery);
+        setSelectedDelivery(delivery); // Fallback to original data
     }
-  }, []);
-  
-  const handleLoadedQuantityChange = (pedido_item_id: string, newQuantity: number, maxQuantity: number) => {
-      const validatedQuantity = Math.max(0, Math.min(newQuantity, maxQuantity));
-      
-      setLoadedItems((prev) => prev.map(li => 
-          li.pedido_item_id === pedido_item_id 
-              ? { ...li, dispatched_quantity: validatedQuantity } 
-              : li
-      ));
-  };
+  }, [confirmLoadForm, replaceLoadedItems]);
 
-  const handleConfirmLoad = useCallback(async () => {
-    if (!selectedDelivery || !user?.id) return;
-    if (!loadPhoto) {
-      toast.error("La foto de carga es obligatoria.");
-      return;
-    }
-    
-    const itemsToDispatch = loadedItems.filter(item => item.dispatched_quantity > 0);
-    
-    if (itemsToDispatch.length === 0) {
-        toast.warning("Debes ingresar una cantidad a cargar mayor a cero para al menos un item.");
-        return;
-    }
-
-    setIsSubmitting(true);
-    try {
-      const formData = new FormData();
-      formData.append("status", "CARGADA");
-      formData.append("notes", notes);
-      formData.append("itemsJson", JSON.stringify(itemsToDispatch));
-      formData.append("userId", user.id);
-      formData.append("photoFile", loadPhoto);
-
-      const res = await fetch(`/api/deliveries/${selectedDelivery.delivery_id}`, {
-        method: "PATCH",
-        body: formData,
-      });
-
-      if (!res.ok) {
-        const errorData = await res.json();
-        throw new Error(errorData.error || "Error desconocido");
-      }
-      
-      const updatedDelivery = await res.json();
-      toast.success(`Carga confirmada para ${selectedDelivery.truck.placa}`);
-      
-      // ✨ **CAMBIO CLAVE: Actualización de estado local**
-      setDeliveries(prev => prev.map(d => d.delivery_id === updatedDelivery.delivery_id ? updatedDelivery : d));
-
-      setShowModal(false);
+  useEffect(() => {
+    if (!showModal) {
       setSelectedDelivery(null);
-
-    } catch (err: any) {
-      toast.error("Error al confirmar la carga", { description: err.message });
-    } finally {
-      setIsSubmitting(false);
+      confirmLoadForm.reset();
     }
-  }, [selectedDelivery, loadedItems, loadPhoto, notes, user?.id]);
+  }, [showModal, confirmLoadForm]);
+  
+  const { isSubmitting: isCreatingTrip } = createTripForm.formState;
+  const { isSubmitting: isConfirmingLoad } = confirmLoadForm.formState;
 
   return (
     <div className="space-y-6">
@@ -251,48 +292,35 @@ export function YardDeliveriesClientUI({
           <CardTitle>Iniciar Nuevo Viaje</CardTitle>
           <CardDescription>Selecciona un pedido, camión y conductor para crear un nuevo despacho.</CardDescription>
         </CardHeader>
-        <CardContent className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
-          <div className="space-y-2">
-            <Label htmlFor="order-select">Pedido Activo</Label>
-            <SearchableSelect
-              value={selectedOrderId}
-              onChange={setSelectedOrderId}
-              placeholder="Seleccionar Pedido..."
-              options={initialActiveOrders.map(o => ({
-                value: o.id.toString(),
-                label: `#${o.order_number} - ${o.client.name}`
-              }))}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="truck-select">Camión Disponible</Label>
-            <SearchableSelect
-              value={selectedTruckId}
-              onChange={setSelectedTruckId}
-              placeholder="Seleccionar Camión..."
-              disabled={!selectedOrderId}
-              options={initialTrucks.map(t => ({
-                value: t.id.toString(),
-                label: t.placa
-              }))}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="driver-select">Conductor</Label>
-            <SearchableSelect
-              value={selectedDriverId}
-              onChange={setSelectedDriverId}
-              placeholder="Seleccionar Conductor..."
-              disabled={!selectedOrderId}
-              options={initialDrivers.map(d => ({
-                value: d.id.toString(),
-                label: d.name
-              }))}
-            />
-          </div>
-          <Button onClick={handleCreateTrip} disabled={!selectedOrderId || !selectedTruckId || !selectedDriverId || isCreatingTrip}>
-            {isCreatingTrip ? "Creando..." : <><Plus className="h-4 w-4 mr-2" /> Crear Viaje</>}
-          </Button>
+        <CardContent>
+            <Form {...createTripForm}>
+                <form onSubmit={createTripForm.handleSubmit(handleCreateTrip)} className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+                    <RHFSearchableSelect
+                        control={createTripForm.control}
+                        name="orderId"
+                        label="Pedido Activo"
+                        placeholder="Seleccionar Pedido..."
+                        options={initialActiveOrders.map(o => ({ value: o.id.toString(), label: `#${o.order_number} - ${o.client.name}` }))}
+                    />
+                    <RHFSearchableSelect
+                        control={createTripForm.control}
+                        name="truckId"
+                        label="Camión Disponible"
+                        placeholder="Seleccionar Camión..."
+                        options={initialTrucks.map(t => ({ value: t.id.toString(), label: t.placa }))}
+                    />
+                    <RHFSearchableSelect
+                        control={createTripForm.control}
+                        name="driverId"
+                        label="Conductor"
+                        placeholder="Seleccionar Conductor..."
+                        options={initialDrivers.map(d => ({ value: d.id.toString(), label: d.name }))}
+                    />
+                    <Button type="submit" disabled={isCreatingTrip}>
+                        {isCreatingTrip ? "Creando..." : <><Plus className="h-4 w-4 mr-2" /> Crear Viaje</>}
+                    </Button>
+                </form>
+            </Form>
         </CardContent>
       </Card>
       
@@ -321,67 +349,108 @@ export function YardDeliveriesClientUI({
                 <DialogTitle>Confirmar Carga: {selectedDelivery.truck.placa}</DialogTitle>
                 <DialogDescription>Ingresa la cantidad real cargada para cada producto de la orden #{selectedDelivery.orderDetails.order_number}.</DialogDescription>
               </DialogHeader>
-              <div className="space-y-4 py-2">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="p-3 bg-muted rounded-lg text-sm space-y-2">
-                      <p><strong>Cliente:</strong> {selectedDelivery.orderDetails.client.name}</p>
-                      <p><strong>Conductor:</strong> {selectedDelivery.driver.name}</p>
+              
+              <Form {...confirmLoadForm}>
+                <form onSubmit={confirmLoadForm.handleSubmit(handleConfirmLoad)} className="space-y-4 py-2">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="p-3 bg-muted rounded-lg text-sm space-y-2">
+                        <p><strong>Cliente:</strong> {selectedDelivery.orderDetails.client.name}</p>
+                        <p><strong>Conductor:</strong> {selectedDelivery.driver.name}</p>
+                    </div>
+                    
+                    <FormField
+                      control={confirmLoadForm.control}
+                      name="loadPhoto"
+                      render={({ field: { onChange, value, ...rest }}) => (
+                        <FormItem>
+                          <FormLabel>Foto de Carga (Obligatoria)</FormLabel>
+                          <FormControl>
+                            <PhotoInput onSelect={onChange} required={true} label="Foto de Carga (Obligatoria)" capture={true} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
                   </div>
-                  <PhotoInput onSelect={setLoadPhoto} required={true} label="Foto de Carga (Obligatoria)" capture={true} />
-                </div>
+                  
+                  <div className="space-y-2">
+                    <Label>Items del Pedido</Label>
+                    <div className="border rounded-lg">
+                      {loadedItemsFields.map((field, index) => {
+                        const item = selectedDelivery.orderDetails.items[index];
+                        if (!item) return null;
 
-                <div className="space-y-2">
-                  <Label>Items del Pedido</Label>
-                  <div className="border rounded-lg">
-                    {selectedDelivery.orderDetails.items.map((item, index) => {
-                      const totalOrdered = item.quantity;
-                      const totalDispatchedPreviously = selectedDelivery.totalDispatched ?? 0;
-                      const pendingQuantity = totalOrdered - totalDispatchedPreviously;
+                        const totalOrdered = item.quantity;
+                        const totalDispatchedPreviously = selectedDelivery.totalDispatched ?? 0;
+                        const pendingQuantity = Math.max(0, totalOrdered - totalDispatchedPreviously);
 
-                      const loadedValue = loadedItems.find(li => li.pedido_item_id === item.id.toString())?.dispatched_quantity;
-                      
-                      return (
-                        <div key={item.id} className={`p-3 grid grid-cols-1 md:grid-cols-3 gap-4 items-center ${index > 0 ? "border-t" : ""}`}>
-                          <div className="col-span-1 md:col-span-1 space-y-1">
-                            <p className="font-medium">{item.product.name}</p>
-                            <div className="text-xs text-muted-foreground space-y-0.5">
-                                <p>Pedido: <span className="font-bold">{totalOrdered.toFixed(2)}</span> {item.product.unit}</p>
-                                <p>Despachado: <span className="font-bold text-blue-600">{totalDispatchedPreviously.toFixed(2)}</span> {item.product.unit}</p>
-                                <p>Pendiente: <span className="font-bold text-green-600">{pendingQuantity.toFixed(2)}</span> {item.product.unit}</p>
+                        return (
+                          <div key={field.id} className={`p-3 grid grid-cols-1 md:grid-cols-3 gap-4 items-center ${index > 0 ? "border-t" : ""}`}>
+                            <div className="col-span-1 md:col-span-1 space-y-1">
+                              <p className="font-medium">{item.product.name}</p>
+                              <div className="text-xs text-muted-foreground space-y-0.5">
+                                  <p>Pedido: <span className="font-bold">{totalOrdered.toFixed(2)}</span> {item.product.unit}</p>
+                                  <p>Despachado: <span className="font-bold text-blue-600">{totalDispatchedPreviously.toFixed(2)}</span> {item.product.unit}</p>
+                                  <p>Pendiente: <span className="font-bold text-green-600">{pendingQuantity.toFixed(2)}</span> {item.product.unit}</p>
+                              </div>
+                            </div>
+                            <div className="col-span-1 md:col-span-2">
+                                <FormField
+                                    control={confirmLoadForm.control}
+                                    name={`loadedItems.${index}.dispatched_quantity`}
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel htmlFor={`item-${item.id}`} className="text-xs mb-1">Cantidad a Cargar en este Viaje *</FormLabel>
+                                            <FormControl>
+                                                <Input 
+                                                    id={`item-${item.id}`} 
+                                                    type="number" 
+                                                    {...field}
+                                                    onChange={e => field.onChange(parseFloat(e.target.value) || 0)}
+                                                    max={pendingQuantity}
+                                                    min={0}
+                                                    required 
+                                                    className="text-lg"
+                                                    disabled={pendingQuantity <= 0}
+                                                />
+                                            </FormControl>
+                                            {pendingQuantity <= 0 && <p className="text-xs text-green-700 mt-1">Este item ya fue despachado por completo.</p>}
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
                             </div>
                           </div>
-                          
-                          <div className="col-span-1 md:col-span-2">
-                            <Label htmlFor={`item-${item.id}`} className="text-xs mb-1">Cantidad a Cargar en este Viaje *</Label>
-                            <Input 
-                                id={`item-${item.id}`} 
-                                type="number" 
-                                value={loadedValue ?? 0}
-                                onChange={(e) => handleLoadedQuantityChange(item.id.toString(), parseFloat(e.target.value) || 0, pendingQuantity)} 
-                                max={pendingQuantity}
-                                min={0}
-                                required 
-                                className="text-lg"
-                                disabled={pendingQuantity <= 0}
-                            />
-                            {pendingQuantity <= 0 && <p className="text-xs text-green-700 mt-1">Este item ya fue despachado por completo.</p>}
-                          </div>
-                        </div>
-                      )
-                    })}
+                        )
+                      })}
+                    </div>
+                     {confirmLoadForm.formState.errors.loadedItems && (
+                        <p className="text-sm font-medium text-destructive">
+                           {confirmLoadForm.formState.errors.loadedItems.message || confirmLoadForm.formState.errors.loadedItems.root?.message}
+                        </p>
+                    )}
                   </div>
-                </div>
 
-                <div className="space-y-2">
-                  <Label>Notas (Opcional)</Label>
-                  <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Observaciones de la carga..." />
-                </div>
+                  <FormField
+                    control={confirmLoadForm.control}
+                    name="notes"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Notas (Opcional)</FormLabel>
+                        <FormControl>
+                          <Textarea {...field} placeholder="Observaciones de la carga..." />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
 
-                <div className="flex justify-end gap-3 pt-4">
-                  <Button variant="outline" onClick={() => setShowModal(false)}>Cancelar</Button>
-                  <Button onClick={handleConfirmLoad} disabled={isSubmitting}>{isSubmitting ? "Procesando..." : "Confirmar Carga"}</Button>
-                </div>
-              </div>
+                  <div className="flex justify-end gap-3 pt-4">
+                    <Button type="button" variant="outline" onClick={() => setShowModal(false)}>Cancelar</Button>
+                    <Button type="submit" disabled={isConfirmingLoad}>{isConfirmingLoad ? "Procesando..." : "Confirmar Carga"}</Button>
+                  </div>
+                </form>
+              </Form>
             </>
           )}
         </DialogContent>
