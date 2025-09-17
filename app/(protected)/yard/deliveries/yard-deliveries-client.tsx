@@ -5,7 +5,7 @@ import Image from "next/image";
 import { toast } from "sonner";
 import { useAuth } from "@/components/auth-provider";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useForm, useFieldArray, Controller } from "react-hook-form";
+import { useForm, useFieldArray } from "react-hook-form";
 import * as z from "zod";
 
 import type {
@@ -30,7 +30,7 @@ import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import {
   SearchableSelect,
-  type SearchableSelectOption as Option,
+  type SearchableSelectOption,
 } from "@/components/ui/searchable-select";
 import {
   Dialog,
@@ -54,9 +54,12 @@ import {
   Clock,
   User,
   Truck as TruckIcon,
-  AlertCircle,
+  Search,
+  Package,
 } from "lucide-react";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { AnimatedCard } from "@/components/ui/animated-card";
+import { GradientButton } from "@/components/ui/gradient-button";
+import { EmptyState } from "@/components/ui/empty-state";
 import { cn } from "@/lib/utils";
 
 // --- Zod Validation Schemas ---
@@ -110,23 +113,21 @@ const RHFSearchableSelect = ({
   options,
   placeholder,
   disabled,
-  className, // <-- AÑADIDO
+  className,
 }: {
   control: any;
   name: string;
   label: string;
-  options: Option[];
+  options: SearchableSelectOption[];
   placeholder: string;
   disabled?: boolean;
-  className?: string; // <-- AÑADIDO
+  className?: string;
 }) => (
   <FormField
     control={control}
     name={name}
     render={({ field }) => (
       <FormItem className={className}>
-        {" "}
-        {/* <-- AÑADIDO */}
         <FormLabel>{label}</FormLabel>
         <SearchableSelect
           value={field.value}
@@ -141,6 +142,7 @@ const RHFSearchableSelect = ({
   />
 );
 
+// --- Delivery Card Component ---
 const DeliveryCard = React.memo(
   ({
     delivery,
@@ -149,8 +151,8 @@ const DeliveryCard = React.memo(
     delivery: Delivery;
     onSelect: (delivery: Delivery) => void;
   }) => (
-    <Card
-      className="cursor-pointer hover:shadow-lg transition-shadow"
+    <AnimatedCard
+      className="cursor-pointer hover:border-primary transition-all"
       onClick={() => onSelect(delivery)}
     >
       <CardHeader className="pb-3">
@@ -163,9 +165,7 @@ const DeliveryCard = React.memo(
               Despacho ID: {delivery.delivery_id}
             </p>
           </div>
-          <Badge
-            variant={delivery.estado === "CARGADA" ? "default" : "secondary"}
-          >
+          <Badge variant={delivery.estado === "CARGADA" ? "default" : "secondary"}>
             Pedido #{delivery.orderDetails.order_number}
           </Badge>
         </div>
@@ -193,7 +193,7 @@ const DeliveryCard = React.memo(
           </div>
         )}
       </CardContent>
-    </Card>
+    </AnimatedCard>
   )
 );
 DeliveryCard.displayName = "DeliveryCard";
@@ -218,19 +218,12 @@ export function YardDeliveriesClientUI({
   // --- React Hook Form Instances ---
   const createTripForm = useForm<CreateDeliveryFormValues>({
     resolver: zodResolver(createDeliverySchema),
-    defaultValues: {
-      order_id: "",
-      truck_id: "",
-      driver_id: "",
-    },
+    defaultValues: { order_id: "", truck_id: "", driver_id: "" },
   });
 
   const confirmLoadForm = useForm<ConfirmLoadFormValues>({
     resolver: zodResolver(confirmLoadSchema),
-    defaultValues: {
-      notes: "",
-      loadedItems: [],
-    },
+    defaultValues: { notes: "", loadedItems: [] },
   });
 
   const { fields: loadedItemsFields, replace: replaceLoadedItems } =
@@ -239,7 +232,7 @@ export function YardDeliveriesClientUI({
       name: "loadedItems",
     });
 
-  // --- Derived State (Memoized for Performance) ---
+  // --- Derived State (Memoized) ---
   const filteredDeliveries = useMemo(() => {
     const query = searchQuery.toLowerCase();
     if (!query) return deliveries;
@@ -367,7 +360,7 @@ export function YardDeliveriesClientUI({
         setShowModal(true);
       } catch (error: any) {
         toast.error("Error de red", { description: error.message });
-        setSelectedDelivery(delivery); // Fallback to original data
+        setSelectedDelivery(delivery); // Fallback
       }
     },
     [confirmLoadForm, replaceLoadedItems]
@@ -384,132 +377,150 @@ export function YardDeliveriesClientUI({
   const { isSubmitting: isConfirmingLoad } = confirmLoadForm.formState;
 
   return (
-    <div className="space-y-6">
-      <h2 className="text-2xl font-bold text-foreground">Gestión de Patio</h2>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Iniciar Nuevo Viaje</CardTitle>
-          <CardDescription>
-            Selecciona un pedido, camión y conductor para crear un nuevo
-            despacho.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Form {...createTripForm}>
-            {/* ============ SECCIÓN MODIFICADA ============ */}
-            <form
-              onSubmit={createTripForm.handleSubmit(handleCreateTrip)}
-              className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4 items-end"
-            >
-              <RHFSearchableSelect
-                control={createTripForm.control}
-                name="order_id"
-                label="Pedido Activo"
-                placeholder="Seleccionar Pedido..."
-                options={initialActiveOrders.map((o) => ({
-                  value: o.id.toString(),
-                  label: `#${o.order_number} - ${o.client.name}`,
-                }))}
-                className="md:col-span-3 lg:col-span-2"
-              />
-              <RHFSearchableSelect
-                control={createTripForm.control}
-                name="truck_id"
-                label="Camión Disponible"
-                placeholder="Seleccionar Camión..."
-                options={initialTrucks.map((t) => ({
-                  value: t.id.toString(),
-                  label: t.placa,
-                }))}
-                className="md:col-span-1"
-              />
-              <RHFSearchableSelect
-                control={createTripForm.control}
-                name="driver_id"
-                label="Conductor"
-                placeholder="Seleccionar Conductor..."
-                options={initialDrivers.map((d) => ({
-                  value: d.id.toString(),
-                  label: d.name,
-                }))}
-                className="md:col-span-1"
-              />
-              <Button
-                type="submit"
-                disabled={isCreatingTrip}
-                className="w-full md:w-auto md:col-span-3 lg:col-span-1 justify-self-start"
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+      {/* Columna Izquierda: Formularios y Búsqueda */}
+      <div className="lg:col-span-1 space-y-6 lg:sticky lg:top-6">
+        <AnimatedCard>
+          <CardHeader>
+            <CardTitle>Iniciar Nuevo Viaje</CardTitle>
+            <CardDescription>
+              Crea un nuevo despacho asociando un pedido, camión y conductor.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Form {...createTripForm}>
+              <form
+                onSubmit={createTripForm.handleSubmit(handleCreateTrip)}
+                className="space-y-4"
               >
-                {isCreatingTrip ? (
-                  "Creando..."
-                ) : (
-                  <>
-                    <Plus className="h-4 w-4 mr-2" /> Crear Viaje
-                  </>
-                )}
-              </Button>
-            </form>
-            {/* ======================================= */}
-          </Form>
-        </CardContent>
-      </Card>
+                <RHFSearchableSelect
+                  control={createTripForm.control}
+                  name="order_id"
+                  label="Pedido Activo"
+                  placeholder="Seleccionar Pedido..."
+                  options={initialActiveOrders.map((o) => ({
+                    value: o.id.toString(),
+                    label: `#${o.order_number} - ${o.client.name}`,
+                  }))}
+                />
+                <RHFSearchableSelect
+                  control={createTripForm.control}
+                  name="truck_id"
+                  label="Camión Disponible"
+                  placeholder="Seleccionar Camión..."
+                  options={initialTrucks.map((t) => ({
+                    value: t.id.toString(),
+                    label: t.placa,
+                  }))}
+                />
+                <RHFSearchableSelect
+                  control={createTripForm.control}
+                  name="driver_id"
+                  label="Conductor"
+                  placeholder="Seleccionar Conductor..."
+                  options={initialDrivers.map((d) => ({
+                    value: d.id.toString(),
+                    label: d.name,
+                  }))}
+                />
+                <GradientButton
+                  type="submit"
+                  disabled={isCreatingTrip}
+                  className="w-full"
+                >
+                  {isCreatingTrip ? (
+                    "Creando..."
+                  ) : (
+                    <>
+                      <Plus className="h-4 w-4 mr-2" /> Crear Viaje
+                    </>
+                  )}
+                </GradientButton>
+              </form>
+            </Form>
+          </CardContent>
+        </AnimatedCard>
 
-      <Card>
-        <CardContent className="pt-6">
-          <Input
-            placeholder="Buscar por placa, conductor, cliente o ID de despacho..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
-        </CardContent>
-      </Card>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="space-y-4">
-          <h3 className="font-semibold flex items-center gap-2">
-            <Clock className="h-5 w-5 text-blue-500" /> Pendientes por Cargar{" "}
-            <Badge variant="secondary">{pendingDeliveries.length}</Badge>
-          </h3>
-          {pendingDeliveries.length > 0 ? (
-            pendingDeliveries.map((d) => (
-              <DeliveryCard
-                key={d.delivery_id}
-                delivery={d}
-                onSelect={handleSelectDelivery}
-              />
-            ))
-          ) : (
-            <p className="text-sm text-muted-foreground pt-4">
-              No hay viajes pendientes.
-            </p>
-          )}
-        </div>
-        <div className="space-y-4">
-          <h3 className="font-semibold flex items-center gap-2">
-            <CheckCircle className="h-5 w-5 text-green-500" /> Cargados (Listos
-            para Salir){" "}
-            <Badge variant="secondary">{loadedDeliveries.length}</Badge>
-          </h3>
-          {loadedDeliveries.length > 0 ? (
-            loadedDeliveries.map((d) => (
-              <DeliveryCard
-                key={d.delivery_id}
-                delivery={d}
-                onSelect={() =>
-                  toast.info(
-                    `El despacho #${d.delivery_id} ya está cargado y listo para salir.`
-                  )
-                }
-              />
-            ))
-          ) : (
-            <p className="text-sm text-muted-foreground pt-4">
-              No hay viajes cargados.
-            </p>
-          )}
-        </div>
+        <Card>
+            <CardContent className="pt-6">
+                <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                    placeholder="Buscar despacho..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-9"
+                />
+                </div>
+            </CardContent>
+        </Card>
       </div>
 
+      {/* Columna Derecha: Listas de Despachos */}
+      <div className="lg:col-span-2 space-y-6">
+        <AnimatedCard>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Clock className="h-5 w-5 text-blue-500" /> Pendientes por Cargar
+              <Badge variant="secondary">{pendingDeliveries.length}</Badge>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {pendingDeliveries.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {pendingDeliveries.map((d) => (
+                  <DeliveryCard
+                    key={d.delivery_id}
+                    delivery={d}
+                    onSelect={handleSelectDelivery}
+                  />
+                ))}
+              </div>
+            ) : (
+              <EmptyState
+                title="No hay viajes pendientes"
+                description="Crea un nuevo viaje para que aparezca aquí."
+                icon={<TruckIcon className="h-10 w-10" />}
+              />
+            )}
+          </CardContent>
+        </AnimatedCard>
+
+        <AnimatedCard>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <CheckCircle className="h-5 w-5 text-green-500" /> Cargados
+              (Listos para Salir)
+              <Badge variant="secondary">{loadedDeliveries.length}</Badge>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {loadedDeliveries.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {loadedDeliveries.map((d) => (
+                  <DeliveryCard
+                    key={d.delivery_id}
+                    delivery={d}
+                    onSelect={() =>
+                      toast.info(
+                        `El despacho #${d.delivery_id} ya está cargado y listo para salir.`
+                      )
+                    }
+                  />
+                ))}
+              </div>
+            ) : (
+              <EmptyState
+                title="No hay viajes cargados"
+                description="Confirma la carga de un viaje pendiente para que aparezca en esta sección."
+                icon={<Package className="h-10 w-10" />}
+              />
+            )}
+          </CardContent>
+        </AnimatedCard>
+      </div>
+
+      {/* Modal de Confirmación de Carga */}
       <Dialog open={showModal} onOpenChange={setShowModal}>
         <DialogContent className="sm:max-w-3xl max-h-[90vh] overflow-y-auto">
           {selectedDelivery && (
@@ -523,7 +534,6 @@ export function YardDeliveriesClientUI({
                   orden #{selectedDelivery.orderDetails.order_number}.
                 </DialogDescription>
               </DialogHeader>
-
               <Form {...confirmLoadForm}>
                 <form
                   onSubmit={confirmLoadForm.handleSubmit(handleConfirmLoad)}
@@ -536,15 +546,14 @@ export function YardDeliveriesClientUI({
                         {selectedDelivery.orderDetails.client.name}
                       </p>
                       <p>
-                        <strong>Conductor:</strong>{" "}
-                        {selectedDelivery.driver.name}
+                        <strong>Conductor:</strong> {selectedDelivery.driver.name}
                       </p>
                     </div>
 
                     <FormField
                       control={confirmLoadForm.control}
                       name="loadPhoto"
-                      render={({ field: { onChange, value, ...rest } }) => (
+                      render={({ field: { onChange } }) => (
                         <FormItem>
                           <FormLabel>Foto de Carga (Obligatoria)</FormLabel>
                           <FormControl>
@@ -579,34 +588,17 @@ export function YardDeliveriesClientUI({
                         return (
                           <div
                             key={field.id}
-                            className={`p-3 grid grid-cols-1 md:grid-cols-3 gap-4 items-center ${
-                              index > 0 ? "border-t" : ""
-                            }`}
+                            className={cn(
+                              "p-3 grid grid-cols-1 md:grid-cols-3 gap-4 items-center",
+                              index > 0 && "border-t"
+                            )}
                           >
                             <div className="col-span-1 md:col-span-1 space-y-1">
                               <p className="font-medium">{item.product.name}</p>
                               <div className="text-xs text-muted-foreground space-y-0.5">
-                                <p>
-                                  Pedido:{" "}
-                                  <span className="font-bold">
-                                    {totalOrdered.toFixed(2)}
-                                  </span>{" "}
-                                  {item.product.unit}
-                                </p>
-                                <p>
-                                  Despachado:{" "}
-                                  <span className="font-bold text-blue-600">
-                                    {totalDispatchedPreviously.toFixed(2)}
-                                  </span>{" "}
-                                  {item.product.unit}
-                                </p>
-                                <p>
-                                  Pendiente:{" "}
-                                  <span className="font-bold text-green-600">
-                                    {pendingQuantity.toFixed(2)}
-                                  </span>{" "}
-                                  {item.product.unit}
-                                </p>
+                                <p>Pedido: <span className="font-bold">{totalOrdered.toFixed(2)}</span> {item.product.unit}</p>
+                                <p>Despachado: <span className="font-bold text-blue-600">{totalDispatchedPreviously.toFixed(2)}</span> {item.product.unit}</p>
+                                <p>Pendiente: <span className="font-bold text-green-600">{pendingQuantity.toFixed(2)}</span> {item.product.unit}</p>
                               </div>
                             </div>
                             <div className="col-span-1 md:col-span-2">
@@ -615,10 +607,7 @@ export function YardDeliveriesClientUI({
                                 name={`loadedItems.${index}.dispatched_quantity`}
                                 render={({ field }) => (
                                   <FormItem>
-                                    <FormLabel
-                                      htmlFor={`item-${item.id}`}
-                                      className="text-xs mb-1"
-                                    >
+                                    <FormLabel htmlFor={`item-${item.id}`} className="text-xs mb-1">
                                       Cantidad a Cargar en este Viaje *
                                     </FormLabel>
                                     <FormControl>
@@ -626,11 +615,7 @@ export function YardDeliveriesClientUI({
                                         id={`item-${item.id}`}
                                         type="number"
                                         {...field}
-                                        onChange={(e) =>
-                                          field.onChange(
-                                            parseFloat(e.target.value) || 0
-                                          )
-                                        }
+                                        onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
                                         max={pendingQuantity}
                                         min={0}
                                         required
@@ -640,8 +625,7 @@ export function YardDeliveriesClientUI({
                                     </FormControl>
                                     {pendingQuantity <= 0 && (
                                       <p className="text-xs text-green-700 mt-1">
-                                        Este item ya fue despachado por
-                                        completo.
+                                        Este item ya fue despachado por completo.
                                       </p>
                                     )}
                                     <FormMessage />
@@ -655,9 +639,7 @@ export function YardDeliveriesClientUI({
                     </div>
                     {confirmLoadForm.formState.errors.loadedItems && (
                       <p className="text-sm font-medium text-destructive">
-                        {confirmLoadForm.formState.errors.loadedItems.message ||
-                          confirmLoadForm.formState.errors.loadedItems.root
-                            ?.message}
+                        {confirmLoadForm.formState.errors.loadedItems.message || confirmLoadForm.formState.errors.loadedItems.root?.message}
                       </p>
                     )}
                   </div>
