@@ -212,15 +212,6 @@ export function CashierDeliveriesClientUI({
                               {completedTrips}/{orderDeliveries.length} Viajes
                               Completados
                             </Badge>
-                            <Button variant="outline" size="sm" asChild>
-                              <Link
-                                href={`/cashier/orders/${order_id}`}
-                                prefetch
-                              >
-                                <Eye className="mr-1 h-3 w-3" />
-                                Ver orden
-                              </Link>
-                            </Button>
                             <ChevronDown
                               aria-hidden="true"
                               className="h-5 w-5 transition-transform duration-300 data-[state=open]:rotate-180"
