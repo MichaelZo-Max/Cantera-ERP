@@ -36,7 +36,7 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    // ⬇️ SE ELIMINÓ driverId DEL BODY
+    // ⬇️ SE ELIMINÓ driver_id DEL BODY
     const { placa, brand, model, capacity } = body;
 
     if (!placa || !capacity) {
@@ -52,7 +52,7 @@ export async function POST(request: Request) {
       VALUES (@placa, @brand, @model, @capacity);
     `;
 
-    // ⬇️ SE ELIMINÓ EL PARÁMETRO driverId
+    // ⬇️ SE ELIMINÓ EL PARÁMETRO driver_id
     const params = [
       { name: "placa", type: TYPES.NVarChar, value: placa },
       { name: "brand", type: TYPES.NVarChar, value: brand },
@@ -61,10 +61,10 @@ export async function POST(request: Request) {
     ];
 
     const result = await executeQuery(query, params);
-    
+
     // ✨ INVALIDACIÓN DEL CACHÉ
     revalidateTag("trucks");
-    
+
     // ⬇️ SE ELIMINÓ LA LÓGICA PARA BUSCAR EL CHOFER Y SE DEVUELVE SOLO EL CAMIÓN CREADO
     return NextResponse.json(result[0], { status: 201 });
   } catch (error: any) {

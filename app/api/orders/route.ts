@@ -1,8 +1,8 @@
-import { NextResponse } from "next/server"
-import { getUser } from "@/lib/auth"
-import { executeQuery, TYPES } from "@/lib/db"
-import { revalidateTag } from "next/cache"
-import { createOrderSchema } from "@/lib/validations"
+import { NextResponse } from "next/server";
+import { getUser } from "@/lib/auth";
+import { executeQuery, TYPES } from "@/lib/db";
+import { revalidateTag } from "next/cache";
+import { createOrderSchema } from "@/lib/validations";
 
 /**
  * @route   GET /api/orders
@@ -11,7 +11,7 @@ import { createOrderSchema } from "@/lib/validations"
  */
 export async function GET() {
   try {
-    console.log("[v0] Starting orders fetch...")
+    console.log("[v0] Starting orders fetch...");
 
     const sql = `
       SELECT
@@ -32,27 +32,27 @@ export async function GET() {
           RIP.VW_APP_CLIENTES AS c ON p.customer_id = c.id
       ORDER BY
           p.created_at DESC;
-    `
+    `;
 
-    const rawOrders = await executeQuery(sql)
+    const rawOrders = await executeQuery(sql);
 
     const orders = rawOrders.map((order: any) => ({
       ...order,
       client: {
         id: order.customer_id,
         name: order.client_name,
-      }
+      },
     }));
 
-    console.log("[v0] Orders fetched:", orders.length)
-    console.log("[v0] Sample order:", JSON.stringify(orders[0], null, 2))
+    console.log("[v0] Orders fetched:", orders.length);
+    console.log("[v0] Sample order:", JSON.stringify(orders[0], null, 2));
 
-    return NextResponse.json(orders)
+    return NextResponse.json(orders);
   } catch (error) {
-    console.error("[API_ORDERS_GET]", error)
+    console.error("[API_ORDERS_GET]", error);
     return new NextResponse("Error interno al obtener los pedidos", {
       status: 500,
-    })
+    });
   }
 }
 
@@ -65,14 +65,23 @@ export async function POST(req: Request) {
   try {
     const { user } = await getUser();
     if (!user || !user.id) {
-      return NextResponse.json({ error: "No autorizado. Inicia sesión para continuar." }, { status: 401 });
+      return NextResponse.json(
+        { error: "No autorizado. Inicia sesión para continuar." },
+        { status: 401 }
+      );
     }
 
     const body = await req.json();
 
     const validation = createOrderSchema.safeParse(body);
     if (!validation.success) {
-      return NextResponse.json({ error: "Datos de la orden inválidos.", details: validation.error.flatten() }, { status: 400 });
+      return NextResponse.json(
+        {
+          error: "Datos de la orden inválidos.",
+          details: validation.error.flatten(),
+        },
+        { status: 400 }
+      );
     }
 
     // Ahora, gracias al cambio en validations.ts, 'total' será reconocido aquí
@@ -85,13 +94,15 @@ export async function POST(req: Request) {
     `;
 
     const headerResult = await executeQuery(orderHeaderSql, [
-      { name: 'customer_id', type: TYPES.Int, value: customer_id },
-      { name: 'total', type: TYPES.Decimal, value: total },
-      { name: 'created_by', type: TYPES.Int, value: user.id },
+      { name: "customer_id", type: TYPES.Int, value: customer_id },
+      { name: "total", type: TYPES.Decimal, value: total },
+      { name: "created_by", type: TYPES.Int, value: user.id },
     ]);
 
     if (!headerResult || headerResult.length === 0 || !headerResult[0].id) {
-      throw new Error("Falló la creación del encabezado de la orden en la base de datos.");
+      throw new Error(
+        "Falló la creación del encabezado de la orden en la base de datos."
+      );
     }
 
     const newOrderId = headerResult[0].id;
@@ -106,20 +117,30 @@ export async function POST(req: Request) {
         { name: "product_id", type: TYPES.Int, value: item.product_id },
         { name: "quantity", type: TYPES.Decimal, value: item.quantity },
         { name: "unit", type: TYPES.NVarChar, value: item.unit },
-        { name: "price_per_unit", type: TYPES.Decimal, value: item.price_per_unit },
+        {
+          name: "price_per_unit",
+          type: TYPES.Decimal,
+          value: item.price_per_unit,
+        },
       ]);
     }
 
     revalidateTag("orders");
 
-    return NextResponse.json({
-      message: "Orden creada con éxito",
-      orderId: newOrderId,
-    }, { status: 201 });
-
+    return NextResponse.json(
+      {
+        message: "Orden creada con éxito",
+        order_id: newOrderId,
+      },
+      { status: 201 }
+    );
   } catch (error) {
     console.error("[API_ORDERS_POST_ERROR]", error);
-    const errorMessage = error instanceof Error ? error.message : "Ocurrió un error desconocido";
-    return NextResponse.json({ error: "Error interno al crear la orden", details: errorMessage }, { status: 500 });
+    const errorMessage =
+      error instanceof Error ? error.message : "Ocurrió un error desconocido";
+    return NextResponse.json(
+      { error: "Error interno al crear la orden", details: errorMessage },
+      { status: 500 }
+    );
   }
 }

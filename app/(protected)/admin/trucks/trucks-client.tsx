@@ -68,7 +68,7 @@ export function TrucksClientUI({
     [trucks, searchTerm]
   );
 
-  // Se elimina 'driverId' del formulario
+  // Se elimina 'driver_id' del formulario
   const handleNewTruck = useCallback(() => {
     setEditingTruck(null);
     setFormData({
@@ -81,7 +81,7 @@ export function TrucksClientUI({
     setShowDialog(true);
   }, []);
 
-  // Se elimina 'driverId' del formulario de edición
+  // Se elimina 'driver_id' del formulario de edición
   const handleEditTruck = useCallback((truck: TruckType) => {
     setEditingTruck(truck);
     setFormData({
@@ -384,25 +384,25 @@ export function TrucksClientUI({
               </div>
             </div>
             <div className="space-y-2">
-                <Label htmlFor="capacity" className="font-semibold">
-                  Capacidad (m³)
-                </Label>
-                <Input
-                  id="capacity"
-                  type="number"
-                  step="0.1"
-                  min="0"
-                  value={formData.capacity || ""}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      capacity: Number.parseFloat(e.target.value) || 0,
-                    })
-                  }
-                  placeholder="15.0"
-                  className="focus-ring"
-                />
-              </div>
+              <Label htmlFor="capacity" className="font-semibold">
+                Capacidad (m³)
+              </Label>
+              <Input
+                id="capacity"
+                type="number"
+                step="0.1"
+                min="0"
+                value={formData.capacity || ""}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    capacity: Number.parseFloat(e.target.value) || 0,
+                  })
+                }
+                placeholder="15.0"
+                className="focus-ring"
+              />
+            </div>
 
             {apiError && <p className="text-sm text-red-500">{apiError}</p>}
             <DialogFooter className="pt-4">

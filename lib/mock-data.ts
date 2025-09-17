@@ -257,9 +257,9 @@ export const mockDrivers: Driver[] = [
 export const mockDeliveries: Delivery[] = [
   {
     id: "1",
-    orderId: "1",
+    order_id: "1",
     order: mockOrders[0],
-    truckId: "1",
+    truck_id: "1",
     truck: mockTrucks[0],
     cantidadBase: 10,
     estado: "ASIGNADA",
@@ -268,9 +268,9 @@ export const mockDeliveries: Delivery[] = [
   },
   {
     id: "2",
-    orderId: "2",
+    order_id: "2",
     order: mockOrders[1],
-    truckId: "2",
+    truck_id: "2",
     truck: mockTrucks[1],
     cantidadBase: 15,
     loadedBy: "2",

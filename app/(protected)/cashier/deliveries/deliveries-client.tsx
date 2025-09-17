@@ -90,9 +90,9 @@ export function CashierDeliveriesClientUI({
   const deliveriesByOrder = useMemo(() => {
     const grouped = new Map<string, Delivery[]>();
     for (const d of filteredDeliveries) {
-      const orderId = String(d.orderDetails.id);
-      if (!grouped.has(orderId)) grouped.set(orderId, []);
-      grouped.get(orderId)!.push(d);
+      const order_id = String(d.orderDetails.id);
+      if (!grouped.has(order_id)) grouped.set(order_id, []);
+      grouped.get(order_id)!.push(d);
     }
     // Ordenar cada grupo por ID de viaje
     for (const [, arr] of grouped) {
@@ -172,18 +172,18 @@ export function CashierDeliveriesClientUI({
       <section className="space-y-4 sm:space-y-6">
         {Array.from(deliveriesByOrder.entries()).length > 0 ? (
           Array.from(deliveriesByOrder.entries()).map(
-            ([orderId, orderDeliveries], orderIndex) => {
+            ([order_id, orderDeliveries], orderIndex) => {
               const firstDelivery = orderDeliveries[0];
               const completedTrips = orderDeliveries.filter(
                 (d) => d.estado === "EXITED"
               ).length;
               const orderNumber =
-                firstDelivery.orderDetails.order_number || orderId;
+                firstDelivery.orderDetails.order_number || order_id;
               const clientName =
                 firstDelivery.orderDetails.client?.name || "N/A";
 
               return (
-                <Collapsible key={orderId} defaultOpen>
+                <Collapsible key={order_id} defaultOpen>
                   <AnimatedCard
                     hoverEffect="lift"
                     animateIn
@@ -214,7 +214,7 @@ export function CashierDeliveriesClientUI({
                             </Badge>
                             <Button variant="outline" size="sm" asChild>
                               <Link
-                                href={`/cashier/orders/${orderId}`}
+                                href={`/cashier/orders/${order_id}`}
                                 prefetch
                               >
                                 <Eye className="mr-1 h-3 w-3" />

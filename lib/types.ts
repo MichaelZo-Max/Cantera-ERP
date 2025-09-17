@@ -73,7 +73,7 @@ export interface Driver {
   is_active?: boolean;
   createdAt?: Date;
   updatedAt?: Date;
-  clients?: Client[]; 
+  clients?: Client[];
 }
 
 export interface Truck {
@@ -222,7 +222,7 @@ export interface PaginatedResponse<T> {
 }
 
 export interface OrderProgress {
-  orderId: string;
+  order_id: string;
   totalItems: number;
   dispatchedItems: number;
   pendingItems: number;

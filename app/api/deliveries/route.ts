@@ -1,9 +1,11 @@
 // app/api/deliveries/route.ts
+
 import { NextResponse } from "next/server";
 import { executeQuery, TYPES } from "@/lib/db";
 import { revalidateTag } from "next/cache";
 import { z } from "zod";
-import { Delivery, OrderItem } from "@/lib/types"; // Importar OrderItem
+import { Delivery, OrderItem } from "@/lib/types";
+import { createDeliverySchema } from "@/lib/validations"; // ✨ IMPORTADO
 
 export const dynamic = "force-dynamic";
 
@@ -24,34 +26,34 @@ export async function GET(_request: Request) {
     // Consulta modificada para incluir los items de cada despacho (viaje)
     const listQuery = `
       SELECT
-          d.id                       AS delivery_id,
-          d.status                   AS estado,
-          d.notes                    AS notes,
-          d.load_photo_url           AS loadPhoto,
-          d.exit_photo_url           AS exitPhoto,
-          p.id                       AS order_id,
+          d.id                    AS delivery_id,
+          d.status                AS estado,
+          d.notes                 AS notes,
+          d.load_photo_url        AS loadPhoto,
+          d.exit_photo_url        AS exitPhoto,
+          p.id                    AS order_id,
           p.order_number,
           p.customer_id,
-          p.status                   AS order_status,
-          p.created_at               AS order_created_at,
-          c.id                       AS client_id,
-          c.name                     AS client_name,
-          t.id                       AS truck_id,
+          p.status                AS order_status,
+          p.created_at            AS order_created_at,
+          c.id                    AS client_id,
+          c.name                  AS client_name,
+          t.id                    AS truck_id,
           t.placa,
-          dr.id                      AS driver_id,
-          dr.name                    AS driver_name,
-          dr.phone                   AS driver_phone,
-          oi.id                      AS pedido_item_id,
+          dr.id                   AS driver_id,
+          dr.name                 AS driver_name,
+          dr.phone                AS driver_phone,
+          oi.id                   AS pedido_item_id,
           oi.product_id,
-          oi.quantity                AS cantidadSolicitada,
+          oi.quantity             AS cantidadSolicitada,
           oi.unit,
           oi.price_per_unit,
-          prod.name                  AS product_name,
+          prod.name               AS product_name,
           
           -- Campos de los items despachados
-          di.id                      AS dispatch_item_id,
+          di.id                   AS dispatch_item_id,
           di.dispatched_quantity,
-          di.pedido_item_id          AS dispatched_pedido_item_id
+          di.pedido_item_id       AS dispatched_pedido_item_id
 
       FROM RIP.APP_DESPACHOS d
       JOIN RIP.APP_PEDIDOS p              ON p.id = d.order_id
@@ -154,70 +156,52 @@ export async function GET(_request: Request) {
   }
 }
 
-// Acepta snake_case (front) o camelCase (compat)
-const createDeliverySchema = z
-  .object({
-    order_id: z.number().int().positive().optional(),
-    truck_id: z.number().int().positive().optional(),
-    driver_id: z.number().int().positive().optional(),
-    orderId: z.number().int().positive().optional(),
-    truckId: z.number().int().positive().optional(),
-    driverId: z.number().int().positive().optional(),
-  })
-  .refine(
-    (v) =>
-      (v.order_id ?? v.orderId) &&
-      (v.truck_id ?? v.truckId) &&
-      (v.driver_id ?? v.driverId),
-    { message: "order_id, truck_id y driver_id son requeridos" }
-  );
-
+// ======================= POST /api/deliveries =======================
 export async function POST(request: Request) {
   try {
     const body = await request.json();
+    // ✨ VALIDACIÓN CON ZOD
     const parsed = createDeliverySchema.parse(body);
 
-    const orderId = parsed.order_id ?? parsed.orderId!;
-    const truckId = parsed.truck_id ?? parsed.truckId!;
-    const driverId = parsed.driver_id ?? parsed.driverId!;
+    const { order_id, truck_id, driver_id } = parsed;
 
     // 1. Insertar el despacho y obtener su información básica
     const insertAndSelectQuery = `
       DECLARE @new TABLE (id INT);
       INSERT INTO RIP.APP_DESPACHOS (order_id, truck_id, driver_id, status, created_at)
       OUTPUT INSERTED.id INTO @new(id)
-      VALUES (@orderId, @truckId, @driverId, 'PENDIENTE', GETDATE());
+      VALUES (@order_id, @truck_id, @driver_id, 'PENDIENTE', GETDATE());
 
       SELECT 
-        d.id                          AS delivery_id,
-        d.status                      AS estado,
-        d.notes                       AS notes,
-        d.load_photo_url              AS loadPhoto,
-        d.exit_photo_url              AS exitPhoto,
-        p.id                          AS order_id,
-        p.order_number                AS order_number,
-        p.customer_id                 AS customer_id,
-        p.status                      AS order_status,
-        p.created_at                  AS order_created_at,
-        c.id                          AS client_id,
-        c.name                        AS client_name,
-        t.id                          AS truck_id,
-        t.placa                       AS placa,
-        dr.id                         AS driver_id,
-        dr.name                       AS driver_name,
-        dr.phone                      AS driver_phone
+        d.id                    AS delivery_id,
+        d.status                AS estado,
+        d.notes                 AS notes,
+        d.load_photo_url        AS loadPhoto,
+        d.exit_photo_url        AS exitPhoto,
+        p.id                    AS order_id,
+        p.order_number          AS order_number,
+        p.customer_id           AS customer_id,
+        p.status                AS order_status,
+        p.created_at            AS order_created_at,
+        c.id                    AS client_id,
+        c.name                  AS client_name,
+        t.id                    AS truck_id,
+        t.placa                 AS placa,
+        dr.id                   AS driver_id,
+        dr.name                 AS driver_name,
+        dr.phone                AS driver_phone
       FROM RIP.APP_DESPACHOS d
-      JOIN RIP.APP_PEDIDOS p          ON p.id = d.order_id
-      JOIN RIP.VW_APP_CLIENTES c      ON c.id = p.customer_id
-      LEFT JOIN RIP.APP_CAMIONES t    ON t.id = d.truck_id
-      LEFT JOIN RIP.APP_CHOFERES dr   ON dr.id = d.driver_id
+      JOIN RIP.APP_PEDIDOS p        ON p.id = d.order_id
+      JOIN RIP.VW_APP_CLIENTES c    ON c.id = p.customer_id
+      LEFT JOIN RIP.APP_CAMIONES t  ON t.id = d.truck_id
+      LEFT JOIN RIP.APP_CHOFERES dr ON dr.id = d.driver_id
       WHERE d.id = (SELECT TOP 1 id FROM @new);
     `;
 
     const deliveryRows = await executeQuery(insertAndSelectQuery, [
-      { name: "orderId", type: TYPES.Int, value: orderId },
-      { name: "truckId", type: TYPES.Int, value: truckId },
-      { name: "driverId", type: TYPES.Int, value: driverId },
+      { name: "order_id", type: TYPES.Int, value: order_id },
+      { name: "truck_id", type: TYPES.Int, value: truck_id },
+      { name: "driver_id", type: TYPES.Int, value: driver_id },
     ]);
 
     if (deliveryRows.length === 0) {
@@ -230,24 +214,24 @@ export async function POST(request: Request) {
     // 2. Obtener los items del pedido por separado
     const itemsQuery = `
         SELECT
-            oi.id                   AS pedido_item_id,
-            oi.product_id           AS product_id,
-            oi.quantity             AS cantidadSolicitada,
-            oi.unit                 AS unit,
-            oi.price_per_unit       AS price_per_unit,
-            prod.name               AS product_name
+            oi.id                 AS pedido_item_id,
+            oi.product_id         AS product_id,
+            oi.quantity           AS cantidadSolicitada,
+            oi.unit               AS unit,
+            oi.price_per_unit     AS price_per_unit,
+            prod.name             AS product_name
         FROM RIP.APP_PEDIDOS_ITEMS oi
         JOIN RIP.VW_APP_PRODUCTOS prod ON prod.id = oi.product_id
-        WHERE oi.order_id = @orderId
+        WHERE oi.order_id = @order_id
         ORDER BY oi.id ASC
     `;
     const itemRows = await executeQuery(itemsQuery, [
-      { name: "orderId", type: TYPES.Int, value: orderId },
+      { name: "order_id", type: TYPES.Int, value: order_id },
     ]);
 
     const orderItems: OrderItem[] = itemRows.map((itemRow) => ({
       id: itemRow.pedido_item_id,
-      order_id: orderId,
+      order_id: order_id,
       product_id: itemRow.product_id,
       quantity: itemRow.cantidadSolicitada,
       unit: itemRow.unit,
@@ -290,6 +274,7 @@ export async function POST(request: Request) {
     return NextResponse.json(payload, { status: 201 });
   } catch (e) {
     if (e instanceof z.ZodError) {
+      // ✨ MANEJO DE ERRORES DE ZOD
       return new NextResponse(JSON.stringify(e.errors), { status: 400 });
     }
     console.error("[API_DELIVERIES_POST]", e);

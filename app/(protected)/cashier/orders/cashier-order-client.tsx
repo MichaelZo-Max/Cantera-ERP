@@ -160,7 +160,7 @@ export function CashierOrderClientUI({
       }
 
       const result = await res.json();
-      toast.success(`Pedido #${result.orderId} creado exitosamente.`);
+      toast.success(`Pedido #${result.order_id} creado exitosamente.`);
       router.push("/cashier/orders/list");
     } catch (err: any) {
       toast.error("Error al crear el pedido", { description: err?.message });
@@ -210,7 +210,9 @@ export function CashierOrderClientUI({
                     ? "Primero selecciona un cliente"
                     : "Selecciona destino..."
                 }
-                disabled={!selectedcustomer_id || filteredDestinations.length === 0}
+                disabled={
+                  !selectedcustomer_id || filteredDestinations.length === 0
+                }
                 options={filteredDestinations.map((dest) => ({
                   value: dest.id.toString(),
                   label: dest.name,

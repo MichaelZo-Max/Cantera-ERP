@@ -72,7 +72,7 @@ export async function POST(request: Request) {
       { name: "is_active", type: TYPES.Bit, value: is_active ?? true },
     ]);
 
-    const driverId = driverResult[0].id;
+    const driver_id = driverResult[0].id;
 
     // Paso 2: Si se enviaron IDs de clientes, los insertamos en la tabla de unión
     if (customer_ids.length > 0) {
@@ -82,21 +82,21 @@ export async function POST(request: Request) {
             VALUES (@chofer_id, @cliente_id);
         `;
         await executeQuery(linkQuery, [
-          { name: "chofer_id", type: TYPES.Int, value: driverId },
+          { name: "chofer_id", type: TYPES.Int, value: driver_id },
           { name: "cliente_id", type: TYPES.Int, value: customerId },
         ]);
       }
     }
-    
+
     revalidateTag("drivers");
 
     // Devolvemos el chófer creado para consistencia
     const newDriver = {
-        id: driverId,
-        name,
-        docId,
-        phone,
-        is_active: is_active ?? true
+      id: driver_id,
+      name,
+      docId,
+      phone,
+      is_active: is_active ?? true,
     };
 
     return NextResponse.json(newDriver, { status: 201 });
