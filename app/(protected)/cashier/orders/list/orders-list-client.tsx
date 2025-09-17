@@ -105,7 +105,7 @@ export function OrdersListClientUI({
         description="Consulta y gestiona los pedidos con seguimiento de múltiples viajes"
         actions={
           <Button asChild>
-            <Link href="/cashier/orders/new" className="flex items-center space-x-2">
+            <Link href="/cashier/orders" className="flex items-center space-x-2">
               <FileText className="h-4 w-4" />
               <span>Nuevo Pedido</span>
             </Link>

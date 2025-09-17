@@ -1,4 +1,3 @@
-// alexmgp7/cantera-erp/cantera-erp-nuevas-reglas/app/(protected)/cashier/orders/cashier-order-client.tsx
 "use client";
 
 import { useState, useCallback, useMemo } from "react";
@@ -25,7 +24,6 @@ import { Plus, Trash2, Calculator, CreditCard } from "lucide-react";
 import { toast } from "sonner";
 import type { Client, Product, UnitBase, Destination } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
-// 👇 **IMPORTA EL COMPONENTE REUTILIZABLE**
 import { SearchableSelect } from "@/components/ui/searchable-select";
 
 // Interface para los items del carrito/orden
@@ -37,7 +35,6 @@ interface OrderItem {
   subtotal: number;
 }
 
-// Props del componente, ahora con destinos
 export function CashierOrderClientUI({
   initialClients,
   initialProducts,
@@ -97,7 +94,6 @@ export function CashierOrderClientUI({
       subtotal: currentQuantity * price,
     };
     setOrderItems((prev) => [...prev, newItem]);
-
     setSelectedProduct(null);
     setCurrentQuantity(0);
 
@@ -120,9 +116,8 @@ export function CashierOrderClientUI({
     [products]
   );
 
-  // --- LÓGICA DE ENVÍO ADAPTADA ---
+  // Lógica de envío
   const handleCreateOrder = useCallback(async () => {
-    // Validaciones
     if (!selectedcustomer_id || orderItems.length === 0) {
       toast.error(
         "Por favor, completa todos los campos requeridos: Cliente y al menos un producto."
@@ -147,7 +142,6 @@ export function CashierOrderClientUI({
         total: total,
       };
 
-      // 2. Enviar la solicitud como JSON
       const res = await fetch("/api/orders", {
         method: "POST",
         headers: {
@@ -167,7 +161,7 @@ export function CashierOrderClientUI({
 
       const result = await res.json();
       toast.success(`Pedido #${result.orderId} creado exitosamente.`);
-      router.push("/cashier/orders/list"); // Redirigir
+      router.push("/cashier/orders/list");
     } catch (err: any) {
       toast.error("Error al crear el pedido", { description: err?.message });
     } finally {
@@ -175,7 +169,6 @@ export function CashierOrderClientUI({
     }
   }, [selectedcustomer_id, selectedDestinationId, orderItems, total, router]);
 
-  // Memo para habilitar/deshabilitar el botón de envío
   const canSubmit = useMemo(
     () => !!selectedcustomer_id && orderItems.length > 0,
     [selectedcustomer_id, orderItems]
@@ -194,12 +187,11 @@ export function CashierOrderClientUI({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-2xl">
             <div className="space-y-2">
               <Label>Cliente *</Label>
-              {/* 👇 **SELECT DE CLIENTE ACTUALIZADO** */}
               <SearchableSelect
                 value={selectedcustomer_id}
                 onChange={(value) => {
                   setSelectedcustomer_id(value);
-                  setSelectedDestinationId(undefined); // Reset destination on client change
+                  setSelectedDestinationId(undefined);
                 }}
                 placeholder="Selecciona cliente..."
                 options={clients.map((client) => ({
@@ -210,12 +202,15 @@ export function CashierOrderClientUI({
             </div>
             <div className="space-y-2">
               <Label>Destino (Opcional)</Label>
-              {/* 👇 **SELECT DE DESTINO ACTUALIZADO** */}
               <SearchableSelect
                 value={selectedDestinationId}
                 onChange={setSelectedDestinationId}
-                placeholder="Selecciona destino..."
-                disabled={!selectedcustomer_id}
+                placeholder={
+                  !selectedcustomer_id
+                    ? "Primero selecciona un cliente"
+                    : "Selecciona destino..."
+                }
+                disabled={!selectedcustomer_id || filteredDestinations.length === 0}
                 options={filteredDestinations.map((dest) => ({
                   value: dest.id.toString(),
                   label: dest.name,
@@ -239,14 +234,12 @@ export function CashierOrderClientUI({
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Producto</Label>
-                {/* 👇 **SELECT DE PRODUCTO ACTUALIZADO** */}
                 <SearchableSelect
                   value={selectedProduct?.id.toString() || ""}
                   onChange={handleProductSelect}
                   placeholder="Seleccionar producto..."
                   options={products.map((product) => ({
                     value: product.id.toString(),
-                    // Mantenemos la lógica de mostrar el precio en el label
                     label: (
                       <div className="flex justify-between items-center w-full">
                         <span>{product.name}</span>

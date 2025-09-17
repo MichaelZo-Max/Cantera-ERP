@@ -5,17 +5,20 @@ import { z } from "zod";
  * Estandarizado para usar 'product_id'.
  */
 export const createOrderItemSchema = z.object({
-  // 'product_id' se alinea con el campo usado en el bucle de la API route.
   product_id: z.number({
     required_error: "El ID del producto es obligatorio.",
-  }),
+    invalid_type_error: "El ID del producto debe ser un número.",
+  }).int().positive("El ID del producto debe ser un entero positivo."),
+
   quantity: z.number().positive("La cantidad debe ser un número positivo."),
+  
   price_per_unit: z
     .number()
-    .min(0, "El precio unitario no puede ser negativo."),
+    .nonnegative("El precio unitario no puede ser negativo."),
+
   unit: z.string({
     required_error: "La unidad de medida es obligatoria.",
-  }),
+  }).min(1, "La unidad no puede estar vacía."), // ✨ MEJORA: Evita strings vacíos.
 });
 
 /**
@@ -23,14 +26,13 @@ export const createOrderItemSchema = z.object({
  * Sincronizado con los campos que la API route realmente utiliza.
  */
 export const createOrderSchema = z.object({
-  customer_id: z.number({ required_error: "El cliente es requerido." }),
+  customer_id: z.number({ 
+    required_error: "El cliente es requerido." 
+  }).int().positive("El ID de cliente debe ser un entero positivo."),
   
-  total: z.number(),
+  total: z.number().nonnegative("El total no puede ser negativo."),
 
-  // 'destination_id' es opcional y puede ser nulo, tal como lo maneja la API.
-  destination_id: z.number().nullable().optional(),
-
-  // Se elimina el campo 'notes', ya que no se utiliza en la lógica de inserción de la API.
+  destination_id: z.number().int().positive().nullable().optional(),
 
   items: z
     .array(createOrderItemSchema)
