@@ -34,7 +34,15 @@ export async function GET() {
           p.created_at DESC;
     `
 
-    const orders = await executeQuery(sql)
+    const rawOrders = await executeQuery(sql)
+
+    const orders = rawOrders.map((order: any) => ({
+      ...order,
+      client: {
+        id: order.customer_id,
+        name: order.client_name,
+      }
+    }));
 
     console.log("[v0] Orders fetched:", orders.length)
     console.log("[v0] Sample order:", JSON.stringify(orders[0], null, 2))
