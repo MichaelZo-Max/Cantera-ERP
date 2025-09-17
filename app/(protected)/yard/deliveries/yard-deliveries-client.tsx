@@ -6,7 +6,6 @@ import Image from "next/image";
 import { toast } from "sonner";
 import { useAuth } from "@/components/auth-provider";
 import type { Delivery as BaseDelivery, Order, OrderItem as OrderItemType, Truck as TruckType, Driver } from "@/lib/types";
-import { useRouter } from "next/navigation";
 
 // --- UI Components ---
 import { Button } from "@/components/ui/button";
@@ -15,7 +14,6 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
-// 👇 **IMPORTA EL NUEVO COMPONENTE**
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { PhotoInput } from "@/components/forms/photo-input";
@@ -81,7 +79,6 @@ export function YardDeliveriesClientUI({
   initialDrivers,
 }: YardClientProps) {
   const { user } = useAuth();
-  const router = useRouter();
 
   // --- State Management ---
   const [deliveries, setDeliveries] = useState<Delivery[]>(initialDeliveries);
@@ -141,7 +138,9 @@ export function YardDeliveriesClientUI({
 
       const newDelivery = await res.json();
       toast.success(`Nuevo viaje (Despacho #${newDelivery.delivery_id}) creado con éxito.`);
-      router.refresh(); 
+      
+      // ✨ **CAMBIO CLAVE: Actualización de estado local**
+      setDeliveries(prev => [newDelivery, ...prev]);
 
       setSelectedOrderId('');
       setSelectedTruckId('');
@@ -151,7 +150,7 @@ export function YardDeliveriesClientUI({
     } finally {
       setIsCreatingTrip(false);
     }
-  }, [selectedOrderId, selectedTruckId, selectedDriverId, router]);
+  }, [selectedOrderId, selectedTruckId, selectedDriverId]);
 
   const handleSelectDelivery = useCallback(async (delivery: Delivery) => {
     if (delivery.estado !== "PENDING") {
@@ -227,8 +226,11 @@ export function YardDeliveriesClientUI({
         throw new Error(errorData.error || "Error desconocido");
       }
       
+      const updatedDelivery = await res.json();
       toast.success(`Carga confirmada para ${selectedDelivery.truck.placa}`);
-      router.refresh();
+      
+      // ✨ **CAMBIO CLAVE: Actualización de estado local**
+      setDeliveries(prev => prev.map(d => d.delivery_id === updatedDelivery.delivery_id ? updatedDelivery : d));
 
       setShowModal(false);
       setSelectedDelivery(null);
@@ -238,7 +240,7 @@ export function YardDeliveriesClientUI({
     } finally {
       setIsSubmitting(false);
     }
-  }, [selectedDelivery, loadedItems, loadPhoto, notes, user?.id, router]);
+  }, [selectedDelivery, loadedItems, loadPhoto, notes, user?.id]);
 
   return (
     <div className="space-y-6">
