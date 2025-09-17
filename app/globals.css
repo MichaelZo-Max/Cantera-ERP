@@ -22,7 +22,7 @@
   --destructive: #ea580c;
   --destructive-foreground: #ffffff;
   --border: #e5e7eb;
-  --input: #f1f5f9;
+  --input: #e2e8f0;
   --ring: rgba(99, 102, 241, 0.5);
   --chart-1: #6366f1;
   --chart-2: #8b5cf6;
@@ -64,7 +64,7 @@
   --destructive: #f97316;
   --destructive-foreground: #ffffff;
   --border: #334155;
-  --input: #1e293b;
+  --input: #334155;
   --ring: rgba(139, 92, 246, 0.5);
   --chart-1: #6366f1;
   --chart-2: #8b5cf6;

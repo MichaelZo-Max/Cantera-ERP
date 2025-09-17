@@ -57,6 +57,7 @@ import {
   AlertCircle,
 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { cn } from "@/lib/utils";
 
 // --- Zod Validation Schemas ---
 const createDeliverySchema = z.object({
@@ -109,6 +110,7 @@ const RHFSearchableSelect = ({
   options,
   placeholder,
   disabled,
+  className, // <-- AÑADIDO
 }: {
   control: any;
   name: string;
@@ -116,12 +118,15 @@ const RHFSearchableSelect = ({
   options: Option[];
   placeholder: string;
   disabled?: boolean;
+  className?: string; // <-- AÑADIDO
 }) => (
   <FormField
     control={control}
     name={name}
     render={({ field }) => (
-      <FormItem>
+      <FormItem className={className}>
+        {" "}
+        {/* <-- AÑADIDO */}
         <FormLabel>{label}</FormLabel>
         <SearchableSelect
           value={field.value}
@@ -392,9 +397,10 @@ export function YardDeliveriesClientUI({
         </CardHeader>
         <CardContent>
           <Form {...createTripForm}>
+            {/* ============ SECCIÓN MODIFICADA ============ */}
             <form
               onSubmit={createTripForm.handleSubmit(handleCreateTrip)}
-              className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end"
+              className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4 items-end"
             >
               <RHFSearchableSelect
                 control={createTripForm.control}
@@ -405,6 +411,7 @@ export function YardDeliveriesClientUI({
                   value: o.id.toString(),
                   label: `#${o.order_number} - ${o.client.name}`,
                 }))}
+                className="md:col-span-3 lg:col-span-2"
               />
               <RHFSearchableSelect
                 control={createTripForm.control}
@@ -415,6 +422,7 @@ export function YardDeliveriesClientUI({
                   value: t.id.toString(),
                   label: t.placa,
                 }))}
+                className="md:col-span-1"
               />
               <RHFSearchableSelect
                 control={createTripForm.control}
@@ -425,8 +433,13 @@ export function YardDeliveriesClientUI({
                   value: d.id.toString(),
                   label: d.name,
                 }))}
+                className="md:col-span-1"
               />
-              <Button type="submit" disabled={isCreatingTrip}>
+              <Button
+                type="submit"
+                disabled={isCreatingTrip}
+                className="w-full md:w-auto md:col-span-3 lg:col-span-1 justify-self-start"
+              >
                 {isCreatingTrip ? (
                   "Creando..."
                 ) : (
@@ -436,6 +449,7 @@ export function YardDeliveriesClientUI({
                 )}
               </Button>
             </form>
+            {/* ======================================= */}
           </Form>
         </CardContent>
       </Card>

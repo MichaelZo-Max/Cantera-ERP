@@ -20,11 +20,23 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { QuantityInput } from "@/components/forms/quantity-input";
-import { Plus, Trash2, Calculator, CreditCard } from "lucide-react";
+import {
+  Plus,
+  Trash2,
+  Calculator,
+  CreditCard,
+  ShoppingCart,
+  MapPin,
+  Package,
+  ListOrdered,
+} from "lucide-react";
 import { toast } from "sonner";
 import type { Client, Product, UnitBase, Destination } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
 import { SearchableSelect } from "@/components/ui/searchable-select";
+import { AnimatedCard } from "@/components/ui/animated-card";
+import { GradientButton } from "@/components/ui/gradient-button";
+import { EmptyState } from "@/components/ui/empty-state";
 
 // Interface para los items del carrito/orden
 interface OrderItem {
@@ -176,182 +188,209 @@ export function CashierOrderClientUI({
 
   return (
     <div className="max-w-7xl mx-auto space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle>Datos Generales del Pedido</CardTitle>
-          <CardDescription>
-            Selecciona el cliente y el destino para el pedido.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-2xl">
-            <div className="space-y-2">
-              <Label>Cliente *</Label>
-              <SearchableSelect
-                value={selectedcustomer_id}
-                onChange={(value) => {
-                  setSelectedcustomer_id(value);
-                  setSelectedDestinationId(undefined);
-                }}
-                placeholder="Selecciona cliente..."
-                options={clients.map((client) => ({
-                  value: client.id.toString(),
-                  label: client.name,
-                }))}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Destino (Opcional)</Label>
-              <SearchableSelect
-                value={selectedDestinationId}
-                onChange={setSelectedDestinationId}
-                placeholder={
-                  !selectedcustomer_id
-                    ? "Primero selecciona un cliente"
-                    : "Selecciona destino..."
-                }
-                disabled={
-                  !selectedcustomer_id || filteredDestinations.length === 0
-                }
-                options={filteredDestinations.map((dest) => ({
-                  value: dest.id.toString(),
-                  label: dest.name,
-                }))}
-              />
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 items-start">
+        {/* Columna Izquierda: Formularios */}
+        <div className="lg:col-span-3 space-y-6">
+          <AnimatedCard>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <ShoppingCart className="text-primary" />
+                Datos Generales del Pedido
+              </CardTitle>
+              <CardDescription>
+                Selecciona el cliente y el destino para el pedido.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Cliente *</Label>
+                  <SearchableSelect
+                    value={selectedcustomer_id}
+                    onChange={(value) => {
+                      setSelectedcustomer_id(value);
+                      setSelectedDestinationId(undefined);
+                    }}
+                    placeholder="Selecciona un cliente..."
+                    options={clients.map((client) => ({
+                      value: client.id.toString(),
+                      label: client.name,
+                    }))}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Destino (Opcional)</Label>
+                  <SearchableSelect
+                    value={selectedDestinationId}
+                    onChange={setSelectedDestinationId}
+                    placeholder={
+                      !selectedcustomer_id
+                        ? "Primero selecciona un cliente"
+                        : "Selecciona un destino..."
+                    }
+                    disabled={
+                      !selectedcustomer_id || filteredDestinations.length === 0
+                    }
+                    options={filteredDestinations.map((dest) => ({
+                      value: dest.id.toString(),
+                      label: dest.name,
+                    }))}
+                  />
+                </div>
+              </div>
+            </CardContent>
+          </AnimatedCard>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <Card className="lg:col-span-2">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Plus />
-              Constructor de Items
-            </CardTitle>
-            <CardDescription>Agrega productos al pedido</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Producto</Label>
-                <SearchableSelect
-                  value={selectedProduct?.id.toString() || ""}
-                  onChange={handleProductSelect}
-                  placeholder="Seleccionar producto..."
-                  options={products.map((product) => ({
-                    value: product.id.toString(),
-                    label: (
-                      <div className="flex justify-between items-center w-full">
-                        <span>{product.name}</span>
-                        <Badge variant="secondary">
-                          {product.price_per_unit
-                            ? `$${Number(product.price_per_unit).toFixed(2)}`
-                            : "N/A"}{" "}
-                          / {product.unit}
-                        </Badge>
-                      </div>
-                    ),
-                  }))}
-                />
+          <AnimatedCard>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Package className="text-primary" />
+                Constructor de Items
+              </CardTitle>
+              <CardDescription>Agrega productos al pedido.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
+                <div className="space-y-2">
+                  <Label>Producto</Label>
+                  <SearchableSelect
+                    value={selectedProduct?.id.toString() || ""}
+                    onChange={handleProductSelect}
+                    placeholder="Seleccionar producto..."
+                    options={products.map((product) => ({
+                      value: product.id.toString(),
+                      label: (
+                        <div className="flex justify-between items-center w-full">
+                          <span>{product.name}</span>
+                          <Badge variant="secondary">
+                            {product.price_per_unit
+                              ? `$${Number(product.price_per_unit).toFixed(2)}`
+                              : "N/A"}{" "}
+                            / {product.unit}
+                          </Badge>
+                        </div>
+                      ),
+                    }))}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Cantidad</Label>
+                  <QuantityInput
+                    unitBase={(selectedProduct?.unit as UnitBase) || "M3"}
+                    value={currentQuantity}
+                    onChange={setCurrentQuantity}
+                    disabled={!selectedProduct}
+                  />
+                </div>
               </div>
-              <div className="space-y-2">
-                <Label>Cantidad</Label>
-                <QuantityInput
-                  unitBase={(selectedProduct?.unit as UnitBase) || "M3"}
-                  value={currentQuantity}
-                  onChange={setCurrentQuantity}
-                  disabled={!selectedProduct}
-                />
-              </div>
-            </div>
-            {selectedProduct && (
-              <div className="text-right font-semibold">
-                Subtotal del item: $
-                {(
-                  currentQuantity *
-                  (Number(selectedProduct.price_per_unit) ?? 0)
-                ).toFixed(2)}
-              </div>
-            )}
-            <Button
-              onClick={handleAddItem}
-              disabled={!selectedProduct || currentQuantity <= 0}
-              className="w-full"
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              Agregar al Pedido
-            </Button>
-          </CardContent>
-        </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Calculator />
-              Resumen
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex justify-between font-bold text-lg border-t pt-2">
-              <span>Total:</span>
-              <span>${total.toFixed(2)}</span>
-            </div>
-            <Button
-              onClick={handleCreateOrder}
-              disabled={!canSubmit || isSubmitting}
-              size="lg"
-              className="w-full"
-            >
-              <CreditCard className="h-5 w-5 mr-2" />
-              {isSubmitting ? "Procesando..." : "Crear Pedido"}
-            </Button>
-          </CardContent>
-        </Card>
+              {selectedProduct && (
+                <div className="text-right font-semibold text-muted-foreground pt-2">
+                  Subtotal del item:{" "}
+                  <span className="text-foreground">
+                    $
+                    {(
+                      currentQuantity *
+                      (Number(selectedProduct.price_per_unit) ?? 0)
+                    ).toFixed(2)}
+                  </span>
+                </div>
+              )}
+              <Button
+                onClick={handleAddItem}
+                disabled={!selectedProduct || currentQuantity <= 0}
+                className="w-full"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Agregar al Pedido
+              </Button>
+            </CardContent>
+          </AnimatedCard>
+        </div>
+
+        {/* Columna Derecha: Resumen y Lista de Items */}
+        <div className="lg:col-span-2 space-y-6 lg:sticky top-24">
+          <AnimatedCard>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Calculator className="text-primary" />
+                Resumen del Pedido
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex justify-between items-center font-bold text-2xl border-t pt-4">
+                <span>Total:</span>
+                <span className="text-primary">${total.toFixed(2)}</span>
+              </div>
+              <GradientButton
+                onClick={handleCreateOrder}
+                disabled={!canSubmit || isSubmitting}
+                size="lg"
+                className="w-full"
+              >
+                <CreditCard className="h-5 w-5 mr-2" />
+                {isSubmitting ? "Procesando..." : "Crear Pedido"}
+              </GradientButton>
+            </CardContent>
+          </AnimatedCard>
+
+          {orderItems.length > 0 && (
+            <AnimatedCard>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <ListOrdered className="text-primary" />
+                  Items del Pedido
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Producto</TableHead>
+                      <TableHead className="text-right">Subtotal</TableHead>
+                      <TableHead className="text-right"></TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {orderItems.map((item) => (
+                      <TableRow key={item.id}>
+                        <TableCell>
+                          <div className="font-medium">{item.product.name}</div>
+                          <div className="text-muted-foreground text-xs">
+                            {item.quantity} {item.product.unit} x $
+                            {item.pricePerUnit.toFixed(2)}
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right font-medium">
+                          ${item.subtotal.toFixed(2)}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleRemoveItem(item.id)}
+                            className="h-8 w-8"
+                          >
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </AnimatedCard>
+          )}
+
+          {orderItems.length === 0 && (
+            <EmptyState
+              title="Tu pedido está vacío"
+              description="Añade productos desde el constructor de items para empezar."
+              icon={<ShoppingCart className="h-10 w-10 text-muted-foreground" />}
+            />
+          )}
+        </div>
       </div>
-
-      {orderItems.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Items del Pedido</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Producto</TableHead>
-                  <TableHead>Cantidad</TableHead>
-                  <TableHead>P. Unit.</TableHead>
-                  <TableHead>Subtotal</TableHead>
-                  <TableHead />
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {orderItems.map((item) => (
-                  <TableRow key={item.id}>
-                    <TableCell>{item.product.name}</TableCell>
-                    <TableCell>
-                      {item.quantity} {item.product.unit}
-                    </TableCell>
-                    <TableCell>${item.pricePerUnit.toFixed(2)}</TableCell>
-                    <TableCell>${item.subtotal.toFixed(2)}</TableCell>
-                    <TableCell>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleRemoveItem(item.id)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-      )}
     </div>
   );
 }

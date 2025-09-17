@@ -1,4 +1,3 @@
-// alexmgp7/cantera-erp/cantera-erp-nuevas-reglas/components/ui/searchable-select.tsx
 "use client";
 
 import * as React from "react";
@@ -53,20 +52,48 @@ export function SearchableSelect({
     [options, value]
   );
 
-  /**
-   * Función de filtro personalizada para buscar por la etiqueta visible (label)
-   * en lugar del valor interno (value).
-   * Normaliza el texto para ignorar mayúsculas/minúsculas y acentos.
-   */
+  // === FUNCIÓN DE FILTRADO REESCRITA Y CORREGIDA ===
   const commandFilter = (itemValue: string, search: string): number => {
-    const option = options.find(opt => opt.value === itemValue);
-    
-    if (!option || typeof option.label !== 'string') {
+    const option = options.find((opt) => opt.value === itemValue);
+
+    if (!option) {
       return 0;
     }
 
-    const normalizedLabel = option.label.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-    const normalizedSearch = search.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    // Función recursiva y segura para obtener el texto de cualquier ReactNode
+    const getNodeText = (node: React.ReactNode): string => {
+      // Casos base: texto, nulos o booleanos
+      if (node == null || typeof node === "boolean") return "";
+      if (typeof node === "string" || typeof node === "number")
+        return node.toString();
+
+      // Caso recursivo para arrays (fragmentos)
+      if (Array.isArray(node)) {
+        return node.map(getNodeText).join("");
+      }
+
+      // Caso recursivo para elementos de React
+      // Se verifica que sea un elemento válido y que tenga `props`
+      if (React.isValidElement(node) && node.props) {
+        // La recursión se hace sobre los hijos del elemento
+        return getNodeText(node.props.children);
+      }
+
+      // Si no es ninguno de los anteriores, no tiene texto
+      return "";
+    };
+
+    const labelText = getNodeText(option.label);
+
+    // Normalización y búsqueda (insensible a mayúsculas y acentos)
+    const normalizedLabel = labelText
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "");
+    const normalizedSearch = search
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "");
 
     return normalizedLabel.includes(normalizedSearch) ? 1 : 0;
   };
@@ -78,19 +105,26 @@ export function SearchableSelect({
           variant="outline"
           role="combobox"
           aria-expanded={open}
-          className={cn("w-full justify-between font-normal", className)}
+          className={cn(
+            "w-full justify-between font-normal text-sm",
+            !selectedOption && "text-muted-foreground",
+            className
+          )}
           disabled={disabled}
         >
           {selectedOption ? (
             <span className="truncate">{selectedOption.label}</span>
           ) : (
-            <span className="text-muted-foreground">{placeholder}</span>
+            <span>{placeholder}</span>
           )}
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-[--radix-popover-trigger-width] p-0 z-[99]">
-        {/* 👇 **SE APLICA EL FILTRO PERSONALIZADO AQUÍ** */}
+      <PopoverContent
+        align="start"
+        sideOffset={4}
+        className="w-[--radix-popover-trigger-width] p-0 z-[99]"
+      >
         <Command filter={commandFilter}>
           <CommandInput placeholder={searchPlaceholder} />
           <CommandList>
