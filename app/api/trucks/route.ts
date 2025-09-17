@@ -7,37 +7,21 @@ export const dynamic = "force-dynamic";
 
 /**
  * @route GET /api/trucks
- * @desc Obtener todos los camiones activos con su chofer
+ * @desc Obtener todos los camiones activos
  */
 export async function GET() {
   try {
+    // ⬇️ SE ELIMINÓ LA UNIÓN (JOIN) CON LA TABLA DE CHOFERES
     const query = `
       SELECT 
-        t.id, t.placa, t.brand, t.model, t.capacity, t.is_active,
-        d.id as driverId, d.name as driverName
-      FROM RIP.APP_CAMIONES t
-      LEFT JOIN RIP.APP_CHOFERES d ON t.driver_id = d.id
-      WHERE t.is_active = 1 
-      ORDER BY t.placa;
+        id, placa, brand, model, capacity, is_active
+      FROM RIP.APP_CAMIONES
+      WHERE is_active = 1 
+      ORDER BY placa;
     `;
-    const trucksData = await executeQuery(query);
+    const trucks = await executeQuery(query);
 
-    const trucks = trucksData.map((t) => ({
-      id: t.id,
-      placa: t.placa,
-      brand: t.brand,
-      model: t.model,
-      capacity: t.capacity,
-      is_active: t.is_active,
-      driverId: t.driverId,
-      driver: t.driverId
-        ? {
-            id: t.driverId,
-            name: t.driverName,
-          }
-        : null,
-    }));
-
+    // Se devuelve directamente el resultado de la consulta sin mapeo adicional
     return NextResponse.json(trucks);
   } catch (error) {
     console.error("[API_TRUCKS_GET]", error);
@@ -52,7 +36,8 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { placa, brand, model, capacity, driverId } = body;
+    // ⬇️ SE ELIMINÓ driverId DEL BODY
+    const { placa, brand, model, capacity } = body;
 
     if (!placa || !capacity) {
       return new NextResponse("La placa y la capacidad son requeridas", {
@@ -60,37 +45,28 @@ export async function POST(request: Request) {
       });
     }
 
+    // ⬇️ SE ELIMINÓ driver_id DE LA CONSULTA INSERT
     const query = `
-      INSERT INTO RIP.APP_CAMIONES (placa, brand, model, capacity, driver_id)
-      OUTPUT INSERTED.id, INSERTED.placa, INSERTED.brand, INSERTED.model, INSERTED.capacity, INSERTED.is_active, INSERTED.driver_id
-      VALUES (@placa, @brand, @model, @capacity, @driverId);
+      INSERT INTO RIP.APP_CAMIONES (placa, brand, model, capacity)
+      OUTPUT INSERTED.id, INSERTED.placa, INSERTED.brand, INSERTED.model, INSERTED.capacity, INSERTED.is_active
+      VALUES (@placa, @brand, @model, @capacity);
     `;
 
+    // ⬇️ SE ELIMINÓ EL PARÁMETRO driverId
     const params = [
       { name: "placa", type: TYPES.NVarChar, value: placa },
       { name: "brand", type: TYPES.NVarChar, value: brand },
       { name: "model", type: TYPES.NVarChar, value: model },
       { name: "capacity", type: TYPES.Decimal, value: capacity },
-      { name: "driverId", type: TYPES.Int, value: driverId || null },
     ];
 
     const result = await executeQuery(query, params);
-
-    const driverQuery = `SELECT id, name FROM RIP.APP_CHOFERES WHERE id = @driverId`;
-    const driverResult = driverId
-      ? await executeQuery(driverQuery, [
-          { name: "driverId", type: TYPES.Int, value: driverId },
-        ])
-      : [];
-    const driver = driverResult.length > 0 ? driverResult[0] : null;
-
+    
     // ✨ INVALIDACIÓN DEL CACHÉ
     revalidateTag("trucks");
-    if (driverId) {
-      revalidateTag("drivers"); // Invalidar choferes si se asigna uno
-    }
-
-    return NextResponse.json({ ...result[0], driver }, { status: 201 });
+    
+    // ⬇️ SE ELIMINÓ LA LÓGICA PARA BUSCAR EL CHOFER Y SE DEVUELVE SOLO EL CAMIÓN CREADO
+    return NextResponse.json(result[0], { status: 201 });
   } catch (error: any) {
     if (error?.number === 2627 || error?.number === 2601) {
       const duplicateValue = error.message.match(/\(([^)]+)\)/)?.[1];

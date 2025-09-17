@@ -1,8 +1,6 @@
-// app/(protected)/admin/trucks/trucks-client.tsx
 "use client";
 
 import type React from "react";
-// 1. Importar `useCallback` y `useMemo`
 import { useState, useMemo, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,16 +15,9 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { AnimatedCard } from "@/components/ui/animated-card";
 import { GradientButton } from "@/components/ui/gradient-button";
-import type { Truck as TruckType, Driver } from "@/lib/types";
+import type { Truck as TruckType } from "@/lib/types";
 import {
   TruckIcon,
   Search,
@@ -42,18 +33,13 @@ import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
 import { useConfirmation } from "@/hooks/use-confirmation";
 import { EmptyState } from "@/components/ui/empty-state";
 
-// El componente ahora recibe los datos iniciales como props
+// El componente ahora solo recibe los camiones
 export function TrucksClientUI({
   initialTrucks,
-  initialDrivers,
 }: {
   initialTrucks: TruckType[];
-  initialDrivers: Driver[];
 }) {
-  // Los estados para manejar la data ahora se inicializan con las props
   const [trucks, setTrucks] = useState<TruckType[]>(initialTrucks);
-  const [drivers] = useState<Driver[]>(initialDrivers);
-
   const [searchTerm, setSearchTerm] = useState("");
   const [showDialog, setShowDialog] = useState(false);
   const [editingTruck, setEditingTruck] = useState<TruckType | null>(null);
@@ -62,14 +48,13 @@ export function TrucksClientUI({
     brand: "",
     model: "",
     capacity: 0,
-    driverId: "",
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
   const { isOpen, options, confirm, handleConfirm, handleCancel } =
     useConfirmation();
 
-  // 2. Memorizar el resultado del filtro
+  // Se elimina el filtro por chofer
   const filteredTrucks = useMemo(
     () =>
       trucks.filter(
@@ -78,14 +63,12 @@ export function TrucksClientUI({
           (truck.brand &&
             truck.brand.toLowerCase().includes(searchTerm.toLowerCase())) ||
           (truck.model &&
-            truck.model.toLowerCase().includes(searchTerm.toLowerCase())) ||
-          (truck.driver?.name &&
-            truck.driver.name.toLowerCase().includes(searchTerm.toLowerCase()))
+            truck.model.toLowerCase().includes(searchTerm.toLowerCase()))
       ),
     [trucks, searchTerm]
   );
 
-  // 3. Envolver las funciones en `useCallback`
+  // Se elimina 'driverId' del formulario
   const handleNewTruck = useCallback(() => {
     setEditingTruck(null);
     setFormData({
@@ -93,12 +76,12 @@ export function TrucksClientUI({
       brand: "",
       model: "",
       capacity: 0,
-      driverId: "",
     });
     setApiError(null);
     setShowDialog(true);
   }, []);
 
+  // Se elimina 'driverId' del formulario de edición
   const handleEditTruck = useCallback((truck: TruckType) => {
     setEditingTruck(truck);
     setFormData({
@@ -106,7 +89,6 @@ export function TrucksClientUI({
       brand: truck.brand || "",
       model: truck.model || "",
       capacity: truck.capacity || 0,
-      driverId: truck.driverId || "",
     });
     setApiError(null);
     setShowDialog(true);
@@ -210,7 +192,6 @@ export function TrucksClientUI({
         cancelText={options?.cancelText}
         variant={options?.variant}
       />
-      {/* Header con el botón para abrir el modal */}
       <div className="flex justify-between items-center">
         <div className="space-y-2">
           <div className="flex items-center space-x-3">
@@ -222,7 +203,7 @@ export function TrucksClientUI({
                 Flota de Camiones
               </h2>
               <p className="text-muted-foreground">
-                Administra los vehículos de transporte y sus choferes
+                Administra los vehículos de transporte
               </p>
             </div>
           </div>
@@ -236,13 +217,12 @@ export function TrucksClientUI({
         </GradientButton>
       </div>
 
-      {/* Search Bar */}
       <AnimatedCard hoverEffect="lift" className="glass">
         <CardContent className="pt-6">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-5 w-5" />
             <Input
-              placeholder="Buscar por placas, marca, modelo o chofer..."
+              placeholder="Buscar por placas, marca o modelo..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-12 h-12 text-lg focus-ring"
@@ -251,7 +231,6 @@ export function TrucksClientUI({
         </CardContent>
       </AnimatedCard>
 
-      {/* Trucks Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {filteredTrucks.length === 0 ? (
           <div className="col-span-full">
@@ -302,26 +281,16 @@ export function TrucksClientUI({
                 </div>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="flex justify-between">
-                  {truck.capacity && (
-                    <div className="bg-gradient-to-r from-primary/10 to-accent/10 border border-primary/20 p-3 rounded-xl flex-1">
-                      <p className="text-2xl font-bold bg-gradient-primary bg-clip-text text-transparent">
-                        {truck.capacity} m³
-                      </p>
-                      <p className="text-sm text-primary/80 font-medium">
-                        Capacidad
-                      </p>
-                    </div>
-                  )}
-                  <div className="bg-gradient-to-r from-secondary/10 to-accent/10 border border-secondary/20 p-3 rounded-xl flex-1 ml-2">
-                    <p className="text-lg font-bold bg-gradient-to-r from-secondary to-accent bg-clip-text text-transparent truncate">
-                      {truck.driver?.name || "Sin chofer"}
+                {truck.capacity && (
+                  <div className="bg-gradient-to-r from-primary/10 to-accent/10 border border-primary/20 p-3 rounded-xl flex-1">
+                    <p className="text-2xl font-bold bg-gradient-primary bg-clip-text text-transparent">
+                      {truck.capacity} m³
                     </p>
-                    <p className="text-sm text-secondary/80 font-medium">
-                      Chofer
+                    <p className="text-sm text-primary/80 font-medium">
+                      Capacidad
                     </p>
                   </div>
-                </div>
+                )}
                 <div className="flex space-x-2 pt-4 border-t">
                   <Button
                     variant="outline"
@@ -352,7 +321,6 @@ export function TrucksClientUI({
         )}
       </div>
 
-      {/* Create/Edit Dialog */}
       <Dialog open={showDialog} onOpenChange={setShowDialog}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
@@ -415,8 +383,7 @@ export function TrucksClientUI({
                 />
               </div>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-2">
+            <div className="space-y-2">
                 <Label htmlFor="capacity" className="font-semibold">
                   Capacidad (m³)
                 </Label>
@@ -436,29 +403,6 @@ export function TrucksClientUI({
                   className="focus-ring"
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="driverId" className="font-semibold">
-                  Chofer Asignado
-                </Label>
-                <Select
-                  value={formData.driverId}
-                  onValueChange={(value) =>
-                    setFormData({ ...formData, driverId: value })
-                  }
-                >
-                  <SelectTrigger className="focus-ring">
-                    <SelectValue placeholder="Seleccionar chofer..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {drivers.map((driver) => (
-                      <SelectItem key={driver.id} value={String(driver.id)}>
-                        {driver.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
 
             {apiError && <p className="text-sm text-red-500">{apiError}</p>}
             <DialogFooter className="pt-4">

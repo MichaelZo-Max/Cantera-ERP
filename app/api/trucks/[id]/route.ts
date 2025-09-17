@@ -61,10 +61,6 @@ export async function PATCH(request: Request, { params }: { params: { id: string
             updates.push("capacity = @capacity");
             queryParams.push({ name: 'capacity', type: TYPES.Decimal, value: body.capacity });
         }
-        if (body.driverId !== undefined) {
-            updates.push("driver_id = @driverId");
-            queryParams.push({ name: 'driverId', type: TYPES.Int, value: body.driverId || null });
-        }
         if (body.is_active !== undefined) {
             updates.push("is_active = @is_active");
             queryParams.push({ name: 'is_active', type: TYPES.Bit, value: body.is_active });
@@ -92,11 +88,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
             return new NextResponse('Camión no encontrado para actualizar', { status: 404 });
         }
 
-        // ✨ INVALIDACIÓN DEL CACHÉ
         revalidateTag('trucks');
-        if (body.driverId !== undefined) {
-          revalidateTag('drivers'); // Invalidar choferes si se cambia la asignación
-        }
 
         return NextResponse.json(result[0]);
     } catch (error: any) {
@@ -119,7 +111,7 @@ export async function DELETE(request: Request, { params }: { params: { id: strin
         if (isNaN(id)) {
             return new NextResponse('ID de camión inválido', { status: 400 });
         }
-
+        
         const query = `
             UPDATE RIP.APP_CAMIONES
             SET is_active = 0, updated_at = GETDATE()
@@ -127,7 +119,6 @@ export async function DELETE(request: Request, { params }: { params: { id: strin
         `;
         await executeQuery(query, [{ name: 'id', type: TYPES.Int, value: id }]);
         
-        // ✨ INVALIDACIÓN DEL CACHÉ
         revalidateTag('trucks');
 
         return NextResponse.json({ message: 'Camión desactivado correctamente' });
