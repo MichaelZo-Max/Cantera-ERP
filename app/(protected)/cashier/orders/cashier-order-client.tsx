@@ -1,3 +1,4 @@
+// alexmgp7/cantera-erp/cantera-erp-nuevas-reglas/app/(protected)/cashier/orders/cashier-order-client.tsx
 "use client";
 
 import { useState, useCallback, useMemo } from "react";
@@ -12,13 +13,6 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
   Table,
   TableBody,
   TableCell,
@@ -31,6 +25,8 @@ import { Plus, Trash2, Calculator, CreditCard } from "lucide-react";
 import { toast } from "sonner";
 import type { Client, Product, UnitBase, Destination } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
+// 👇 **IMPORTA EL COMPONENTE REUTILIZABLE**
+import { SearchableSelect } from "@/components/ui/searchable-select";
 
 // Interface para los items del carrito/orden
 interface OrderItem {
@@ -177,7 +173,7 @@ export function CashierOrderClientUI({
     } finally {
       setIsSubmitting(false);
     }
-  }, [selectedcustomer_id, selectedDestinationId, orderItems, router]);
+  }, [selectedcustomer_id, selectedDestinationId, orderItems, total, router]);
 
   // Memo para habilitar/deshabilitar el botón de envío
   const canSubmit = useMemo(
@@ -198,43 +194,33 @@ export function CashierOrderClientUI({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-2xl">
             <div className="space-y-2">
               <Label>Cliente *</Label>
-              <Select
+              {/* 👇 **SELECT DE CLIENTE ACTUALIZADO** */}
+              <SearchableSelect
                 value={selectedcustomer_id}
-                onValueChange={(value) => {
+                onChange={(value) => {
                   setSelectedcustomer_id(value);
                   setSelectedDestinationId(undefined); // Reset destination on client change
                 }}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecciona cliente..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {clients.map((client) => (
-                    <SelectItem key={client.id} value={client.id.toString()}>
-                      {client.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                placeholder="Selecciona cliente..."
+                options={clients.map((client) => ({
+                  value: client.id.toString(),
+                  label: client.name,
+                }))}
+              />
             </div>
             <div className="space-y-2">
               <Label>Destino (Opcional)</Label>
-              <Select
+              {/* 👇 **SELECT DE DESTINO ACTUALIZADO** */}
+              <SearchableSelect
                 value={selectedDestinationId}
-                onValueChange={setSelectedDestinationId}
+                onChange={setSelectedDestinationId}
+                placeholder="Selecciona destino..."
                 disabled={!selectedcustomer_id}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecciona destino..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {filteredDestinations.map((dest) => (
-                    <SelectItem key={dest.id} value={dest.id.toString()}>
-                      {dest.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                options={filteredDestinations.map((dest) => ({
+                  value: dest.id.toString(),
+                  label: dest.name,
+                }))}
+              />
             </div>
           </div>
         </CardContent>
@@ -253,30 +239,27 @@ export function CashierOrderClientUI({
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Producto</Label>
-                <Select
+                {/* 👇 **SELECT DE PRODUCTO ACTUALIZADO** */}
+                <SearchableSelect
                   value={selectedProduct?.id.toString() || ""}
-                  onValueChange={handleProductSelect}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Seleccionar producto..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {products.map((product) => (
-                      <SelectItem
-                        key={product.id}
-                        value={product.id.toString()}
-                      >
+                  onChange={handleProductSelect}
+                  placeholder="Seleccionar producto..."
+                  options={products.map((product) => ({
+                    value: product.id.toString(),
+                    // Mantenemos la lógica de mostrar el precio en el label
+                    label: (
+                      <div className="flex justify-between items-center w-full">
                         <span>{product.name}</span>
-                        <Badge variant="secondary" className="ml-4">
+                        <Badge variant="secondary">
                           {product.price_per_unit
                             ? `$${Number(product.price_per_unit).toFixed(2)}`
                             : "N/A"}{" "}
                           / {product.unit}
                         </Badge>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                      </div>
+                    ),
+                  }))}
+                />
               </div>
               <div className="space-y-2">
                 <Label>Cantidad</Label>
