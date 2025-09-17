@@ -138,6 +138,7 @@ export interface DeliveryItem {
   despacho_id: number;
   pedido_item_id: number;
   dispatched_quantity: number;
+  orderItem?: OrderItem;
 }
 
 export interface DispatchGuide {

@@ -5,13 +5,14 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/componen
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Search, Truck, Clock, CheckCircle, Package, Eye } from "lucide-react"
+import { Search, Truck, Clock, CheckCircle, Package, Eye, ChevronDown } from "lucide-react"
 import type { Delivery } from "@/lib/types"
 import { AnimatedCard } from "@/components/ui/animated-card"
 import { EmptyState } from "@/components/ui/empty-state"
 import Link from "next/link"
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 
-// Objeto de configuración de estados simplificado y alineado con la app
+// Objeto de configuración de estados
 const statusConfig = {
   PENDING: {
     label: "Pendiente",
@@ -42,7 +43,6 @@ export function CashierDeliveriesClientUI({
       initialDeliveries.filter((delivery) => {
         const q = searchTerm.toLowerCase()
         const placa = delivery.truck?.placa?.toLowerCase() ?? ""
-        // Corregido para acceder a los datos anidados
         const cliente = delivery.orderDetails.client?.name?.toLowerCase() ?? ""
         const orderNumber = delivery.orderDetails.order_number?.toLowerCase() ?? ""
         const id = String(delivery.delivery_id)?.toLowerCase() ?? ""
@@ -54,14 +54,12 @@ export function CashierDeliveriesClientUI({
   const deliveriesByOrder = useMemo(() => {
     const grouped = new Map<string, Delivery[]>()
     filteredDeliveries.forEach((delivery) => {
-      // Corregido para usar el ID de la orden
       const orderId = String(delivery.orderDetails.id)
       if (!grouped.has(orderId)) {
         grouped.set(orderId, [])
       }
       grouped.get(orderId)!.push(delivery)
     })
-    // Ordenar viajes dentro de cada orden por ID de despacho
     grouped.forEach((orderDeliveries) => {
       orderDeliveries.sort((a, b) => a.delivery_id - b.delivery_id)
     })
@@ -119,92 +117,90 @@ export function CashierDeliveriesClientUI({
             const completedTrips = orderDeliveries.filter(d => d.estado === "EXITED").length
 
             return (
-              <AnimatedCard
-                key={orderId}
-                hoverEffect="lift"
-                animateIn
-                delay={orderIndex * 100}
-                className="overflow-hidden"
-              >
-                <CardHeader className="pb-3 bg-muted/30">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <div>
-                      <CardTitle className="text-xl font-bold">
-                        Orden {firstDelivery.orderDetails.order_number || orderId}
-                      </CardTitle>
-                      <p className="text-muted-foreground mt-1">{firstDelivery.orderDetails.client?.name || "N/A"}</p>
-                    </div>
-                    <div className="text-right">
-                      <Badge variant="outline" className="mb-2">
-                        {completedTrips}/{orderDeliveries.length} Viajes Completados
-                      </Badge>
-                      <div className="flex items-center gap-2">
-                        <Button variant="outline" size="sm" asChild>
-                          <Link href={`/cashier/orders/${orderId}`}>
-                            <Eye className="h-3 w-3 mr-1" />
-                            Ver Orden Completa
-                          </Link>
-                        </Button>
+              <Collapsible key={orderId} defaultOpen>
+                <AnimatedCard
+                  hoverEffect="lift"
+                  animateIn
+                  delay={orderIndex * 100}
+                  className="overflow-hidden"
+                >
+                  <CollapsibleTrigger asChild>
+                    <CardHeader className="pb-3 bg-muted/30 cursor-pointer hover:bg-muted/40 transition-colors group">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div>
+                          <CardTitle className="text-xl font-bold">
+                            Orden {firstDelivery.orderDetails.order_number || orderId}
+                          </CardTitle>
+                          <p className="text-muted-foreground mt-1">{firstDelivery.orderDetails.client?.name || "N/A"}</p>
+                        </div>
+                        <div className="text-right flex items-center gap-4">
+                          <Badge variant="outline">
+                            {completedTrips}/{orderDeliveries.length} Viajes Completados
+                          </Badge>
+                          <Button variant="outline" size="sm" asChild>
+                            <Link href={`/cashier/orders/${orderId}`}>
+                              <Eye className="h-3 w-3 mr-1" />
+                              Ver Orden Completa
+                            </Link>
+                          </Button>
+                          <ChevronDown className="h-5 w-5 transition-transform duration-300 group-data-[state=open]:rotate-180" />
+                        </div>
                       </div>
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent className="p-4">
-                  <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
-                    {orderDeliveries.map((delivery) => {
-                      const conf = statusConfig[delivery.estado as keyof typeof statusConfig] || statusConfig.PENDING;
-                      const StatusIcon = conf.icon;
+                    </CardHeader>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent>
+                    <CardContent className="p-4">
+                      <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
+                        {orderDeliveries.map((delivery) => {
+                          const conf = statusConfig[delivery.estado as keyof typeof statusConfig] || statusConfig.PENDING;
+                          const StatusIcon = conf.icon;
+                          const hasItemsLoaded = delivery.dispatchItems && delivery.dispatchItems.length > 0
 
-                      // --- LÓGICA CLAVE: CALCULAR TOTAL CARGADO ---
-                      const totalLoadedQuantity = delivery.dispatchItems?.reduce(
-                        (sum, item) => sum + (item.dispatched_quantity || 0), 0
-                      ) ?? 0;
-                      
-                      const hasItemsLoaded = totalLoadedQuantity > 0;
-
-                      return (
-                        <Card key={delivery.delivery_id} className="border-2 flex flex-col">
-                          <CardHeader className="pb-2">
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center gap-2">
-                                <Truck className="h-4 w-4 text-primary" />
-                                <span className="font-semibold text-sm">Viaje #{delivery.delivery_id}</span>
-                              </div>
-                              <Badge className={`${conf.color} text-xs`}>
-                                <StatusIcon className="h-3 w-3 mr-1" />
-                                {conf.label}
-                              </Badge>
-                            </div>
-                            <p className="text-sm font-medium pt-1">{delivery.truck?.placa || "N/A"}</p>
-                          </CardHeader>
-                          <CardContent className="space-y-2 flex-grow">
-                            {/* --- VISUALIZACIÓN DEL TOTAL CARGADO --- */}
-                            {hasItemsLoaded ? (
-                                <div className="bg-muted/50 rounded-lg p-2 space-y-1">
-                                    <div className="flex justify-between items-center text-xs">
-                                    <span className="text-muted-foreground">Cantidad Cargada:</span>
-                                    <span className="font-semibold text-base text-foreground">{totalLoadedQuantity.toFixed(2)}</span>
+                          return (
+                            <Card key={delivery.delivery_id} className="border-2 flex flex-col">
+                              <CardHeader className="pb-2">
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-2">
+                                    <Truck className="h-4 w-4 text-primary" />
+                                    <span className="font-semibold text-sm">Viaje #{delivery.delivery_id}</span>
+                                  </div>
+                                  <Badge className={`${conf.color} text-xs`}>
+                                    <StatusIcon className="h-3 w-3 mr-1" />
+                                    {conf.label}
+                                  </Badge>
+                                </div>
+                                <p className="text-sm font-medium pt-1">{delivery.truck?.placa || "N/A"}</p>
+                              </CardHeader>
+                              <CardContent className="space-y-2 flex-grow pt-2 pb-4">
+                                {/* --- VISTA DE PRODUCTOS CARGADOS --- */}
+                                {hasItemsLoaded ? (
+                                    <div className="bg-muted/50 rounded-lg p-2 space-y-2">
+                                        {delivery.dispatchItems?.map((item, index) => (
+                                            <div key={index} className="flex justify-between items-center text-xs">
+                                                <span className="text-muted-foreground truncate pr-2">
+                                                    {item.orderItem?.product?.name || 'Producto desconocido'}
+                                                </span>
+                                                <span className="font-semibold text-sm text-foreground whitespace-nowrap">
+                                                    {item.dispatched_quantity?.toFixed(2) ?? '0.00'}
+                                                </span>
+                                            </div>
+                                        ))}
                                     </div>
-                                </div>
-                            ) : (
-                                <div className="text-xs text-muted-foreground text-center italic py-2">
-                                    Pendiente por cargar
-                                </div>
-                            )}
-                          </CardContent>
-                          <CardFooter className="pt-3 border-t">
-                             <Button variant="ghost" size="sm" className="w-full" asChild>
-                                <Link href={`/yard/deliveries?highlight=${delivery.delivery_id}`}>
-                                    Ver en Patio
-                                </Link>
-                             </Button>
-                          </CardFooter>
-                        </Card>
-                      )
-                    })}
-                  </div>
-                </CardContent>
-              </AnimatedCard>
+                                ) : (
+                                    <div className="text-xs text-muted-foreground text-center italic py-2">
+                                        Pendiente por cargar
+                                    </div>
+                                )}
+                              </CardContent>
+                              {/* Se elimina el CardFooter para no mostrar el botón "Ver en Patio" */}
+                            </Card>
+                          )
+                        })}
+                      </div>
+                    </CardContent>
+                  </CollapsibleContent>
+                </AnimatedCard>
+              </Collapsible>
             )
           })
         ) : (

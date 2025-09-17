@@ -92,15 +92,17 @@ export async function GET(_request: Request) {
             name: row.driver_name,
             phone: row.driver_phone ?? undefined,
           },
-          // Inicializamos el array para los items cargados en este viaje
-          dispatchItems: [], 
+          dispatchItems: [],
         });
       }
 
       const d = deliveriesMap.get(row.delivery_id)!;
 
-      // Poblar items DEL PEDIDO (evitando duplicados)
-      if (row.pedido_item_id && !d.orderDetails.items.some(i => i.id === row.pedido_item_id)) {
+      // Poblar la lista COMPLETA de items del pedido, evitando duplicados.
+      if (
+        row.pedido_item_id &&
+        !d.orderDetails.items.some((i) => i.id === row.pedido_item_id)
+      ) {
         d.orderDetails.items.push({
           id: row.pedido_item_id,
           order_id: row.order_id,
@@ -113,21 +115,37 @@ export async function GET(_request: Request) {
             name: row.product_name,
             unit: row.unit,
           },
-          dispatchItems: [], // Este se mantiene por consistencia del tipo OrderItem
-        });
-      }
-
-      // Poblar items DESPACHADOS EN ESTE VIAJE (evitando duplicados)
-      if (row.dispatch_item_id && !d.dispatchItems?.some(di => di.id === row.dispatch_item_id)) {
-        d.dispatchItems?.push({
-          id: row.dispatch_item_id,
-          despacho_id: row.delivery_id,
-          pedido_item_id: row.dispatched_pedido_item_id,
-          dispatched_quantity: row.dispatched_quantity,
+          dispatchItems: [], // Por consistencia del tipo OrderItem
         });
       }
     }
-    // --- FIN DE LA MODIFICACIÓN ---
+
+    // PASO 2: Construir la lista de items despachados (dispatchItems).
+    // Ahora que `orderDetails.items` está completo para cada pedido, podemos buscar de forma segura.
+    for (const row of rows) {
+      if (row.dispatch_item_id) {
+        const d = deliveriesMap.get(row.delivery_id)!;
+
+        if (!d.dispatchItems?.some((di) => di.id === row.dispatch_item_id)) {
+          // Buscamos el item del pedido correspondiente en la lista que ya construimos.
+          const orderItem = d.orderDetails.items.find(
+            (item) => item.id === row.dispatched_pedido_item_id
+          );
+
+          // Solo añadimos el item despachado si encontramos su correspondiente `orderItem`
+          if (orderItem) {
+            d.dispatchItems?.push({
+              id: row.dispatch_item_id,
+              despacho_id: row.delivery_id,
+              pedido_item_id: row.dispatched_pedido_item_id,
+              dispatched_quantity: row.dispatched_quantity,
+              // Adjuntamos el objeto 'orderItem' completo, que incluye el nombre del producto.
+              orderItem: orderItem,
+            });
+          }
+        }
+      }
+    }
 
     return NextResponse.json(Array.from(deliveriesMap.values()));
   } catch (e) {
@@ -137,20 +155,22 @@ export async function GET(_request: Request) {
 }
 
 // Acepta snake_case (front) o camelCase (compat)
-const createDeliverySchema = z.object({
-  order_id: z.number().int().positive().optional(),
-  truck_id: z.number().int().positive().optional(),
-  driver_id: z.number().int().positive().optional(),
-  orderId: z.number().int().positive().optional(),
-  truckId: z.number().int().positive().optional(),
-  driverId: z.number().int().positive().optional(),
-}).refine(
-  (v) =>
-    (v.order_id ?? v.orderId) &&
-    (v.truck_id ?? v.truckId) &&
-    (v.driver_id ?? v.driverId),
-  { message: "order_id, truck_id y driver_id son requeridos" }
-);
+const createDeliverySchema = z
+  .object({
+    order_id: z.number().int().positive().optional(),
+    truck_id: z.number().int().positive().optional(),
+    driver_id: z.number().int().positive().optional(),
+    orderId: z.number().int().positive().optional(),
+    truckId: z.number().int().positive().optional(),
+    driverId: z.number().int().positive().optional(),
+  })
+  .refine(
+    (v) =>
+      (v.order_id ?? v.orderId) &&
+      (v.truck_id ?? v.truckId) &&
+      (v.driver_id ?? v.driverId),
+    { message: "order_id, truck_id y driver_id son requeridos" }
+  );
 
 export async function POST(request: Request) {
   try {
@@ -201,10 +221,10 @@ export async function POST(request: Request) {
     ]);
 
     if (deliveryRows.length === 0) {
-        throw new Error("No se pudo crear el despacho en la base de datos.");
+      throw new Error("No se pudo crear el despacho en la base de datos.");
     }
     const r = deliveryRows[0];
-    
+
     // --- INICIO DE LA CORRECCIÓN ---
 
     // 2. Obtener los items del pedido por separado
@@ -221,21 +241,23 @@ export async function POST(request: Request) {
         WHERE oi.order_id = @orderId
         ORDER BY oi.id ASC
     `;
-    const itemRows = await executeQuery(itemsQuery, [{ name: "orderId", type: TYPES.Int, value: orderId }]);
+    const itemRows = await executeQuery(itemsQuery, [
+      { name: "orderId", type: TYPES.Int, value: orderId },
+    ]);
 
-    const orderItems: OrderItem[] = itemRows.map(itemRow => ({
-        id: itemRow.pedido_item_id,
-        order_id: orderId,
-        product_id: itemRow.product_id,
-        quantity: itemRow.cantidadSolicitada,
+    const orderItems: OrderItem[] = itemRows.map((itemRow) => ({
+      id: itemRow.pedido_item_id,
+      order_id: orderId,
+      product_id: itemRow.product_id,
+      quantity: itemRow.cantidadSolicitada,
+      unit: itemRow.unit,
+      price_per_unit: itemRow.price_per_unit,
+      product: {
+        id: itemRow.product_id,
+        name: itemRow.product_name,
         unit: itemRow.unit,
-        price_per_unit: itemRow.price_per_unit,
-        product: {
-            id: itemRow.product_id,
-            name: itemRow.product_name,
-            unit: itemRow.unit,
-        },
-        dispatchItems: [],
+      },
+      dispatchItems: [],
     }));
 
     // 3. Construir el payload completo
@@ -255,14 +277,17 @@ export async function POST(request: Request) {
         items: orderItems, // <--- Aquí incluimos los items
       },
       truck: { id: r.truck_id, placa: r.placa },
-      driver: { id: r.driver_id, name: r.driver_name, phone: r.driver_phone ?? undefined },
+      driver: {
+        id: r.driver_id,
+        name: r.driver_name,
+        phone: r.driver_phone ?? undefined,
+      },
     };
 
     // --- FIN DE LA CORRECCIÓN ---
 
     revalidateTag("deliveries");
     return NextResponse.json(payload, { status: 201 });
-
   } catch (e) {
     if (e instanceof z.ZodError) {
       return new NextResponse(JSON.stringify(e.errors), { status: 400 });
