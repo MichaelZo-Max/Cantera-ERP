@@ -1,12 +1,10 @@
-// app/(protected)/yard/deliveries/yard-deliveries-client.tsx
+// alexmgp7/cantera-erp/cantera-erp-nuevas-reglas/app/(protected)/yard/deliveries/yard-deliveries-client.tsx
 "use client";
 
 import React, { useState, useMemo, useCallback } from "react";
 import Image from "next/image";
 import { toast } from "sonner";
 import { useAuth } from "@/components/auth-provider";
-// --- 1. ACTUALIZAR TIPO Delivery ---
-// Añadimos totalDispatched para que TypeScript lo reconozca.
 import type { Delivery as BaseDelivery, Order, OrderItem as OrderItemType, Truck as TruckType, Driver } from "@/lib/types";
 import { useRouter } from "next/navigation";
 
@@ -17,13 +15,13 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+// 👇 **IMPORTA EL NUEVO COMPONENTE**
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { PhotoInput } from "@/components/forms/photo-input";
 import { Plus, CheckCircle, Clock, User, Truck as TruckIcon } from "lucide-react";
 
 // --- Type Definitions ---
-// Extendemos el tipo base de Delivery
 type Delivery = BaseDelivery & {
   totalDispatched?: number;
 };
@@ -161,7 +159,6 @@ export function YardDeliveriesClientUI({
       return;
     }
     
-    // --- 2. OBTENER DATOS ACTUALIZADOS DE LA API ---
     try {
         const res = await fetch(`/api/deliveries/${delivery.delivery_id}`);
         if (!res.ok) {
@@ -171,7 +168,6 @@ export function YardDeliveriesClientUI({
 
         setSelectedDelivery(updatedDelivery);
         
-        // Inicializar los items a cargar a 0
         const initialLoadedItems = updatedDelivery.orderDetails.items?.map(item => ({
             pedido_item_id: item.id.toString(),
             dispatched_quantity: 0,
@@ -184,7 +180,7 @@ export function YardDeliveriesClientUI({
 
     } catch (error: any) {
         toast.error("Error de red", { description: error.message });
-        setSelectedDelivery(delivery); // Fallback to initial data on error
+        setSelectedDelivery(delivery);
     }
   }, []);
   
@@ -227,7 +223,7 @@ export function YardDeliveriesClientUI({
       });
 
       if (!res.ok) {
-        const errorData = await res.json(); // Leer el cuerpo del error como JSON
+        const errorData = await res.json();
         throw new Error(errorData.error || "Error desconocido");
       }
       
@@ -244,7 +240,6 @@ export function YardDeliveriesClientUI({
     }
   }, [selectedDelivery, loadedItems, loadPhoto, notes, user?.id, router]);
 
-  // --- Render Method ---
   return (
     <div className="space-y-6">
       <h2 className="text-2xl font-bold text-foreground">Gestión de Patio</h2>
@@ -257,24 +252,41 @@ export function YardDeliveriesClientUI({
         <CardContent className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
           <div className="space-y-2">
             <Label htmlFor="order-select">Pedido Activo</Label>
-            <Select onValueChange={setSelectedOrderId} value={selectedOrderId}>
-              <SelectTrigger id="order-select"><SelectValue placeholder="Seleccionar Pedido..." /></SelectTrigger>
-              <SelectContent>{initialActiveOrders.map(o => <SelectItem key={o.id} value={o.id.toString()}>#{o.order_number} - {o.client.name}</SelectItem>)}</SelectContent>
-            </Select>
+            <SearchableSelect
+              value={selectedOrderId}
+              onChange={setSelectedOrderId}
+              placeholder="Seleccionar Pedido..."
+              options={initialActiveOrders.map(o => ({
+                value: o.id.toString(),
+                label: `#${o.order_number} - ${o.client.name}`
+              }))}
+            />
           </div>
           <div className="space-y-2">
             <Label htmlFor="truck-select">Camión Disponible</Label>
-            <Select onValueChange={setSelectedTruckId} value={selectedTruckId} disabled={!selectedOrderId}>
-              <SelectTrigger id="truck-select"><SelectValue placeholder="Seleccionar Camión..." /></SelectTrigger>
-              <SelectContent>{initialTrucks.map(t => <SelectItem key={t.id} value={t.id.toString()}>{t.placa}</SelectItem>)}</SelectContent>
-            </Select>
+            <SearchableSelect
+              value={selectedTruckId}
+              onChange={setSelectedTruckId}
+              placeholder="Seleccionar Camión..."
+              disabled={!selectedOrderId}
+              options={initialTrucks.map(t => ({
+                value: t.id.toString(),
+                label: t.placa
+              }))}
+            />
           </div>
           <div className="space-y-2">
             <Label htmlFor="driver-select">Conductor</Label>
-            <Select onValueChange={setSelectedDriverId} value={selectedDriverId} disabled={!selectedOrderId}>
-              <SelectTrigger id="driver-select"><SelectValue placeholder="Seleccionar Conductor..." /></SelectTrigger>
-              <SelectContent>{initialDrivers.map(d => <SelectItem key={d.id} value={d.id.toString()}>{d.name}</SelectItem>)}</SelectContent>
-            </Select>
+            <SearchableSelect
+              value={selectedDriverId}
+              onChange={setSelectedDriverId}
+              placeholder="Seleccionar Conductor..."
+              disabled={!selectedOrderId}
+              options={initialDrivers.map(d => ({
+                value: d.id.toString(),
+                label: d.name
+              }))}
+            />
           </div>
           <Button onClick={handleCreateTrip} disabled={!selectedOrderId || !selectedTruckId || !selectedDriverId || isCreatingTrip}>
             {isCreatingTrip ? "Creando..." : <><Plus className="h-4 w-4 mr-2" /> Crear Viaje</>}
@@ -319,12 +331,9 @@ export function YardDeliveriesClientUI({
                 <div className="space-y-2">
                   <Label>Items del Pedido</Label>
                   <div className="border rounded-lg">
-                    {/* --- 3. RENDERIZADO CON LA LÓGICA CORRECTA --- */}
                     {selectedDelivery.orderDetails.items.map((item, index) => {
                       const totalOrdered = item.quantity;
-                      // Usamos el valor que nos da la API
                       const totalDispatchedPreviously = selectedDelivery.totalDispatched ?? 0;
-                      // Calculamos el pendiente real
                       const pendingQuantity = totalOrdered - totalDispatchedPreviously;
 
                       const loadedValue = loadedItems.find(li => li.pedido_item_id === item.id.toString())?.dispatched_quantity;
@@ -346,7 +355,6 @@ export function YardDeliveriesClientUI({
                                 id={`item-${item.id}`} 
                                 type="number" 
                                 value={loadedValue ?? 0}
-                                // --- 4. USAR EL PENDIENTE REAL COMO MÁXIMO ---
                                 onChange={(e) => handleLoadedQuantityChange(item.id.toString(), parseFloat(e.target.value) || 0, pendingQuantity)} 
                                 max={pendingQuantity}
                                 min={0}
