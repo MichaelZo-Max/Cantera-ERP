@@ -1,22 +1,28 @@
-"use client"
+"use client";
 
-import { useMemo, useState } from "react"
-import Link from "next/link"
+import { useMemo, useState } from "react";
+import Link from "next/link";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
-  Card, CardContent, CardHeader, CardTitle
-} from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
+  Search,
+  Truck,
+  Clock,
+  CheckCircle,
+  Package,
+  Eye,
+  ChevronDown,
+} from "lucide-react";
+import type { Delivery } from "@/lib/types";
+import { AnimatedCard } from "@/components/ui/animated-card";
+import { EmptyState } from "@/components/ui/empty-state";
 import {
-  Search, Truck, Clock, CheckCircle, Package, Eye, ChevronDown
-} from "lucide-react"
-import type { Delivery } from "@/lib/types"
-import { AnimatedCard } from "@/components/ui/animated-card"
-import { EmptyState } from "@/components/ui/empty-state"
-import {
-  Collapsible, CollapsibleContent, CollapsibleTrigger
-} from "@/components/ui/collapsible"
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 
 /* ----------------------------- Config de estado ----------------------------- */
 const STATUS_CONFIG = {
@@ -38,68 +44,70 @@ const STATUS_CONFIG = {
       "bg-emerald-500/10 text-emerald-700 border-emerald-200 dark:bg-emerald-500/20 dark:text-emerald-300 dark:border-emerald-800",
     icon: CheckCircle,
   },
-} as const
+} as const;
 
-type StatusKey = keyof typeof STATUS_CONFIG
+type StatusKey = keyof typeof STATUS_CONFIG;
 
 function StatusBadge({ estado }: { estado: string }) {
-  const conf = (STATUS_CONFIG[(estado as StatusKey)] ?? STATUS_CONFIG.PENDING)
-  const Icon = conf.icon
+  const conf = STATUS_CONFIG[estado as StatusKey] ?? STATUS_CONFIG.PENDING;
+  const Icon = conf.icon;
   return (
     <Badge className={`text-xs ${conf.color}`}>
       <Icon className="mr-1 h-3 w-3" />
       {conf.label}
     </Badge>
-  )
+  );
 }
 
 /* --------------------------------- Componente -------------------------------- */
 export function CashierDeliveriesClientUI({
   initialDeliveries,
 }: {
-  initialDeliveries: Delivery[]
+  initialDeliveries: Delivery[];
 }) {
-  const [searchTerm, setSearchTerm] = useState("")
+  const [searchTerm, setSearchTerm] = useState("");
 
   /* Filtrado por búsqueda (placa, cliente, nro orden, id viaje) */
   const filteredDeliveries = useMemo(() => {
-    const q = searchTerm.trim().toLowerCase()
-    if (!q) return initialDeliveries
+    const q = searchTerm.trim().toLowerCase();
+    if (!q) return initialDeliveries;
     return initialDeliveries.filter((delivery) => {
-      const placa = delivery.truck?.placa?.toLowerCase() ?? ""
-      const cliente = delivery.orderDetails.client?.name?.toLowerCase() ?? ""
-      const orderNumber = delivery.orderDetails.order_number?.toLowerCase() ?? ""
-      const id = String(delivery.delivery_id).toLowerCase()
+      const placa = delivery.truck?.placa?.toLowerCase() ?? "";
+      const cliente = delivery.orderDetails.client?.name?.toLowerCase() ?? "";
+      const orderNumber =
+        delivery.orderDetails.order_number?.toLowerCase() ?? "";
+      const id = String(delivery.delivery_id).toLowerCase();
       return (
         placa.includes(q) ||
         cliente.includes(q) ||
         id.includes(q) ||
         orderNumber.includes(q)
-      )
-    })
-  }, [initialDeliveries, searchTerm])
+      );
+    });
+  }, [initialDeliveries, searchTerm]);
 
   /* Agrupar por orden */
   const deliveriesByOrder = useMemo(() => {
-    const grouped = new Map<string, Delivery[]>()
+    const grouped = new Map<string, Delivery[]>();
     for (const d of filteredDeliveries) {
-      const orderId = String(d.orderDetails.id)
-      if (!grouped.has(orderId)) grouped.set(orderId, [])
-      grouped.get(orderId)!.push(d)
+      const orderId = String(d.orderDetails.id);
+      if (!grouped.has(orderId)) grouped.set(orderId, []);
+      grouped.get(orderId)!.push(d);
     }
     // Ordenar cada grupo por ID de viaje
     for (const [, arr] of grouped) {
-      arr.sort((a, b) => a.delivery_id - b.delivery_id)
+      arr.sort((a, b) => a.delivery_id - b.delivery_id);
     }
-    return grouped
-  }, [filteredDeliveries])
+    return grouped;
+  }, [filteredDeliveries]);
 
   /* Contadores (según lo filtrado para coherencia visual) */
   const completedDeliveriesCount = useMemo(
     () => filteredDeliveries.filter((d) => d.estado === "EXITED").length,
-    [filteredDeliveries],
-  )
-  const inProgressDeliveriesCount = filteredDeliveries.length - completedDeliveriesCount
+    [filteredDeliveries]
+  );
+  const inProgressDeliveriesCount =
+    filteredDeliveries.length - completedDeliveriesCount;
 
   return (
     <div className="space-y-6 sm:space-y-8 motion-safe:animate-fade-in">
@@ -118,14 +126,18 @@ export function CashierDeliveriesClientUI({
           <div className="flex items-center gap-2">
             <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-500" />
             <span>
-              <span className="font-medium text-foreground">{completedDeliveriesCount}</span>{" "}
+              <span className="font-medium text-foreground">
+                {completedDeliveriesCount}
+              </span>{" "}
               Completados
             </span>
           </div>
           <div className="flex items-center gap-2">
             <span className="h-2 w-2 animate-pulse rounded-full bg-amber-500" />
             <span>
-              <span className="font-medium text-foreground">{inProgressDeliveriesCount}</span>{" "}
+              <span className="font-medium text-foreground">
+                {inProgressDeliveriesCount}
+              </span>{" "}
               En proceso
             </span>
           </div>
@@ -161,13 +173,14 @@ export function CashierDeliveriesClientUI({
         {Array.from(deliveriesByOrder.entries()).length > 0 ? (
           Array.from(deliveriesByOrder.entries()).map(
             ([orderId, orderDeliveries], orderIndex) => {
-              const firstDelivery = orderDeliveries[0]
+              const firstDelivery = orderDeliveries[0];
               const completedTrips = orderDeliveries.filter(
-                (d) => d.estado === "EXITED",
-              ).length
+                (d) => d.estado === "EXITED"
+              ).length;
               const orderNumber =
-                firstDelivery.orderDetails.order_number || orderId
-              const clientName = firstDelivery.orderDetails.client?.name || "N/A"
+                firstDelivery.orderDetails.order_number || orderId;
+              const clientName =
+                firstDelivery.orderDetails.client?.name || "N/A";
 
               return (
                 <Collapsible key={orderId} defaultOpen>
@@ -180,7 +193,7 @@ export function CashierDeliveriesClientUI({
                     <CollapsibleTrigger asChild>
                       <CardHeader
                         role="button"
-                        className="group cursor-pointer bg-muted/30 pb-3 transition-colors hover:bg-muted/40"
+                        className="group cursor-pointer p-4 transition-colors hover:bg-muted/50"
                       >
                         <div className="flex flex-wrap items-center justify-between gap-3">
                           <div className="min-w-0">
@@ -192,11 +205,18 @@ export function CashierDeliveriesClientUI({
                             </p>
                           </div>
                           <div className="flex items-center gap-3 sm:gap-4">
-                            <Badge variant="outline" className="whitespace-nowrap">
-                              {completedTrips}/{orderDeliveries.length} Viajes Completados
+                            <Badge
+                              variant="outline"
+                              className="whitespace-nowrap"
+                            >
+                              {completedTrips}/{orderDeliveries.length} Viajes
+                              Completados
                             </Badge>
                             <Button variant="outline" size="sm" asChild>
-                              <Link href={`/cashier/orders/${orderId}`} prefetch>
+                              <Link
+                                href={`/cashier/orders/${orderId}`}
+                                prefetch
+                              >
                                 <Eye className="mr-1 h-3 w-3" />
                                 Ver orden
                               </Link>
@@ -224,7 +244,7 @@ export function CashierDeliveriesClientUI({
                         >
                           {orderDeliveries.map((delivery) => {
                             const hasItemsLoaded =
-                              (delivery.dispatchItems?.length ?? 0) > 0
+                              (delivery.dispatchItems?.length ?? 0) > 0;
 
                             return (
                               <Card
@@ -251,20 +271,25 @@ export function CashierDeliveriesClientUI({
                                   {hasItemsLoaded ? (
                                     <div className="rounded-lg bg-muted/50 p-2">
                                       <ul className="space-y-2">
-                                        {delivery.dispatchItems!.map((item, idx) => (
-                                          <li
-                                            key={`${delivery.delivery_id}-${idx}`}
-                                            className="flex items-center justify-between text-xs"
-                                          >
-                                            <span className="truncate pr-2 text-muted-foreground">
-                                              {item.orderItem?.product?.name ||
-                                                "Producto desconocido"}
-                                            </span>
-                                            <span className="whitespace-nowrap text-sm font-semibold text-foreground">
-                                              {(item.dispatched_quantity ?? 0).toFixed(2)}
-                                            </span>
-                                          </li>
-                                        ))}
+                                        {delivery.dispatchItems!.map(
+                                          (item, idx) => (
+                                            <li
+                                              key={`${delivery.delivery_id}-${idx}`}
+                                              className="flex items-center justify-between text-xs"
+                                            >
+                                              <span className="truncate pr-2 text-muted-foreground">
+                                                {item.orderItem?.product
+                                                  ?.name ||
+                                                  "Producto desconocido"}
+                                              </span>
+                                              <span className="whitespace-nowrap text-sm font-semibold text-foreground">
+                                                {(
+                                                  item.dispatched_quantity ?? 0
+                                                ).toFixed(2)}
+                                              </span>
+                                            </li>
+                                          )
+                                        )}
                                       </ul>
                                     </div>
                                   ) : (
@@ -274,15 +299,15 @@ export function CashierDeliveriesClientUI({
                                   )}
                                 </CardContent>
                               </Card>
-                            )
+                            );
                           })}
                         </div>
                       </CardContent>
                     </CollapsibleContent>
                   </AnimatedCard>
                 </Collapsible>
-              )
-            },
+              );
+            }
           )
         ) : (
           <Card>
@@ -301,5 +326,5 @@ export function CashierDeliveriesClientUI({
         )}
       </section>
     </div>
-  )
+  );
 }
