@@ -165,7 +165,9 @@ const DeliveryCard = React.memo(
               Despacho ID: {delivery.delivery_id}
             </p>
           </div>
-          <Badge variant={delivery.estado === "CARGADA" ? "default" : "secondary"}>
+          <Badge
+            variant={delivery.estado === "CARGADA" ? "default" : "secondary"}
+          >
             Pedido #{delivery.orderDetails.order_number}
           </Badge>
         </div>
@@ -442,17 +444,17 @@ export function YardDeliveriesClientUI({
         </AnimatedCard>
 
         <Card>
-            <CardContent className="pt-6">
-                <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                    placeholder="Buscar despacho..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-9"
-                />
-                </div>
-            </CardContent>
+          <CardContent className="pt-6">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Buscar despacho..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-9"
+              />
+            </div>
+          </CardContent>
         </Card>
       </div>
 
@@ -522,7 +524,7 @@ export function YardDeliveriesClientUI({
 
       {/* Modal de Confirmación de Carga */}
       <Dialog open={showModal} onOpenChange={setShowModal}>
-        <DialogContent className="sm:max-w-3xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-xl max-h-[90vh] overflow-y-auto">
           {selectedDelivery && (
             <>
               <DialogHeader>
@@ -537,38 +539,45 @@ export function YardDeliveriesClientUI({
               <Form {...confirmLoadForm}>
                 <form
                   onSubmit={confirmLoadForm.handleSubmit(handleConfirmLoad)}
-                  className="space-y-4 py-2"
+                  className="space-y-6 py-2" // Aumentado para mejor separación
                 >
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="p-3 bg-muted rounded-lg text-sm space-y-2">
-                      <p>
-                        <strong>Cliente:</strong>{" "}
-                        {selectedDelivery.orderDetails.client.name}
-                      </p>
-                      <p>
-                        <strong>Conductor:</strong> {selectedDelivery.driver.name}
-                      </p>
-                    </div>
+                  {/* --- INICIO DEL CÓDIGO MODIFICADO --- */}
 
-                    <FormField
-                      control={confirmLoadForm.control}
-                      name="loadPhoto"
-                      render={({ field: { onChange } }) => (
-                        <FormItem>
-                          <FormLabel>Foto de Carga (Obligatoria)</FormLabel>
-                          <FormControl>
-                            <PhotoInput
-                              onSelect={onChange}
-                              required={true}
-                              label="Foto de Carga (Obligatoria)"
-                              capture={true}
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+                  {/* El campo de la foto ahora está aquí */}
+                  <FormField
+                    control={confirmLoadForm.control}
+                    name="loadPhoto"
+                    render={({ field: { onChange } }) => (
+                      <FormItem>
+                        <FormLabel>Foto de Carga (Obligatoria)</FormLabel>
+                        <FormControl>
+                          <PhotoInput
+                            onSelect={onChange}
+                            required={true}
+                            label="Tocar para tomar o seleccionar foto"
+                            capture={true}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  {/* El resumen del despacho está a continuación */}
+                  <div className="p-3 border rounded-lg text-sm space-y-2">
+                    <p>
+                      <strong>Cliente:</strong>{" "}
+                      {selectedDelivery.orderDetails.client.name}
+                    </p>
+                    <p>
+                      <strong>Conductor:</strong> {selectedDelivery.driver.name}
+                    </p>
+                    <p>
+                      <strong>Camión:</strong> {selectedDelivery.truck.placa}
+                    </p>
                   </div>
+
+                  {/* --- FIN DEL CÓDIGO MODIFICADO --- */}
 
                   <div className="space-y-2">
                     <Label>Items del Pedido</Label>
@@ -596,9 +605,27 @@ export function YardDeliveriesClientUI({
                             <div className="col-span-1 md:col-span-1 space-y-1">
                               <p className="font-medium">{item.product.name}</p>
                               <div className="text-xs text-muted-foreground space-y-0.5">
-                                <p>Pedido: <span className="font-bold">{totalOrdered.toFixed(2)}</span> {item.product.unit}</p>
-                                <p>Despachado: <span className="font-bold text-blue-600">{totalDispatchedPreviously.toFixed(2)}</span> {item.product.unit}</p>
-                                <p>Pendiente: <span className="font-bold text-green-600">{pendingQuantity.toFixed(2)}</span> {item.product.unit}</p>
+                                <p>
+                                  Pedido:{" "}
+                                  <span className="font-bold">
+                                    {totalOrdered.toFixed(2)}
+                                  </span>{" "}
+                                  {item.product.unit}
+                                </p>
+                                <p>
+                                  Despachado:{" "}
+                                  <span className="font-bold text-blue-600">
+                                    {totalDispatchedPreviously.toFixed(2)}
+                                  </span>{" "}
+                                  {item.product.unit}
+                                </p>
+                                <p>
+                                  Pendiente:{" "}
+                                  <span className="font-bold text-green-600">
+                                    {pendingQuantity.toFixed(2)}
+                                  </span>{" "}
+                                  {item.product.unit}
+                                </p>
                               </div>
                             </div>
                             <div className="col-span-1 md:col-span-2">
@@ -607,7 +634,10 @@ export function YardDeliveriesClientUI({
                                 name={`loadedItems.${index}.dispatched_quantity`}
                                 render={({ field }) => (
                                   <FormItem>
-                                    <FormLabel htmlFor={`item-${item.id}`} className="text-xs mb-1">
+                                    <FormLabel
+                                      htmlFor={`item-${item.id}`}
+                                      className="text-xs mb-1"
+                                    >
                                       Cantidad a Cargar en este Viaje *
                                     </FormLabel>
                                     <FormControl>
@@ -615,7 +645,11 @@ export function YardDeliveriesClientUI({
                                         id={`item-${item.id}`}
                                         type="number"
                                         {...field}
-                                        onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                                        onChange={(e) =>
+                                          field.onChange(
+                                            parseFloat(e.target.value) || 0
+                                          )
+                                        }
                                         max={pendingQuantity}
                                         min={0}
                                         required
@@ -625,7 +659,8 @@ export function YardDeliveriesClientUI({
                                     </FormControl>
                                     {pendingQuantity <= 0 && (
                                       <p className="text-xs text-green-700 mt-1">
-                                        Este item ya fue despachado por completo.
+                                        Este item ya fue despachado por
+                                        completo.
                                       </p>
                                     )}
                                     <FormMessage />
@@ -639,7 +674,9 @@ export function YardDeliveriesClientUI({
                     </div>
                     {confirmLoadForm.formState.errors.loadedItems && (
                       <p className="text-sm font-medium text-destructive">
-                        {confirmLoadForm.formState.errors.loadedItems.message || confirmLoadForm.formState.errors.loadedItems.root?.message}
+                        {confirmLoadForm.formState.errors.loadedItems.message ||
+                          confirmLoadForm.formState.errors.loadedItems.root
+                            ?.message}
                       </p>
                     )}
                   </div>
