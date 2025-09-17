@@ -1,36 +1,59 @@
 "use client"
 
-import { useState, useMemo } from "react"
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
+import { useMemo, useState } from "react"
+import Link from "next/link"
+import {
+  Card, CardContent, CardHeader, CardTitle
+} from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Search, Truck, Clock, CheckCircle, Package, Eye, ChevronDown } from "lucide-react"
+import {
+  Search, Truck, Clock, CheckCircle, Package, Eye, ChevronDown
+} from "lucide-react"
 import type { Delivery } from "@/lib/types"
 import { AnimatedCard } from "@/components/ui/animated-card"
 import { EmptyState } from "@/components/ui/empty-state"
-import Link from "next/link"
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
+import {
+  Collapsible, CollapsibleContent, CollapsibleTrigger
+} from "@/components/ui/collapsible"
 
-// Objeto de configuración de estados
-const statusConfig = {
+/* ----------------------------- Config de estado ----------------------------- */
+const STATUS_CONFIG = {
   PENDING: {
     label: "Pendiente",
-    color: "bg-gray-500/10 text-gray-700 border-gray-200 dark:bg-gray-500/20 dark:text-gray-300 dark:border-gray-800",
+    color:
+      "bg-gray-500/10 text-gray-700 border-gray-200 dark:bg-gray-500/20 dark:text-gray-300 dark:border-gray-800",
     icon: Clock,
   },
   CARGADA: {
     label: "Cargada en Patio",
-    color: "bg-blue-500/10 text-blue-700 border-blue-200 dark:bg-blue-500/20 dark:text-blue-300 dark:border-blue-800",
+    color:
+      "bg-blue-500/10 text-blue-700 border-blue-200 dark:bg-blue-500/20 dark:text-blue-300 dark:border-blue-800",
     icon: Package,
   },
   EXITED: {
     label: "Despachado",
-    color: "bg-emerald-500/10 text-emerald-700 border-emerald-200 dark:bg-emerald-500/20 dark:text-emerald-300 dark:border-emerald-800",
+    color:
+      "bg-emerald-500/10 text-emerald-700 border-emerald-200 dark:bg-emerald-500/20 dark:text-emerald-300 dark:border-emerald-800",
     icon: CheckCircle,
   },
 } as const
 
+type StatusKey = keyof typeof STATUS_CONFIG
+
+function StatusBadge({ estado }: { estado: string }) {
+  const conf = (STATUS_CONFIG[(estado as StatusKey)] ?? STATUS_CONFIG.PENDING)
+  const Icon = conf.icon
+  return (
+    <Badge className={`text-xs ${conf.color}`}>
+      <Icon className="mr-1 h-3 w-3" />
+      {conf.label}
+    </Badge>
+  )
+}
+
+/* --------------------------------- Componente -------------------------------- */
 export function CashierDeliveriesClientUI({
   initialDeliveries,
 }: {
@@ -38,183 +61,245 @@ export function CashierDeliveriesClientUI({
 }) {
   const [searchTerm, setSearchTerm] = useState("")
 
-  const filteredDeliveries = useMemo(
-    () =>
-      initialDeliveries.filter((delivery) => {
-        const q = searchTerm.toLowerCase()
-        const placa = delivery.truck?.placa?.toLowerCase() ?? ""
-        const cliente = delivery.orderDetails.client?.name?.toLowerCase() ?? ""
-        const orderNumber = delivery.orderDetails.order_number?.toLowerCase() ?? ""
-        const id = String(delivery.delivery_id)?.toLowerCase() ?? ""
-        return placa.includes(q) || cliente.includes(q) || id.includes(q) || orderNumber.includes(q)
-      }),
-    [initialDeliveries, searchTerm],
-  )
+  /* Filtrado por búsqueda (placa, cliente, nro orden, id viaje) */
+  const filteredDeliveries = useMemo(() => {
+    const q = searchTerm.trim().toLowerCase()
+    if (!q) return initialDeliveries
+    return initialDeliveries.filter((delivery) => {
+      const placa = delivery.truck?.placa?.toLowerCase() ?? ""
+      const cliente = delivery.orderDetails.client?.name?.toLowerCase() ?? ""
+      const orderNumber = delivery.orderDetails.order_number?.toLowerCase() ?? ""
+      const id = String(delivery.delivery_id).toLowerCase()
+      return (
+        placa.includes(q) ||
+        cliente.includes(q) ||
+        id.includes(q) ||
+        orderNumber.includes(q)
+      )
+    })
+  }, [initialDeliveries, searchTerm])
 
+  /* Agrupar por orden */
   const deliveriesByOrder = useMemo(() => {
     const grouped = new Map<string, Delivery[]>()
-    filteredDeliveries.forEach((delivery) => {
-      const orderId = String(delivery.orderDetails.id)
-      if (!grouped.has(orderId)) {
-        grouped.set(orderId, [])
-      }
-      grouped.get(orderId)!.push(delivery)
-    })
-    grouped.forEach((orderDeliveries) => {
-      orderDeliveries.sort((a, b) => a.delivery_id - b.delivery_id)
-    })
+    for (const d of filteredDeliveries) {
+      const orderId = String(d.orderDetails.id)
+      if (!grouped.has(orderId)) grouped.set(orderId, [])
+      grouped.get(orderId)!.push(d)
+    }
+    // Ordenar cada grupo por ID de viaje
+    for (const [, arr] of grouped) {
+      arr.sort((a, b) => a.delivery_id - b.delivery_id)
+    }
     return grouped
   }, [filteredDeliveries])
 
+  /* Contadores (según lo filtrado para coherencia visual) */
   const completedDeliveriesCount = useMemo(
-    () => initialDeliveries.filter((d) => d.estado === "EXITED").length,
-    [initialDeliveries],
+    () => filteredDeliveries.filter((d) => d.estado === "EXITED").length,
+    [filteredDeliveries],
   )
-
-  const inProgressDeliveriesCount = initialDeliveries.length - completedDeliveriesCount
+  const inProgressDeliveriesCount = filteredDeliveries.length - completedDeliveriesCount
 
   return (
-    <div className="space-y-8 animate-fade-in">
+    <div className="space-y-6 sm:space-y-8 motion-safe:animate-fade-in">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-foreground to-muted-foreground bg-clip-text text-transparent">
+          <h1 className="text-2xl font-bold tracking-tight sm:text-3xl bg-gradient-to-r from-foreground to-muted-foreground bg-clip-text text-transparent">
             Seguimiento de Despachos
           </h1>
-          <p className="text-muted-foreground mt-1">Monitorea el estado de múltiples viajes por orden</p>
+          <p className="mt-1 text-sm text-muted-foreground sm:text-base">
+            Monitorea el estado de múltiples viajes por orden
+          </p>
         </div>
+
         <div className="flex items-center gap-4 text-sm text-muted-foreground">
           <div className="flex items-center gap-2">
-            <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-            <span>{completedDeliveriesCount} Completados</span>
+            <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-500" />
+            <span>
+              <span className="font-medium text-foreground">{completedDeliveriesCount}</span>{" "}
+              Completados
+            </span>
           </div>
           <div className="flex items-center gap-2">
-            <div className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse"></div>
-            <span>{inProgressDeliveriesCount} En Proceso</span>
+            <span className="h-2 w-2 animate-pulse rounded-full bg-amber-500" />
+            <span>
+              <span className="font-medium text-foreground">{inProgressDeliveriesCount}</span>{" "}
+              En proceso
+            </span>
           </div>
         </div>
-      </div>
+      </header>
 
       {/* Search Bar */}
       <AnimatedCard hoverEffect="lift">
         <CardContent className="pt-6">
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-5 w-5" />
+            <label htmlFor="search-deliveries" className="sr-only">
+              Buscar despachos por placa, cliente, orden o ID de viaje
+            </label>
+            <Search
+              aria-hidden="true"
+              className="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground"
+            />
             <Input
+              id="search-deliveries"
               placeholder="Buscar por placa, cliente, orden o ID de viaje…"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-12 h-12 text-lg focus-ring"
+              className="h-12 pl-12 text-base sm:text-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+              inputMode="search"
+              autoComplete="off"
             />
           </div>
         </CardContent>
       </AnimatedCard>
 
-      <div className="space-y-6">
+      {/* Listado por Orden */}
+      <section className="space-y-4 sm:space-y-6">
         {Array.from(deliveriesByOrder.entries()).length > 0 ? (
-          Array.from(deliveriesByOrder.entries()).map(([orderId, orderDeliveries], orderIndex) => {
-            const firstDelivery = orderDeliveries[0]
-            const completedTrips = orderDeliveries.filter(d => d.estado === "EXITED").length
+          Array.from(deliveriesByOrder.entries()).map(
+            ([orderId, orderDeliveries], orderIndex) => {
+              const firstDelivery = orderDeliveries[0]
+              const completedTrips = orderDeliveries.filter(
+                (d) => d.estado === "EXITED",
+              ).length
+              const orderNumber =
+                firstDelivery.orderDetails.order_number || orderId
+              const clientName = firstDelivery.orderDetails.client?.name || "N/A"
 
-            return (
-              <Collapsible key={orderId} defaultOpen>
-                <AnimatedCard
-                  hoverEffect="lift"
-                  animateIn
-                  delay={orderIndex * 100}
-                  className="overflow-hidden"
-                >
-                  <CollapsibleTrigger asChild>
-                    <CardHeader className="pb-3 bg-muted/30 cursor-pointer hover:bg-muted/40 transition-colors group">
-                      <div className="flex flex-wrap items-center justify-between gap-2">
-                        <div>
-                          <CardTitle className="text-xl font-bold">
-                            Orden {firstDelivery.orderDetails.order_number || orderId}
-                          </CardTitle>
-                          <p className="text-muted-foreground mt-1">{firstDelivery.orderDetails.client?.name || "N/A"}</p>
+              return (
+                <Collapsible key={orderId} defaultOpen>
+                  <AnimatedCard
+                    hoverEffect="lift"
+                    animateIn
+                    delay={orderIndex * 80}
+                    className="overflow-hidden"
+                  >
+                    <CollapsibleTrigger asChild>
+                      <CardHeader
+                        role="button"
+                        className="group cursor-pointer bg-muted/30 pb-3 transition-colors hover:bg-muted/40"
+                      >
+                        <div className="flex flex-wrap items-center justify-between gap-3">
+                          <div className="min-w-0">
+                            <CardTitle className="truncate text-lg font-semibold sm:text-xl">
+                              Orden {orderNumber}
+                            </CardTitle>
+                            <p className="mt-1 line-clamp-1 text-sm text-muted-foreground">
+                              {clientName}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-3 sm:gap-4">
+                            <Badge variant="outline" className="whitespace-nowrap">
+                              {completedTrips}/{orderDeliveries.length} Viajes Completados
+                            </Badge>
+                            <Button variant="outline" size="sm" asChild>
+                              <Link href={`/cashier/orders/${orderId}`} prefetch>
+                                <Eye className="mr-1 h-3 w-3" />
+                                Ver orden
+                              </Link>
+                            </Button>
+                            <ChevronDown
+                              aria-hidden="true"
+                              className="h-5 w-5 transition-transform duration-300 data-[state=open]:rotate-180"
+                              /* El estado lo inyecta shadcn al trigger; usamos un span "espejo" para heredar el data-state */
+                            />
+                          </div>
                         </div>
-                        <div className="text-right flex items-center gap-4">
-                          <Badge variant="outline">
-                            {completedTrips}/{orderDeliveries.length} Viajes Completados
-                          </Badge>
-                          <Button variant="outline" size="sm" asChild>
-                            <Link href={`/cashier/orders/${orderId}`}>
-                              <Eye className="h-3 w-3 mr-1" />
-                              Ver Orden Completa
-                            </Link>
-                          </Button>
-                          <ChevronDown className="h-5 w-5 transition-transform duration-300 group-data-[state=open]:rotate-180" />
-                        </div>
-                      </div>
-                    </CardHeader>
-                  </CollapsibleTrigger>
-                  <CollapsibleContent>
-                    <CardContent className="p-4">
-                      <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
-                        {orderDeliveries.map((delivery) => {
-                          const conf = statusConfig[delivery.estado as keyof typeof statusConfig] || statusConfig.PENDING;
-                          const StatusIcon = conf.icon;
-                          const hasItemsLoaded = delivery.dispatchItems && delivery.dispatchItems.length > 0
+                      </CardHeader>
+                    </CollapsibleTrigger>
 
-                          return (
-                            <Card key={delivery.delivery_id} className="border-2 flex flex-col">
-                              <CardHeader className="pb-2">
-                                <div className="flex items-center justify-between">
-                                  <div className="flex items-center gap-2">
-                                    <Truck className="h-4 w-4 text-primary" />
-                                    <span className="font-semibold text-sm">Viaje #{delivery.delivery_id}</span>
+                    <CollapsibleContent>
+                      <CardContent className="p-4">
+                        <div
+                          className="
+                            grid gap-4
+                            grid-cols-1
+                            sm:grid-cols-2
+                            lg:grid-cols-3
+                            xl:grid-cols-4
+                          "
+                        >
+                          {orderDeliveries.map((delivery) => {
+                            const hasItemsLoaded =
+                              (delivery.dispatchItems?.length ?? 0) > 0
+
+                            return (
+                              <Card
+                                key={delivery.delivery_id}
+                                className="flex h-full flex-col border-2"
+                              >
+                                <CardHeader className="pb-2">
+                                  <div className="flex items-center justify-between gap-2">
+                                    <div className="flex items-center gap-2">
+                                      <Truck className="h-4 w-4 text-primary" />
+                                      <span className="text-sm font-semibold">
+                                        Viaje #{delivery.delivery_id}
+                                      </span>
+                                    </div>
+                                    <StatusBadge estado={delivery.estado} />
                                   </div>
-                                  <Badge className={`${conf.color} text-xs`}>
-                                    <StatusIcon className="h-3 w-3 mr-1" />
-                                    {conf.label}
-                                  </Badge>
-                                </div>
-                                <p className="text-sm font-medium pt-1">{delivery.truck?.placa || "N/A"}</p>
-                              </CardHeader>
-                              <CardContent className="space-y-2 flex-grow pt-2 pb-4">
-                                {/* --- VISTA DE PRODUCTOS CARGADOS --- */}
-                                {hasItemsLoaded ? (
-                                    <div className="bg-muted/50 rounded-lg p-2 space-y-2">
-                                        {delivery.dispatchItems?.map((item, index) => (
-                                            <div key={index} className="flex justify-between items-center text-xs">
-                                                <span className="text-muted-foreground truncate pr-2">
-                                                    {item.orderItem?.product?.name || 'Producto desconocido'}
-                                                </span>
-                                                <span className="font-semibold text-sm text-foreground whitespace-nowrap">
-                                                    {item.dispatched_quantity?.toFixed(2) ?? '0.00'}
-                                                </span>
-                                            </div>
+
+                                  <p className="pt-1 text-sm font-medium">
+                                    {delivery.truck?.placa || "N/A"}
+                                  </p>
+                                </CardHeader>
+
+                                <CardContent className="flex grow flex-col gap-2 pt-2 pb-4">
+                                  {hasItemsLoaded ? (
+                                    <div className="rounded-lg bg-muted/50 p-2">
+                                      <ul className="space-y-2">
+                                        {delivery.dispatchItems!.map((item, idx) => (
+                                          <li
+                                            key={`${delivery.delivery_id}-${idx}`}
+                                            className="flex items-center justify-between text-xs"
+                                          >
+                                            <span className="truncate pr-2 text-muted-foreground">
+                                              {item.orderItem?.product?.name ||
+                                                "Producto desconocido"}
+                                            </span>
+                                            <span className="whitespace-nowrap text-sm font-semibold text-foreground">
+                                              {(item.dispatched_quantity ?? 0).toFixed(2)}
+                                            </span>
+                                          </li>
                                         ))}
+                                      </ul>
                                     </div>
-                                ) : (
-                                    <div className="text-xs text-muted-foreground text-center italic py-2">
-                                        Pendiente por cargar
+                                  ) : (
+                                    <div className="py-2 text-center text-xs italic text-muted-foreground">
+                                      Pendiente por cargar
                                     </div>
-                                )}
-                              </CardContent>
-                              {/* Se elimina el CardFooter para no mostrar el botón "Ver en Patio" */}
-                            </Card>
-                          )
-                        })}
-                      </div>
-                    </CardContent>
-                  </CollapsibleContent>
-                </AnimatedCard>
-              </Collapsible>
-            )
-          })
+                                  )}
+                                </CardContent>
+                              </Card>
+                            )
+                          })}
+                        </div>
+                      </CardContent>
+                    </CollapsibleContent>
+                  </AnimatedCard>
+                </Collapsible>
+              )
+            },
+          )
         ) : (
           <Card>
             <CardContent className="pt-6">
               <EmptyState
-                icon={<Truck className="h-12 w-12" />}
+                icon={<Truck className="h-12 w-12" aria-hidden="true" />}
                 title="No se encontraron despachos"
-                description={searchTerm ? "Intenta con otros términos de búsqueda" : "Aún no hay despachos registrados"}
+                description={
+                  searchTerm
+                    ? "Intenta con otros términos de búsqueda."
+                    : "Aún no hay despachos registrados."
+                }
               />
             </CardContent>
           </Card>
         )}
-      </div>
+      </section>
     </div>
   )
 }
