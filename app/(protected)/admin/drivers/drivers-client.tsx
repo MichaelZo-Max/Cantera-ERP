@@ -131,7 +131,10 @@ export function DriversClientUI({
             <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
           </Button>
         </PopoverTrigger>
-        <PopoverContent className="w-[--radix-popover-trigger-width] p-0 z-[99]">
+        <PopoverContent
+          className="w-[--radix-popover-trigger-width] p-0 z-[99]"
+          onOpenAutoFocus={(e) => e.preventDefault()}
+        >
           <Command>
             <CommandInput placeholder="Buscar cliente..." />
             <CommandList>
@@ -264,7 +267,7 @@ export function DriversClientUI({
             throw new Error(errorText || "Ocurrió un error en el servidor.");
           }
         }
-        
+
         // Refrescar la lista de choferes (tu lógica actual es buena)
         const fetchResponse = await fetch("/api/drivers");
         const updatedDrivers = await fetchResponse.json();
@@ -321,7 +324,6 @@ export function DriversClientUI({
     },
     [confirm]
   );
-
 
   return (
     <div className="space-y-8 animate-fade-in">
@@ -446,7 +448,6 @@ export function DriversClientUI({
         />
       )}
 
-
       {/* ✨ 8. DIALOG CON MEJORAS DE VALIDACIÓN */}
       <Dialog open={showDialog} onOpenChange={setShowDialog}>
         <DialogContent className="sm:max-w-lg">
@@ -496,9 +497,9 @@ export function DriversClientUI({
                 className={cn(formErrors.docId && "border-red-500")}
               />
               {formErrors.docId && (
-                 <p className="text-xs text-red-500 flex items-center gap-1 mt-1">
-                   <AlertCircle className="h-3 w-3" /> {formErrors.docId[0]}
-                 </p>
+                <p className="text-xs text-red-500 flex items-center gap-1 mt-1">
+                  <AlertCircle className="h-3 w-3" /> {formErrors.docId[0]}
+                </p>
               )}
             </div>
 
@@ -515,10 +516,10 @@ export function DriversClientUI({
                 }
                 className={cn(formErrors.phone && "border-red-500")}
               />
-               {formErrors.phone && (
-                 <p className="text-xs text-red-500 flex items-center gap-1 mt-1">
-                   <AlertCircle className="h-3 w-3" /> {formErrors.phone[0]}
-                 </p>
+              {formErrors.phone && (
+                <p className="text-xs text-red-500 flex items-center gap-1 mt-1">
+                  <AlertCircle className="h-3 w-3" /> {formErrors.phone[0]}
+                </p>
               )}
             </div>
 
@@ -536,14 +537,15 @@ export function DriversClientUI({
                 error={!!formErrors.customer_ids}
               />
               {formErrors.customer_ids && (
-                 <p className="text-xs text-red-500 flex items-center gap-1 mt-1">
-                   <AlertCircle className="h-3 w-3" /> {formErrors.customer_ids[0]}
-                 </p>
+                <p className="text-xs text-red-500 flex items-center gap-1 mt-1">
+                  <AlertCircle className="h-3 w-3" />{" "}
+                  {formErrors.customer_ids[0]}
+                </p>
               )}
             </div>
 
             {apiError && <p className="text-sm text-red-500">{apiError}</p>}
-            
+
             <DialogFooter className="pt-4">
               <Button
                 type="button"

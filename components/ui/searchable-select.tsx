@@ -124,6 +124,7 @@ export function SearchableSelect({
         align="start"
         sideOffset={4}
         className="w-[--radix-popover-trigger-width] p-0 z-[99]"
+        onOpenAutoFocus={(e) => e.preventDefault()}
       >
         <Command filter={commandFilter}>
           <CommandInput placeholder={searchPlaceholder} />
