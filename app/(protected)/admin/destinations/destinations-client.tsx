@@ -1,4 +1,3 @@
-// alexmgp7/cantera-erp/cantera-erp-nuevas-reglas/app/(protected)/admin/destinations/destinations-client.tsx
 "use client";
 
 import type React from "react";
@@ -16,20 +15,9 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
-// 👇 **SE ELIMINA LA IMPORTACIÓN DEL SELECT ANTIGUO**
-/*
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-*/
-// 👇 **SE AÑADE LA IMPORTACIÓN DEL NUEVO SELECT**
-import { SearchableSelect } from "@/components/ui/searchable-select";
-import { AnimatedCard } from "@/components/ui/animated-card";
-import { GradientButton } from "@/components/ui/gradient-button";
+import { SearchableSelect } from "../../../../components/ui/searchable-select";
+import { AnimatedCard } from "../../../../components/ui/animated-card";
+import { GradientButton } from "../../../../components/ui/gradient-button";
 import type { Destination, Client } from "@/lib/types";
 import {
   MapPin,
@@ -39,12 +27,21 @@ import {
   Trash2,
   CheckCircle,
   Save,
+  AlertCircle, // ✨ Importar icono de alerta
 } from "lucide-react";
 import { toast } from "sonner";
-import { LoadingSkeleton } from "@/components/ui/loading-skeleton";
-import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
-import { useConfirmation } from "@/hooks/use-confirmation";
-import { EmptyState } from "@/components/ui/empty-state";
+import { LoadingSkeleton } from "../../../../components/ui/loading-skeleton";
+import { ConfirmationDialog } from "../../../../components/ui/confirmation-dialog";
+import { useConfirmation } from "../../../../hooks/use-confirmation";
+import { EmptyState } from "../../../../components/ui/empty-state";
+import { destinationSchema } from "../../../../lib/validations"; // ✨ 1. Importar el esquema de validación
+
+// ✨ 2. Definir un tipo para los errores del formulario
+type FormErrors = {
+  name?: string;
+  direccion?: string;
+  customer_id?: string;
+};
 
 export function DestinationsClientUI({
   initialDestinations,
@@ -66,7 +63,7 @@ export function DestinationsClientUI({
     customer_id: "",
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [apiError, setApiError] = useState<string | null>(null);
+  const [formErrors, setFormErrors] = useState<FormErrors>({}); // ✨ 3. Estado para gestionar los errores
   const { isOpen, options, confirm, handleConfirm, handleCancel } =
     useConfirmation();
 
@@ -90,7 +87,7 @@ export function DestinationsClientUI({
   const handleNewDestination = useCallback(() => {
     setEditingDestination(null);
     setFormData({ name: "", direccion: "", customer_id: "" });
-    setApiError(null);
+    setFormErrors({}); // Limpiar errores al abrir
     setShowDialog(true);
   }, []);
 
@@ -99,9 +96,9 @@ export function DestinationsClientUI({
     setFormData({
       name: destination.name,
       direccion: destination.direccion || "",
-      customer_id: destination.customer_id.toString(), // Asegurarse que es string
+      customer_id: destination.customer_id.toString(),
     });
-    setApiError(null);
+    setFormErrors({}); // Limpiar errores al abrir
     setShowDialog(true);
   }, []);
 
@@ -109,7 +106,26 @@ export function DestinationsClientUI({
     async (e: React.FormEvent) => {
       e.preventDefault();
       setIsSubmitting(true);
-      setApiError(null);
+      setFormErrors({});
+
+      // ✨ 4. Validar en el frontend antes de enviar
+      const validation = destinationSchema.safeParse(formData);
+
+      if (!validation.success) {
+        const errors: FormErrors = {};
+        validation.error.issues.forEach((issue) => {
+          errors[issue.path[0] as keyof FormErrors] = issue.message;
+        });
+        setFormErrors(errors);
+        setIsSubmitting(false);
+        toast.error("Error de validación", {
+          description: "Por favor, corrige los campos marcados.",
+        });
+        return; // Detener el envío
+      }
+
+      // ✨ 5. Usar los datos validados y limpios por Zod
+      const validatedData = validation.data;
 
       const method = editingDestination ? "PATCH" : "POST";
       const url = editingDestination
@@ -120,39 +136,29 @@ export function DestinationsClientUI({
         const res = await fetch(url, {
           method,
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            ...formData,
-            customer_id: parseInt(formData.customer_id, 10), // Convertir a número antes de enviar
-          }),
+          body: JSON.stringify(validatedData), // Enviar datos validados
         });
 
         if (!res.ok) {
-          const errorData = await res.json();
-          throw new Error(errorData.error || "Error al guardar el destino");
+          const errorText = await res.text();
+          throw new Error(errorText || "Error al guardar el destino");
         }
 
         const savedDestination = await res.json();
         
-        // Asignar el cliente completo para la UI
-        const client = clients.find(c => c.id.toString() === savedDestination.customer_id.toString());
-        savedDestination.client = client;
-
-
-        if (editingDestination) {
-          setDestinations((prevDestinations) =>
-            prevDestinations.map((d) =>
-              d.id === savedDestination.id ? savedDestination : d
-            )
-          );
-          toast.success("Destino actualizado exitosamente.");
-        } else {
-          setDestinations((prev) => [...prev, savedDestination]);
-          toast.success("Destino creado exitosamente.");
-        }
+        // La API ahora devuelve el objeto completo, por lo que podemos usarlo directamente
+        setDestinations((prev) =>
+          editingDestination
+            ? prev.map((d) => (d.id === savedDestination.id ? savedDestination : d))
+            : [...prev, savedDestination]
+        );
+        
+        toast.success(
+          `Destino ${editingDestination ? "actualizado" : "creado"} exitosamente.`
+        );
 
         setShowDialog(false);
       } catch (err: any) {
-        setApiError(err.message);
         toast.error("Error al guardar", { description: err.message });
       } finally {
         setIsSubmitting(false);
@@ -184,13 +190,8 @@ export function DestinationsClientUI({
             if (!res.ok) throw new Error(await res.text());
             const updatedDestination = await res.json();
 
-             // Asignar el cliente completo para la UI
-            const client = clients.find(c => c.id.toString() === updatedDestination.customer_id.toString());
-            updatedDestination.client = client;
-
-
-            setDestinations((prevDestinations) =>
-              prevDestinations.map((d) =>
+            setDestinations((prev) =>
+              prev.map((d) =>
                 d.id === updatedDestination.id ? updatedDestination : d
               )
             );
@@ -220,48 +221,46 @@ export function DestinationsClientUI({
         cancelText={options?.cancelText}
         variant={options?.variant}
       />
-      {/* Header */}
+      {/* Header y Search Bar (sin cambios) */}
       <div className="flex justify-between items-center">
         <div className="space-y-2">
-          <div className="flex items-center space-x-3">
-            <div className="p-2 bg-gradient-primary rounded-lg">
-              <MapPin className="h-6 w-6 text-white" />
+            <div className="flex items-center space-x-3">
+                <div className="p-2 bg-gradient-primary rounded-lg">
+                    <MapPin className="h-6 w-6 text-white" />
+                </div>
+                <div>
+                    <h2 className="text-3xl font-bold bg-gradient-to-r from-foreground to-muted-foreground bg-clip-text text-transparent">
+                        Destinos
+                    </h2>
+                    <p className="text-muted-foreground">
+                        Administra las ubicaciones de entrega de los clientes
+                    </p>
+                </div>
             </div>
-            <div>
-              <h2 className="text-3xl font-bold bg-gradient-to-r from-foreground to-muted-foreground bg-clip-text text-transparent">
-                Destinos
-              </h2>
-              <p className="text-muted-foreground">
-                Administra las ubicaciones de entrega de los clientes
-              </p>
-            </div>
-          </div>
         </div>
         <GradientButton
-          onClick={handleNewDestination}
-          className="flex items-center space-x-2 animate-pulse-glow"
+            onClick={handleNewDestination}
+            className="flex items-center space-x-2 animate-pulse-glow"
         >
-          <Plus className="h-4 w-4" />
-          <span>Nuevo Destino</span>
+            <Plus className="h-4 w-4" />
+            <span>Nuevo Destino</span>
         </GradientButton>
       </div>
-
-      {/* Search Bar */}
       <AnimatedCard hoverEffect="lift" className="glass">
         <CardContent className="pt-6">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-5 w-5" />
-            <Input
-              placeholder="Buscar por name, dirección o cliente..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-12 h-12 text-lg focus-ring"
-            />
-          </div>
+            <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-5 w-5" />
+                <Input
+                    placeholder="Buscar por nombre, dirección o cliente..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-12 h-12 text-lg focus-ring"
+                />
+            </div>
         </CardContent>
       </AnimatedCard>
 
-      {/* Destinations Grid */}
+      {/* Grid de Destinos (sin cambios) */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {filteredDestinations.length === 0 ? (
           <div className="col-span-full">
@@ -349,7 +348,7 @@ export function DestinationsClientUI({
         )}
       </div>
 
-      {/* Create/Edit Dialog */}
+      {/* Create/Edit Dialog con feedback de validación */}
       <Dialog open={showDialog} onOpenChange={setShowDialog}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
@@ -368,18 +367,23 @@ export function DestinationsClientUI({
               <Label htmlFor="customer_id" className="font-semibold">
                 Cliente *
               </Label>
-              {/* 👇 **SELECT DE CLIENTE ACTUALIZADO** */}
               <SearchableSelect
-                  value={formData.customer_id}
-                  onChange={(value) =>
-                    setFormData({ ...formData, customer_id: value })
-                  }
-                  placeholder="Seleccionar cliente..."
-                  options={clients.map((client) => ({
-                    value: client.id.toString(),
-                    label: client.name,
-                  }))}
+                value={formData.customer_id}
+                onChange={(value) =>
+                  setFormData({ ...formData, customer_id: value })
+                }
+                placeholder="Seleccionar cliente..."
+                options={clients.map((client) => ({
+                  value: client.id.toString(),
+                  label: client.name,
+                }))}
+                className={formErrors.customer_id ? "border-red-500" : ""}
               />
+              {formErrors.customer_id && (
+                  <p className="text-xs text-red-500 flex items-center gap-1">
+                      <AlertCircle className="h-3 w-3" /> {formErrors.customer_id}
+                  </p>
+              )}
             </div>
             <div className="space-y-2">
               <Label htmlFor="name" className="font-semibold">
@@ -392,9 +396,13 @@ export function DestinationsClientUI({
                   setFormData({ ...formData, name: e.target.value })
                 }
                 placeholder="Ej: Obra principal, Sucursal Centro"
-                required
-                className="focus-ring"
+                className={`focus-ring ${formErrors.name ? "border-red-500" : ""}`}
               />
+              {formErrors.name && (
+                  <p className="text-xs text-red-500 flex items-center gap-1">
+                      <AlertCircle className="h-3 w-3" /> {formErrors.name}
+                  </p>
+              )}
             </div>
             <div className="space-y-2">
               <Label htmlFor="direccion" className="font-semibold">
@@ -407,12 +415,14 @@ export function DestinationsClientUI({
                   setFormData({ ...formData, direccion: e.target.value })
                 }
                 placeholder="Dirección completa del lugar"
-                className="focus-ring"
+                className={`focus-ring ${formErrors.direccion ? "border-red-500" : ""}`}
               />
+               {formErrors.direccion && (
+                  <p className="text-xs text-red-500 flex items-center gap-1">
+                      <AlertCircle className="h-3 w-3" /> {formErrors.direccion}
+                  </p>
+              )}
             </div>
-
-            {apiError && <p className="text-sm text-red-500">{apiError}</p>}
-
             <DialogFooter className="pt-4">
               <Button
                 type="button"
@@ -423,9 +433,7 @@ export function DestinationsClientUI({
               </Button>
               <GradientButton
                 type="submit"
-                disabled={
-                  isSubmitting || !formData.name || !formData.customer_id
-                }
+                disabled={isSubmitting}
               >
                 {isSubmitting ? (
                   <>
@@ -446,3 +454,4 @@ export function DestinationsClientUI({
     </div>
   );
 }
+

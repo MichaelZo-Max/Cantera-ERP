@@ -117,3 +117,22 @@ export const customerSchema = z.object({
     .optional()
     .transform((val) => (val === "" ? undefined : val)),
 });
+/**
+ * @description Esquema para la CREACIÓN y ACTUALIZACIÓN de un destino.
+ */
+export const destinationSchema = z.object({
+  name: z
+    .string({ required_error: "El nombre del destino es obligatorio." })
+    .min(3, "El nombre debe tener al menos 3 caracteres.")
+    .trim(),
+  direccion: z
+    .string()
+    .optional()
+    .transform((val) => (val === "" ? undefined : val)), // Transforma "" a undefined
+  customer_id: z.coerce // ✨ Coerce convierte el string del select a número
+    .number({
+      required_error: "Debes seleccionar un cliente.",
+      invalid_type_error: "El ID de cliente debe ser un número.",
+    })
+    .positive("Debes seleccionar un cliente."),
+});

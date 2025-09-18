@@ -1,7 +1,9 @@
 // app/api/destinations/[id]/route.ts
 import { NextResponse } from "next/server";
 import { executeQuery, TYPES } from "@/lib/db";
-import { revalidateTag } from "next/cache"; // Importamos revalidateTag
+import { revalidateTag } from "next/cache";
+import { z } from "zod"; // ✨ 1. Importar Zod
+import { destinationSchema } from "@/lib/validations"; // ✨ 2. Importar el esquema base
 
 export const dynamic = "force-dynamic";
 
@@ -42,56 +44,74 @@ export async function PATCH(
       return new NextResponse("ID de destino inválido", { status: 400 });
     }
 
-    const body = await request.json();
+    const body = await request.json().catch(() => ({}));
+
+    // ✨ 3. Crear esquema para PATCH: hace opcionales los campos del formulario y añade `is_active`.
+    const patchSchema = destinationSchema.partial().extend({
+      is_active: z.boolean().optional(),
+    });
+
+    // ✨ 4. Validar el body con Zod.
+    const validation = patchSchema.safeParse(body);
+    if (!validation.success) {
+      return new NextResponse(JSON.stringify(validation.error.format()), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    // ✨ 5. Usar los datos ya validados y limpios en tu lógica original.
+    const { name, direccion, customer_id, is_active } = validation.data;
 
     const updates: string[] = [];
     const queryParams: any[] = [{ name: "id", type: TYPES.Int, value: id }];
 
-    // Construimos la consulta dinámicamente solo con los campos que vienen en el body
-    if (body.name !== undefined) {
+    // Construir la consulta dinámicamente con los datos validados.
+    if (name !== undefined) {
       updates.push("name = @name");
       queryParams.push({
         name: "name",
         type: TYPES.NVarChar,
-        value: body.name,
+        value: name,
       });
     }
-    if (body.direccion !== undefined) {
+    if (direccion !== undefined) {
       updates.push("address = @address");
       queryParams.push({
         name: "address",
         type: TYPES.NVarChar,
-        value: body.direccion,
+        value: direccion,
       });
     }
-    if (body.is_active !== undefined) {
+    if (customer_id !== undefined) {
+        updates.push("customer_id = @customer_id");
+        queryParams.push({
+            name: "customer_id",
+            type: TYPES.Int,
+            value: customer_id
+        });
+    }
+    if (is_active !== undefined) {
       updates.push("is_active = @is_active");
       queryParams.push({
         name: "is_active",
         type: TYPES.Bit,
-        value: body.is_active,
+        value: is_active,
       });
     }
 
-    // Si no hay nada que actualizar, devolvemos un error o el objeto actual
     if (updates.length === 0) {
-      const currentDestination = await executeQuery(
-        "SELECT * FROM RIP.APP_DESTINOS WHERE id = @id",
-        [{ name: "id", type: TYPES.Int, value: id }]
-      );
-      if (currentDestination.length === 0) {
-        return new NextResponse("Destino no encontrado", { status: 404 });
-      }
-      return NextResponse.json(currentDestination[0]);
+      // Si no hay nada que actualizar, se devuelve el estado actual.
+      return GET(request, { params });
     }
 
     updates.push("updated_at = GETDATE()");
 
     const query = `
-            UPDATE RIP.APP_DESTINOS SET ${updates.join(", ")}
-            OUTPUT INSERTED.*
-            WHERE id = @id;
-        `;
+      UPDATE RIP.APP_DESTINOS SET ${updates.join(", ")}
+      OUTPUT INSERTED.*
+      WHERE id = @id;
+    `;
 
     const result = await executeQuery(query, queryParams);
     if (result.length === 0) {
@@ -100,15 +120,29 @@ export async function PATCH(
       });
     }
 
-    // ✨ INVALIDACIÓN DEL CACHÉ
     revalidateTag("destinations");
 
-    return NextResponse.json(result[0]);
+    // Devolver el objeto completo con el nombre del cliente para consistencia
+    const updatedDestinationData = result[0];
+    const clientQuery = `SELECT name as name FROM RIP.VW_APP_CLIENTES WHERE id = @customer_id`;
+    const clientResult = await executeQuery(clientQuery, [
+        { name: "customer_id", type: TYPES.Int, value: updatedDestinationData.customer_id },
+    ]);
+
+    const finalResponse = {
+        ...updatedDestinationData,
+        client: {
+            name: clientResult[0]?.name || null,
+        }
+    };
+
+    return NextResponse.json(finalResponse);
   } catch (error) {
     console.error("[API_DESTINATIONS_PATCH]", error);
     return new NextResponse("Error al actualizar el destino", { status: 500 });
   }
 }
+
 
 /**
  * @route DELETE /api/destinations/[id]
@@ -120,15 +154,14 @@ export async function DELETE(
 ) {
   try {
     const query = `
-            UPDATE RIP.APP_DESTINOS
-            SET is_active = 0, updated_at = GETDATE()
-            WHERE id = @id;
-        `;
+      UPDATE RIP.APP_DESTINOS
+      SET is_active = 0, updated_at = GETDATE()
+      WHERE id = @id;
+    `;
     await executeQuery(query, [
       { name: "id", type: TYPES.Int, value: params.id },
     ]);
 
-    // ✨ INVALIDACIÓN DEL CACHÉ
     revalidateTag("destinations");
 
     return NextResponse.json({ message: "Destino desactivado correctamente" });
