@@ -1,8 +1,6 @@
-// app/(protected)/admin/users/users-client.tsx
 "use client";
 
 import type React from "react";
-// 1. Importar `useCallback` y `useMemo`
 import { useState, useMemo, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -37,12 +35,23 @@ import {
   CheckCircle,
   Save,
   Mail,
+  AlertCircle,
 } from "lucide-react";
 import { toast } from "sonner";
 import { LoadingSkeleton } from "@/components/ui/loading-skeleton";
 import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
 import { useConfirmation } from "@/hooks/use-confirmation";
 import { EmptyState } from "@/components/ui/empty-state";
+import { createUserSchema, updateUserSchema } from "@/lib/validations"; // ✨ 2. Importar esquemas
+import { cn } from "@/lib/utils";
+
+// ✨ 3. Definir tipo para errores del formulario
+type FormErrors = {
+  name?: string[];
+  email?: string[];
+  role?: string[];
+  password?: string[];
+};
 
 export function UsersClientUI({ initialUsers }: { initialUsers: User[] }) {
   const [users, setUsers] = useState<User[]>(initialUsers);
@@ -56,11 +65,9 @@ export function UsersClientUI({ initialUsers }: { initialUsers: User[] }) {
     password: "",
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [apiError, setApiError] = useState<string | null>(null);
-  const { isOpen, options, confirm, handleConfirm, handleCancel } =
-    useConfirmation();
+  const [formErrors, setFormErrors] = useState<FormErrors>({}); // ✨ 4. Estado para errores
+  const { isOpen, options, confirm, handleConfirm, handleCancel } = useConfirmation();
 
-  // 2. Memorizar el resultado del filtro
   const filteredUsers = useMemo(
     () =>
       users.filter(
@@ -72,18 +79,13 @@ export function UsersClientUI({ initialUsers }: { initialUsers: User[] }) {
   );
 
   const getInitials = (name: string) => {
-    return name
-      .split(" ")
-      .map((n) => n[0])
-      .join("")
-      .toUpperCase();
+    return name.split(" ").map((n) => n[0]).join("").toUpperCase();
   };
 
-  // 3. Envolver las funciones en `useCallback`
   const handleNewUser = useCallback(() => {
     setEditingUser(null);
     setFormData({ name: "", email: "", role: "CASHIER", password: "" });
-    setApiError(null);
+    setFormErrors({}); // Limpiar errores
     setShowDialog(true);
   }, []);
 
@@ -93,9 +95,9 @@ export function UsersClientUI({ initialUsers }: { initialUsers: User[] }) {
       name: user.name,
       email: user.email,
       role: user.role,
-      password: "", // La contraseña no se precarga por seguridad
+      password: "",
     });
-    setApiError(null);
+    setFormErrors({}); // Limpiar errores
     setShowDialog(true);
   }, []);
 
@@ -103,14 +105,24 @@ export function UsersClientUI({ initialUsers }: { initialUsers: User[] }) {
     async (e: React.FormEvent) => {
       e.preventDefault();
       setIsSubmitting(true);
-      setApiError(null);
+      setFormErrors({});
 
-      const method = editingUser ? "PATCH" : "POST";
-      const url = editingUser ? `/api/users/${editingUser.id}` : "/api/users";
-      const body = { ...formData };
-      if (editingUser && !body.password) {
-        delete (body as any).password;
+      // ✨ 5. Elegir el esquema correcto y validar
+      const schema = editingUser ? updateUserSchema : createUserSchema;
+      const validation = schema.safeParse(formData);
+
+      if (!validation.success) {
+        setFormErrors(validation.error.flatten().fieldErrors);
+        setIsSubmitting(false);
+        toast.error("Error de validación", {
+          description: "Por favor, corrige los campos marcados.",
+        });
+        return;
       }
+
+      const body = validation.data;
+      const url = editingUser ? `/api/users/${editingUser.id}` : "/api/users";
+      const method = editingUser ? "PATCH" : "POST";
 
       try {
         const res = await fetch(url, {
@@ -119,24 +131,24 @@ export function UsersClientUI({ initialUsers }: { initialUsers: User[] }) {
           body: JSON.stringify(body),
         });
 
+        const responseData = await res.json();
+
         if (!res.ok) {
-          const errorText = await res.text();
-          throw new Error(errorText || "Error al guardar el usuario");
-        }
-        const savedUser = await res.json();
-        if (editingUser) {
-          setUsers((prevUsers) =>
-            prevUsers.map((u) => (u.id === savedUser.id ? savedUser : u))
-          );
-          toast.success("Usuario actualizado exitosamente.");
-        } else {
-          setUsers((prev) => [...prev, savedUser]);
-          toast.success("Usuario creado exitosamente.");
+          // Si el backend devuelve errores de Zod (ej: email duplicado)
+          if (res.status === 409 || res.status === 400) {
+            setFormErrors(responseData);
+          }
+          throw new Error(responseData.email?.[0] || "Ocurrió un error al guardar.");
         }
 
+        // Refrescar lista de usuarios para mantener UI sincronizada
+        const fetchResponse = await fetch("/api/users");
+        const updatedUsers = await fetchResponse.json();
+        setUsers(updatedUsers);
+        
+        toast.success(`Usuario ${editingUser ? "actualizado" : "creado"} exitosamente.`);
         setShowDialog(false);
       } catch (err: any) {
-        setApiError(err.message);
         toast.error("Error al guardar", { description: err.message });
       } finally {
         setIsSubmitting(false);
@@ -145,6 +157,7 @@ export function UsersClientUI({ initialUsers }: { initialUsers: User[] }) {
     [editingUser, formData]
   );
 
+  // (handleToggleStatus se mantiene igual)
   const handleToggleStatus = useCallback(
     (user: User) => {
       const is_active = user.is_active;
@@ -342,9 +355,10 @@ export function UsersClientUI({ initialUsers }: { initialUsers: User[] }) {
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-6 pt-4">
+            {/* --- CAMPO NOMBRE --- */}
             <div className="space-y-2">
               <Label htmlFor="name" className="font-semibold">
-                Nombre Completo *
+                Nombre Completo <span className="text-red-500">*</span>
               </Label>
               <Input
                 id="name"
@@ -353,13 +367,19 @@ export function UsersClientUI({ initialUsers }: { initialUsers: User[] }) {
                   setFormData({ ...formData, name: e.target.value })
                 }
                 placeholder="Ej: Ana Frank"
-                required
-                className="focus-ring"
+                className={cn(formErrors.name && "border-red-500", "focus-ring")}
               />
+              {formErrors.name && (
+                <p className="text-xs text-red-500 flex items-center gap-1 mt-1">
+                  <AlertCircle className="h-3 w-3" /> {formErrors.name[0]}
+                </p>
+              )}
             </div>
+
+            {/* --- CAMPO EMAIL --- */}
             <div className="space-y-2">
               <Label htmlFor="email" className="font-semibold">
-                Correo Electrónico *
+                Correo Electrónico <span className="text-red-500">*</span>
               </Label>
               <Input
                 id="email"
@@ -369,23 +389,28 @@ export function UsersClientUI({ initialUsers }: { initialUsers: User[] }) {
                   setFormData({ ...formData, email: e.target.value })
                 }
                 placeholder="usuario@ejemplo.com"
-                required
-                className="focus-ring"
+                className={cn(formErrors.email && "border-red-500", "focus-ring")}
               />
+              {formErrors.email && (
+                <p className="text-xs text-red-500 flex items-center gap-1 mt-1">
+                  <AlertCircle className="h-3 w-3" /> {formErrors.email[0]}
+                </p>
+              )}
             </div>
+            
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* --- CAMPO ROL --- */}
               <div className="space-y-2">
                 <Label htmlFor="role" className="font-semibold">
-                  Rol *
+                  Rol <span className="text-red-500">*</span>
                 </Label>
                 <Select
                   value={formData.role}
                   onValueChange={(value) =>
                     setFormData({ ...formData, role: value })
                   }
-                  required
                 >
-                  <SelectTrigger className="focus-ring">
+                  <SelectTrigger className={cn(formErrors.role && "border-red-500", "focus-ring")}>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -396,10 +421,18 @@ export function UsersClientUI({ initialUsers }: { initialUsers: User[] }) {
                     <SelectItem value="REPORTS">Reportes</SelectItem>
                   </SelectContent>
                 </Select>
+                 {formErrors.role && (
+                    <p className="text-xs text-red-500 flex items-center gap-1 mt-1">
+                      <AlertCircle className="h-3 w-3" /> {formErrors.role[0]}
+                    </p>
+                 )}
               </div>
+
+              {/* --- CAMPO CONTRASEÑA --- */}
               <div className="space-y-2">
                 <Label htmlFor="password">
                   {editingUser ? "Nueva Contraseña" : "Contraseña"}
+                   {!editingUser && <span className="text-red-500"> *</span>}
                 </Label>
                 <Input
                   id="password"
@@ -408,28 +441,27 @@ export function UsersClientUI({ initialUsers }: { initialUsers: User[] }) {
                   onChange={(e) =>
                     setFormData({ ...formData, password: e.target.value })
                   }
-                  placeholder={
-                    editingUser ? "Dejar en blanco para no cambiar" : "••••••••"
-                  }
-                  required={!editingUser}
-                  className="focus-ring"
+                  placeholder={editingUser ? "Dejar en blanco para no cambiar" : "••••••••"}
+                  className={cn(formErrors.password && "border-red-500", "focus-ring")}
                 />
+                {formErrors.password && (
+                    <p className="text-xs text-red-500 flex items-center gap-1 mt-1">
+                      <AlertCircle className="h-3 w-3" /> {formErrors.password[0]}
+                    </p>
+                 )}
               </div>
             </div>
 
-            {apiError && <p className="text-sm text-red-500">{apiError}</p>}
             <DialogFooter className="pt-4">
               <Button
                 type="button"
                 variant="outline"
                 onClick={() => setShowDialog(false)}
+                disabled={isSubmitting}
               >
                 Cancelar
               </Button>
-              <GradientButton
-                type="submit"
-                disabled={isSubmitting || !formData.name || !formData.email}
-              >
+              <GradientButton type="submit" disabled={isSubmitting}>
                 {isSubmitting ? (
                   <>
                     <LoadingSkeleton className="w-4 h-4 mr-2" />

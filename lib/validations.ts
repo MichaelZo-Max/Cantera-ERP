@@ -179,3 +179,53 @@ export const truckSchema = z.object({
     .positive("La capacidad debe ser un valor positivo.")
     .optional(),
 });
+
+const userRoles = z.enum([
+  "ADMIN",
+  "CASHIER",
+  "YARD_MANAGER",
+  "SECURITY",
+  "REPORTS",
+]);
+
+/**
+ * @description Esquema base para los datos de un usuario.
+ */
+const userBaseSchema = z.object({
+  name: z
+    .string({ required_error: "El nombre es obligatorio." })
+    .min(3, "El nombre debe tener al menos 3 caracteres.")
+    .trim(),
+  email: z
+    .string({ required_error: "El email es obligatorio." })
+    .email("El formato del email no es válido.")
+    .trim(),
+  role: userRoles,
+});
+
+/**
+ * @description Esquema para la CREACIÓN de un nuevo usuario.
+ * La contraseña es obligatoria y debe tener al menos 6 caracteres.
+ */
+export const createUserSchema = userBaseSchema.extend({
+  password: z
+    .string({ required_error: "La contraseña es obligatoria." })
+    .min(6, "La contraseña debe tener al menos 6 caracteres."),
+});
+
+/**
+ * @description Esquema para la ACTUALIZACIÓN de un usuario.
+ * La contraseña es opcional. Si se proporciona, debe tener al menos 6 caracteres.
+ */
+export const updateUserSchema = userBaseSchema.extend({
+  password: z
+    .string()
+    .refine(
+      (val) => val === undefined || val === "" || val.length >= 6,
+      {
+        message: "La nueva contraseña debe tener al menos 6 caracteres.",
+      }
+    )
+    .optional()
+    .transform((val) => (val === "" ? undefined : val)), // Transforma "" a undefined para la API
+});
