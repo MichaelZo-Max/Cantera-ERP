@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useCallback, useMemo } from "react";
+// (El resto de tus importaciones de componentes de UI se mantienen igual)
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -45,6 +46,7 @@ import {
   Phone,
   ChevronsUpDown,
   Check,
+  AlertCircle, // ✨ 1. Importar icono para errores
 } from "lucide-react";
 import { toast } from "sonner";
 import { useConfirmation } from "@/hooks/use-confirmation";
@@ -53,16 +55,18 @@ import { AnimatedCard } from "@/components/ui/animated-card";
 import { PageHeader } from "@/components/page-header";
 import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
 import { cn } from "@/lib/utils";
+import { driverSchema } from "@/lib/validations"; // ✨ 2. Importar el esquema de Zod
 
-// =================================================================
-// Componente Reutilizable para Selección Múltiple de Clientes
-// NOTA: Este componente ahora está definido DENTRO del componente principal
-// para asegurar que se re-renderice correctamente con los cambios.
-// =================================================================
+// ✨ 3. Definir un tipo para los errores del formulario
+type FormErrors = {
+  name?: string[];
+  docId?: string[];
+  phone?: string[];
+  customer_ids?: string[];
+};
 
-// =================================================================
-// Componente Principal de la UI de Choferes
-// =================================================================
+// ... (El componente MultiSelectCustomers se mantiene igual)
+
 export function DriversClientUI({
   initialDrivers,
   initialCustomers,
@@ -70,15 +74,16 @@ export function DriversClientUI({
   initialDrivers: Driver[];
   initialCustomers: Client[];
 }) {
-  // --- Componente MultiSelect definido aquí ---
+  // ... (El componente MultiSelectCustomers se puede definir aquí como lo tenías)
   const MultiSelectCustomers = React.forwardRef<
     HTMLButtonElement,
     {
       allCustomers: Client[];
       selectedIds: number[];
       onChange: (ids: number[]) => void;
+      error?: boolean; // Prop opcional para marcar error
     }
-  >(({ allCustomers, selectedIds, onChange }, ref) => {
+  >(({ allCustomers, selectedIds, onChange, error }, ref) => {
     const [open, setOpen] = useState(false);
 
     const handleSelect = (customerId: number) => {
@@ -101,7 +106,10 @@ export function DriversClientUI({
             variant="outline"
             role="combobox"
             aria-expanded={open}
-            className="w-full justify-between h-auto"
+            className={cn(
+              "w-full justify-between h-auto",
+              error && "border-red-500" // Estilo de error
+            )}
           >
             <div className="flex flex-wrap gap-1">
               {selectedCustomers.length > 0 ? (
@@ -154,7 +162,6 @@ export function DriversClientUI({
     );
   });
   MultiSelectCustomers.displayName = "MultiSelectCustomers";
-  // --- Fin de la definición de MultiSelect ---
 
   const [drivers, setDrivers] = useState<Driver[]>(initialDrivers);
   const [customers, setCustomers] = useState<Client[]>(initialCustomers);
@@ -163,18 +170,20 @@ export function DriversClientUI({
   const [showDialog, setShowDialog] = useState(false);
   const [editingDriver, setEditingDriver] = useState<Driver | null>(null);
 
+  // ✨ 4. Renombrar `client_ids` a `customer_ids` para consistencia con el backend
   const [formData, setFormData] = useState({
     name: "",
     docId: "",
     phone: "",
-    client_ids: [] as number[],
+    customer_ids: [] as number[],
   });
 
+  const [formErrors, setFormErrors] = useState<FormErrors>({}); // ✨ 5. Estado para errores
   const [isSubmitting, setIsSubmitting] = useState(false);
-
   const { isOpen, options, confirm, handleConfirm, handleCancel } =
     useConfirmation();
 
+  // (filteredDrivers se mantiene igual)
   const filteredDrivers = useMemo(
     () =>
       drivers.filter(
@@ -188,7 +197,8 @@ export function DriversClientUI({
 
   const handleNewDriver = useCallback(() => {
     setEditingDriver(null);
-    setFormData({ name: "", docId: "", phone: "", client_ids: [] });
+    setFormData({ name: "", docId: "", phone: "", customer_ids: [] });
+    setFormErrors({}); // Limpiar errores
     setApiError(null);
     setShowDialog(true);
   }, []);
@@ -199,8 +209,9 @@ export function DriversClientUI({
       name: driver.name,
       docId: driver.docId || "",
       phone: driver.phone || "",
-      client_ids: driver.clients?.map((c) => c.id) || [],
+      customer_ids: driver.clients?.map((c) => c.id) || [],
     });
+    setFormErrors({}); // Limpiar errores
     setApiError(null);
     setShowDialog(true);
   }, []);
@@ -210,17 +221,27 @@ export function DriversClientUI({
       e.preventDefault();
       setIsSubmitting(true);
       setApiError(null);
+      setFormErrors({}); // Limpiar errores antes de una nueva validación
 
+      // ✨ 6. Validación con Zod en el frontend
+      const validation = driverSchema.safeParse(formData);
+
+      if (!validation.success) {
+        const zodErrors = validation.error.flatten().fieldErrors;
+        setFormErrors(zodErrors);
+        setIsSubmitting(false);
+        toast.error("Error de validación", {
+          description: "Por favor, corrige los campos marcados en rojo.",
+        });
+        return; // Detiene el envío si hay errores
+      }
+
+      // ✨ 7. Usar `validation.data` que contiene los datos limpios y validados
+      const body = validation.data;
       const method = editingDriver ? "PATCH" : "POST";
       const url = editingDriver
         ? `/api/drivers/${editingDriver.id}`
         : "/api/drivers";
-
-      const { client_ids, ...restOfData } = formData;
-      const body = {
-        ...restOfData,
-        customer_ids: client_ids,
-      };
 
       try {
         const res = await fetch(url, {
@@ -230,10 +251,21 @@ export function DriversClientUI({
         });
 
         if (!res.ok) {
-          const errorText = await res.text();
-          throw new Error(errorText || "Error al guardar el chofer");
+          // Intenta parsear el error de Zod del backend si existe
+          try {
+            const errorData = await res.json();
+            // Aquí podrías mapear los errores del backend al estado `formErrors`
+            throw new Error(
+              errorData.message || "Error al guardar. Verifica los datos."
+            );
+          } catch {
+            // Si el error no es JSON, usa el texto
+            const errorText = await res.text();
+            throw new Error(errorText || "Ocurrió un error en el servidor.");
+          }
         }
-
+        
+        // Refrescar la lista de choferes (tu lógica actual es buena)
         const fetchResponse = await fetch("/api/drivers");
         const updatedDrivers = await fetchResponse.json();
         setDrivers(updatedDrivers);
@@ -252,6 +284,7 @@ export function DriversClientUI({
     [editingDriver, formData]
   );
 
+  // (handleToggleStatus se mantiene igual)
   const handleToggleStatus = useCallback(
     (driver: Driver) => {
       confirm(
@@ -289,6 +322,7 @@ export function DriversClientUI({
     [confirm]
   );
 
+
   return (
     <div className="space-y-8 animate-fade-in">
       <PageHeader
@@ -301,7 +335,6 @@ export function DriversClientUI({
           </Button>
         }
       />
-
       <div className="relative">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
         <Input
@@ -413,7 +446,8 @@ export function DriversClientUI({
         />
       )}
 
-      {/* DIALOG PARA CREAR/EDITAR CHOFER */}
+
+      {/* ✨ 8. DIALOG CON MEJORAS DE VALIDACIÓN */}
       <Dialog open={showDialog} onOpenChange={setShowDialog}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
@@ -426,10 +460,12 @@ export function DriversClientUI({
                 : "Completa el formulario para añadir un nuevo chofer."}
             </DialogDescription>
           </DialogHeader>
+
           <form onSubmit={handleSubmit} className="space-y-6 pt-4">
+            {/* --- CAMPO NOMBRE --- */}
             <div className="space-y-2">
               <Label htmlFor="name" className="font-semibold">
-                Nombre Completo
+                Nombre Completo <span className="text-red-500">*</span>
               </Label>
               <Input
                 id="name"
@@ -437,9 +473,16 @@ export function DriversClientUI({
                 onChange={(e) =>
                   setFormData({ ...formData, name: e.target.value })
                 }
-                required
+                className={cn(formErrors.name && "border-red-500")}
               />
+              {formErrors.name && (
+                <p className="text-xs text-red-500 flex items-center gap-1 mt-1">
+                  <AlertCircle className="h-3 w-3" /> {formErrors.name[0]}
+                </p>
+              )}
             </div>
+
+            {/* --- CAMPO DOCUMENTO --- */}
             <div className="space-y-2">
               <Label htmlFor="docId" className="font-semibold">
                 Documento de Identidad
@@ -450,8 +493,16 @@ export function DriversClientUI({
                 onChange={(e) =>
                   setFormData({ ...formData, docId: e.target.value })
                 }
+                className={cn(formErrors.docId && "border-red-500")}
               />
+              {formErrors.docId && (
+                 <p className="text-xs text-red-500 flex items-center gap-1 mt-1">
+                   <AlertCircle className="h-3 w-3" /> {formErrors.docId[0]}
+                 </p>
+              )}
             </div>
+
+            {/* --- CAMPO TELÉFONO --- */}
             <div className="space-y-2">
               <Label htmlFor="phone" className="font-semibold">
                 Teléfono
@@ -462,26 +513,43 @@ export function DriversClientUI({
                 onChange={(e) =>
                   setFormData({ ...formData, phone: e.target.value })
                 }
+                className={cn(formErrors.phone && "border-red-500")}
               />
+               {formErrors.phone && (
+                 <p className="text-xs text-red-500 flex items-center gap-1 mt-1">
+                   <AlertCircle className="h-3 w-3" /> {formErrors.phone[0]}
+                 </p>
+              )}
             </div>
+
+            {/* --- CAMPO CLIENTES --- */}
             <div className="space-y-2">
               <Label htmlFor="customers" className="font-semibold">
                 Clientes Asociados
               </Label>
               <MultiSelectCustomers
                 allCustomers={customers}
-                selectedIds={formData.client_ids}
+                selectedIds={formData.customer_ids}
                 onChange={(ids) =>
-                  setFormData({ ...formData, client_ids: ids })
+                  setFormData({ ...formData, customer_ids: ids })
                 }
+                error={!!formErrors.customer_ids}
               />
+              {formErrors.customer_ids && (
+                 <p className="text-xs text-red-500 flex items-center gap-1 mt-1">
+                   <AlertCircle className="h-3 w-3" /> {formErrors.customer_ids[0]}
+                 </p>
+              )}
             </div>
+
             {apiError && <p className="text-sm text-red-500">{apiError}</p>}
+            
             <DialogFooter className="pt-4">
               <Button
                 type="button"
                 variant="ghost"
                 onClick={() => setShowDialog(false)}
+                disabled={isSubmitting}
               >
                 Cancelar
               </Button>

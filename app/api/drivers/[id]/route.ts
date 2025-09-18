@@ -2,6 +2,8 @@
 import { NextResponse } from "next/server";
 import { executeQuery, TYPES } from "@/lib/db";
 import { revalidateTag } from "next/cache";
+import { driverSchema } from "@/lib/validations";
+import { z } from "zod";
 
 export const dynamic = "force-dynamic";
 
@@ -53,15 +55,47 @@ export async function GET(request: Request, { params }: { params: { id: string }
  * @route   PATCH /api/drivers/[id]
  * @desc    Actualizar un chofer y sus asociaciones de clientes.
  */
-export async function PATCH(request: Request, { params }: { params: { id: string } }) {
+export async function PATCH(
+  request: Request,
+  { params }: { params: { id: string } }
+) {
   try {
     const id = parseInt(params.id, 10);
-    if (isNaN(id)) return new NextResponse("ID inválido", { status: 400 });
+    if (isNaN(id)) {
+      return new NextResponse("ID de chofer inválido.", { status: 400 });
+    }
 
-    const body = await request.json();
-    const { name, docId, phone, is_active, customer_ids } = body;
+    const body = await request.json().catch(() => ({}));
 
-    // Paso 1: Actualizar los datos principales del chófer
+    // ✨ 1. Definir un esquema para PATCH que hace todos los campos opcionales
+    // y añade el campo `is_active`.
+    const patchSchema = driverSchema.partial().extend({
+      is_active: z.boolean().optional(),
+    });
+
+    // ✨ 2. Validar el body de la petición con el esquema de Zod.
+    const validation = patchSchema.safeParse(body);
+    if (!validation.success) {
+      // Si la validación falla, devuelve los errores en formato JSON.
+      return new NextResponse(JSON.stringify(validation.error.format()), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    // ✨ 3. Usar los datos ya validados y limpios.
+    const { name, docId, phone, is_active, customer_ids } = validation.data;
+
+    // Si no hay datos para actualizar (excepto `customer_ids`), no tiene sentido continuar.
+    if (Object.keys(validation.data).length === 0) {
+        return new NextResponse(
+          JSON.stringify({ message: "No se proporcionaron datos para actualizar." }),
+          { status: 400, headers: { "Content-Type": "application/json" } }
+        );
+    }
+
+    // Paso 4: Actualizar los datos principales del chofer en la DB.
+    // La consulta SQL ya maneja correctamente los valores nulos o no definidos.
     const updateQuery = `
         UPDATE RIP.APP_CHOFERES
         SET 
@@ -74,34 +108,41 @@ export async function PATCH(request: Request, { params }: { params: { id: string
         WHERE id = @id;
     `;
     const updateResult = await executeQuery(updateQuery, [
-        { name: "id", type: TYPES.Int, value: id },
-        { name: "name", type: TYPES.NVarChar, value: name },
-        { name: "docId", type: TYPES.NVarChar, value: docId },
-        { name: "phone", type: TYPES.NVarChar, value: phone },
-        { name: "is_active", type: TYPES.Bit, value: is_active },
+      { name: "id", type: TYPES.Int, value: id },
+      { name: "name", type: TYPES.NVarChar, value: name },
+      { name: "docId", type: TYPES.NVarChar, value: docId },
+      { name: "phone", type: TYPES.NVarChar, value: phone },
+      { name: "is_active", type: TYPES.Bit, value: is_active },
     ]);
-    
+
     if (updateResult.length === 0) {
-        return new NextResponse("Chófer no encontrado para actualizar", { status: 404 });
+      return new NextResponse("Chofer no encontrado para actualizar.", {
+        status: 404,
+      });
     }
 
-    // Si se envió el array 'customer_ids', actualizamos las asociaciones
+    // Si se envió el array 'customer_ids', actualizamos las asociaciones.
+    // Esto se ejecuta solo si el campo está presente en el body, incluso si es un array vacío.
     if (Array.isArray(customer_ids)) {
-        // Paso 2: Borrar todas las asociaciones existentes para este chófer
-        const deleteLinksQuery = `DELETE FROM RIP.APP_CLIENTES_CHOFERES WHERE chofer_id = @id;`;
-        await executeQuery(deleteLinksQuery, [{ name: "id", type: TYPES.Int, value: id }]);
+      // Borrar todas las asociaciones existentes para este chofer
+      const deleteLinksQuery = `DELETE FROM RIP.APP_CLIENTES_CHOFERES WHERE chofer_id = @id;`;
+      await executeQuery(deleteLinksQuery, [
+        { name: "id", type: TYPES.Int, value: id },
+      ]);
 
-        // Paso 3: Insertar las nuevas asociaciones
+      // Insertar las nuevas asociaciones si el array no está vacío
+      if (customer_ids.length > 0) {
         for (const customerId of customer_ids) {
-            const linkQuery = `
-                INSERT INTO RIP.APP_CLIENTES_CHOFERES (chofer_id, cliente_id)
-                VALUES (@chofer_id, @cliente_id);
-            `;
-            await executeQuery(linkQuery, [
-                { name: "chofer_id", type: TYPES.Int, value: id },
-                { name: "cliente_id", type: TYPES.Int, value: customerId },
-            ]);
+          const linkQuery = `
+              INSERT INTO RIP.APP_CLIENTES_CHOFERES (chofer_id, cliente_id)
+              VALUES (@chofer_id, @cliente_id);
+          `;
+          await executeQuery(linkQuery, [
+            { name: "chofer_id", type: TYPES.Int, value: id },
+            { name: "cliente_id", type: TYPES.Int, value: customerId },
+          ]);
         }
+      }
     }
 
     revalidateTag("drivers");
@@ -109,7 +150,9 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     return NextResponse.json(updateResult[0]);
   } catch (error) {
     console.error("[API_DRIVERS_PATCH]", error);
-    return new NextResponse("Error al actualizar el chofer", { status: 500 });
+    return new NextResponse("Error interno al actualizar el chofer.", {
+      status: 500,
+    });
   }
 }
 

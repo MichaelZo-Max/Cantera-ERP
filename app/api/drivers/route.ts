@@ -2,6 +2,7 @@
 import { NextResponse } from "next/server";
 import { executeQuery, TYPES } from "@/lib/db";
 import { revalidateTag } from "next/cache";
+import { driverSchema } from "@/lib/validations";
 
 export const dynamic = "force-dynamic";
 
@@ -51,31 +52,35 @@ export async function GET() {
  */
 export async function POST(request: Request) {
   try {
-    const body = await request.json();
-    // Esperamos `customer_ids` como un array. Si no viene, es un array vacío.
-    const { name, docId, phone, is_active, customer_ids = [] } = body;
+    const body = await request.json().catch(() => ({}));
 
-    if (!name) {
-      return new NextResponse("El nombre es requerido", { status: 400 });
+    // ✨ 2. Validar el body con Zod
+    const validation = driverSchema.safeParse(body);
+    if (!validation.success) {
+      return new NextResponse(JSON.stringify(validation.error.format()), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      });
     }
 
-    // Paso 1: Insertar el chófer en la tabla principal
+    // ✨ 3. Usar los datos validados
+    const { name, docId, phone, customer_ids } = validation.data;
+
+    // El resto de la lógica se mantiene, pero usando `validation.data`
     const createDriverQuery = `
         INSERT INTO RIP.APP_CHOFERES (name, docId, phone, is_active)
         OUTPUT INSERTED.id
-        VALUES (@name, @docId, @phone, @is_active);
+        VALUES (@name, @docId, @phone, 1);
     `;
     const driverResult = await executeQuery(createDriverQuery, [
       { name: "name", type: TYPES.NVarChar, value: name },
       { name: "docId", type: TYPES.NVarChar, value: docId ?? null },
       { name: "phone", type: TYPES.NVarChar, value: phone ?? null },
-      { name: "is_active", type: TYPES.Bit, value: is_active ?? true },
     ]);
-
+    
     const driver_id = driverResult[0].id;
 
-    // Paso 2: Si se enviaron IDs de clientes, los insertamos en la tabla de unión
-    if (customer_ids.length > 0) {
+    if (customer_ids && customer_ids.length > 0) {
       for (const customerId of customer_ids) {
         const linkQuery = `
             INSERT INTO RIP.APP_CLIENTES_CHOFERES (chofer_id, cliente_id)
@@ -90,13 +95,12 @@ export async function POST(request: Request) {
 
     revalidateTag("drivers");
 
-    // Devolvemos el chófer creado para consistencia
     const newDriver = {
       id: driver_id,
       name,
       docId,
       phone,
-      is_active: is_active ?? true,
+      is_active: true,
     };
 
     return NextResponse.json(newDriver, { status: 201 });

@@ -136,3 +136,22 @@ export const destinationSchema = z.object({
     })
     .positive("Debes seleccionar un cliente."),
 });
+
+/**
+ * @description Esquema para la CREACIÓN y ACTUALIZACIÓN de un chofer.
+ */
+export const driverSchema = z.object({
+  name: z
+    .string({ required_error: "El nombre es obligatorio." })
+    .min(3, "El nombre debe tener al menos 3 caracteres.")
+    .trim(),
+  docId: z
+    .string()
+    .optional()
+    .transform((val) => (val === "" ? undefined : val)),
+  phone: z
+    .string()
+    .optional()
+    .transform((val) => (val === "" ? undefined : val)),
+  customer_ids: z.array(z.number()).optional().default([]),
+});
