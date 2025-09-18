@@ -26,14 +26,25 @@ import {
   CheckCircle,
   Save,
   Plus,
+  AlertCircle, // ✨ 1. Importar icono de alerta
 } from "lucide-react";
 import { toast } from "sonner";
 import { LoadingSkeleton } from "@/components/ui/loading-skeleton";
 import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
 import { useConfirmation } from "@/hooks/use-confirmation";
 import { EmptyState } from "@/components/ui/empty-state";
+import { truckSchema } from "@/lib/validations"; // ✨ 2. Importar el esquema
+import { cn } from "@/lib/utils";
 
-// El componente ahora solo recibe los camiones
+// ✨ 3. Definir tipo para errores de formulario (usando nombres correctos)
+type FormErrors = {
+  placa?: string[];
+  brand?: string[];
+  model?: string[];
+  capacity?: string[];
+  _errors?: string[];
+};
+
 export function TrucksClientUI({
   initialTrucks,
 }: {
@@ -43,22 +54,24 @@ export function TrucksClientUI({
   const [searchTerm, setSearchTerm] = useState("");
   const [showDialog, setShowDialog] = useState(false);
   const [editingTruck, setEditingTruck] = useState<TruckType | null>(null);
+  
+  // ✨ 4. Usar los nombres de campo correctos en el estado inicial
   const [formData, setFormData] = useState({
     placa: "",
     brand: "",
     model: "",
-    capacity: 0,
+    capacity: "" as string | number, // El input de número devuelve string
   });
+  
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [apiError, setApiError] = useState<string | null>(null);
-  const { isOpen, options, confirm, handleConfirm, handleCancel } =
-    useConfirmation();
+  const [formErrors, setFormErrors] = useState<FormErrors>({}); // ✨ 5. Estado para errores
+  const { isOpen, options, confirm, handleConfirm, handleCancel } = useConfirmation();
 
-  // Se elimina el filtro por chofer
   const filteredTrucks = useMemo(
     () =>
       trucks.filter(
         (truck) =>
+          // Corregido: usar 'placa'
           truck.placa.toLowerCase().includes(searchTerm.toLowerCase()) ||
           (truck.brand &&
             truck.brand.toLowerCase().includes(searchTerm.toLowerCase())) ||
@@ -68,29 +81,28 @@ export function TrucksClientUI({
     [trucks, searchTerm]
   );
 
-  // Se elimina 'driver_id' del formulario
   const handleNewTruck = useCallback(() => {
     setEditingTruck(null);
     setFormData({
       placa: "",
       brand: "",
       model: "",
-      capacity: 0,
+      capacity: "",
     });
-    setApiError(null);
+    setFormErrors({});
     setShowDialog(true);
   }, []);
 
-  // Se elimina 'driver_id' del formulario de edición
   const handleEditTruck = useCallback((truck: TruckType) => {
     setEditingTruck(truck);
     setFormData({
+      // Corregido: usar 'placa'
       placa: truck.placa,
       brand: truck.brand || "",
       model: truck.model || "",
-      capacity: truck.capacity || 0,
+      capacity: truck.capacity || "",
     });
-    setApiError(null);
+    setFormErrors({});
     setShowDialog(true);
   }, []);
 
@@ -98,8 +110,22 @@ export function TrucksClientUI({
     async (e: React.FormEvent) => {
       e.preventDefault();
       setIsSubmitting(true);
-      setApiError(null);
+      setFormErrors({});
 
+      // ✨ 6. Validar con Zod en el frontend
+      const validation = truckSchema.safeParse(formData);
+
+      if (!validation.success) {
+        const zodErrors = validation.error.flatten().fieldErrors;
+        setFormErrors(zodErrors as FormErrors);
+        setIsSubmitting(false);
+        toast.error("Error de validación", {
+          description: "Por favor, corrige los campos marcados.",
+        });
+        return;
+      }
+      
+      const body = validation.data; // Usar datos validados
       const method = editingTruck ? "PATCH" : "POST";
       const url = editingTruck
         ? `/api/trucks/${editingTruck.id}`
@@ -109,29 +135,28 @@ export function TrucksClientUI({
         const res = await fetch(url, {
           method,
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(formData),
+          body: JSON.stringify(body),
         });
 
+        const responseData = await res.json();
+        
         if (!res.ok) {
-          const errorText = await res.text();
-          throw new Error(errorText || "Error al guardar el camión");
+           if (res.status === 400 || res.status === 409) {
+             setFormErrors(responseData);
+           }
+           throw new Error(responseData._errors?.[0] || "Error al guardar el camión");
         }
+        
+        // Refrescar lista de camiones para mantener la UI sincronizada
+        const fetchResponse = await fetch("/api/trucks");
+        const updatedTrucks = await fetchResponse.json();
+        setTrucks(updatedTrucks);
 
-        const savedTruck = await res.json();
-
-        if (editingTruck) {
-          setTrucks((prevTrucks) =>
-            prevTrucks.map((t) => (t.id === savedTruck.id ? savedTruck : t))
-          );
-          toast.success("Camión actualizado exitosamente.");
-        } else {
-          setTrucks((prevTrucks) => [...prevTrucks, savedTruck]);
-          toast.success("Camión creado exitosamente.");
-        }
-
+        toast.success(
+          `Camión ${editingTruck ? "actualizado" : "creado"} exitosamente.`
+        );
         setShowDialog(false);
       } catch (err: any) {
-        setApiError(err.message);
         toast.error("Error al guardar", { description: err.message });
       } finally {
         setIsSubmitting(false);
@@ -148,7 +173,7 @@ export function TrucksClientUI({
           title: `¿Estás seguro?`,
           description: `Esta acción ${
             is_active ? "desactivará" : "activará"
-          } el camión con placas "${truck.placa}".`,
+          } el camión con placas "${truck.placa}".`, // Corregido: usar 'placa'
           confirmText: is_active ? "Desactivar" : "Activar",
           variant: is_active ? "destructive" : "default",
         },
@@ -160,12 +185,12 @@ export function TrucksClientUI({
               body: JSON.stringify({ is_active: !is_active }),
             });
             if (!res.ok) throw new Error(await res.text());
+            
             const updatedTruck = await res.json();
-            setTrucks((prevTrucks) =>
-              prevTrucks.map((t) =>
-                t.id === updatedTruck.id ? updatedTruck : t
-              )
+            setTrucks((prev) =>
+              prev.map((t) => (t.id === updatedTruck.id ? updatedTruck : t))
             );
+            
             toast.success(
               `Camión ${!is_active ? "activado" : "desactivado"} exitosamente.`
             );
@@ -179,7 +204,8 @@ export function TrucksClientUI({
     },
     [confirm]
   );
-
+  
+  // (El resto del JSX se mantiene igual que en tu código original)
   return (
     <div className="space-y-8 animate-fade-in">
       <ConfirmationDialog
@@ -335,9 +361,10 @@ export function TrucksClientUI({
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-6 pt-4">
+            {/* --- CAMPO PLACA --- */}
             <div className="space-y-2">
               <Label htmlFor="placa" className="font-semibold">
-                Placas *
+                Placa <span className="text-red-500">*</span>
               </Label>
               <Input
                 id="placa"
@@ -348,11 +375,17 @@ export function TrucksClientUI({
                     placa: e.target.value.toUpperCase(),
                   })
                 }
-                placeholder="ABC-123-D"
-                required
-                className="focus-ring"
+                placeholder="ABC-123"
+                className={cn(formErrors.placa && "border-red-500", "focus-ring")}
               />
+              {formErrors.placa && (
+                <p className="text-xs text-red-500 flex items-center gap-1 mt-1">
+                  <AlertCircle className="h-3 w-3" /> {formErrors.placa[0]}
+                </p>
+              )}
             </div>
+
+            {/* --- CAMPOS MARCA Y MODELO --- */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="brand" className="font-semibold">
@@ -365,8 +398,13 @@ export function TrucksClientUI({
                     setFormData({ ...formData, brand: e.target.value })
                   }
                   placeholder="Ej: Kenworth"
-                  className="focus-ring"
+                  className={cn(formErrors.brand && "border-red-500", "focus-ring")}
                 />
+                {formErrors.brand && (
+                   <p className="text-xs text-red-500 flex items-center gap-1 mt-1">
+                     <AlertCircle className="h-3 w-3" /> {formErrors.brand[0]}
+                   </p>
+                )}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="model" className="font-semibold">
@@ -379,10 +417,17 @@ export function TrucksClientUI({
                     setFormData({ ...formData, model: e.target.value })
                   }
                   placeholder="Ej: T800"
-                  className="focus-ring"
+                  className={cn(formErrors.model && "border-red-500", "focus-ring")}
                 />
+                {formErrors.model && (
+                   <p className="text-xs text-red-500 flex items-center gap-1 mt-1">
+                     <AlertCircle className="h-3 w-3" /> {formErrors.model[0]}
+                   </p>
+                )}
               </div>
             </div>
+            
+            {/* --- CAMPO CAPACIDAD --- */}
             <div className="space-y-2">
               <Label htmlFor="capacity" className="font-semibold">
                 Capacidad (m³)
@@ -390,33 +435,40 @@ export function TrucksClientUI({
               <Input
                 id="capacity"
                 type="number"
-                step="0.1"
+                step="0.01"
                 min="0"
-                value={formData.capacity || ""}
+                value={formData.capacity}
                 onChange={(e) =>
-                  setFormData({
-                    ...formData,
-                    capacity: Number.parseFloat(e.target.value) || 0,
-                  })
+                  setFormData({ ...formData, capacity: e.target.value })
                 }
                 placeholder="15.0"
-                className="focus-ring"
+                className={cn(formErrors.capacity && "border-red-500", "focus-ring")}
               />
+              {formErrors.capacity && (
+                <p className="text-xs text-red-500 flex items-center gap-1 mt-1">
+                  <AlertCircle className="h-3 w-3" /> {formErrors.capacity[0]}
+                </p>
+              )}
             </div>
 
-            {apiError && <p className="text-sm text-red-500">{apiError}</p>}
+            {/* --- ERROR GENERAL --- */}
+            {formErrors._errors && (
+                <div className="text-sm text-red-500 bg-red-500/10 p-3 rounded-md flex items-center gap-2">
+                    <AlertCircle className="h-4 w-4" />
+                    {formErrors._errors[0]}
+                </div>
+            )}
+            
             <DialogFooter className="pt-4">
               <Button
                 type="button"
                 variant="outline"
                 onClick={() => setShowDialog(false)}
+                disabled={isSubmitting}
               >
                 Cancelar
               </Button>
-              <GradientButton
-                type="submit"
-                disabled={isSubmitting || !formData.placa}
-              >
+              <GradientButton type="submit" disabled={isSubmitting}>
                 {isSubmitting ? (
                   <>
                     <LoadingSkeleton className="w-4 h-4 mr-2" />

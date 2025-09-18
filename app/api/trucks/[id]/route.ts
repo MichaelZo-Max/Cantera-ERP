@@ -1,9 +1,11 @@
 // app/api/trucks/[id]/route.ts
 import { NextResponse } from 'next/server';
 import { executeQuery, TYPES } from '@/lib/db';
-import { revalidateTag } from 'next/cache'; // Importamos revalidateTag
+import { revalidateTag } from 'next/cache';
+import { truckSchema } from '@/lib/validations';
+import { z } from 'zod';
 
-export const dynamic = 'force-dynamic'
+export const dynamic = 'force-dynamic';
 
 /**
  * @route GET /api/trucks/[id]
@@ -13,10 +15,11 @@ export async function GET(request: Request, { params }: { params: { id: string }
   try {
     const id = parseInt(params.id, 10);
     if (isNaN(id)) {
-        return new NextResponse('ID de camión inválido', { status: 400 });
+      return new NextResponse('ID de camión inválido', { status: 400 });
     }
     
-    const query = "SELECT * FROM RIP.APP_CAMIONES WHERE id = @id";
+    // ✨ Usar las columnas correctas que necesita el frontend
+    const query = "SELECT id, placa, brand, model, capacity, is_active FROM RIP.APP_CAMIONES WHERE id = @id";
     const result = await executeQuery(query, [{ name: 'id', type: TYPES.Int, value: id }]);
     
     if (result.length === 0) {
@@ -30,75 +33,82 @@ export async function GET(request: Request, { params }: { params: { id: string }
 }
 
 /**
- * @route PATCH /api/trucks/[id]
- * @desc Actualizar un camión de forma dinámica (solo los campos enviados)
+ * @route   PATCH /api/trucks/[id]
+ * @desc    Actualizar un camión
  */
-export async function PATCH(request: Request, { params }: { params: { id: string } }) {
-    try {
-        const id = parseInt(params.id, 10);
-        if (isNaN(id)) {
-            return new NextResponse('ID de camión inválido', { status: 400 });
-        }
-
-        const body = await request.json();
-        
-        const updates: string[] = [];
-        const queryParams: any[] = [{ name: 'id', type: TYPES.Int, value: id }];
-
-        if (body.placa !== undefined) {
-            updates.push("placa = @placa");
-            queryParams.push({ name: 'placa', type: TYPES.NVarChar, value: body.placa });
-        }
-        if (body.brand !== undefined) {
-            updates.push("brand = @brand");
-            queryParams.push({ name: 'brand', type: TYPES.NVarChar, value: body.brand });
-        }
-        if (body.model !== undefined) {
-            updates.push("model = @model");
-            queryParams.push({ name: 'model', type: TYPES.NVarChar, value: body.model });
-        }
-        if (body.capacity !== undefined) {
-            updates.push("capacity = @capacity");
-            queryParams.push({ name: 'capacity', type: TYPES.Decimal, value: body.capacity });
-        }
-        if (body.is_active !== undefined) {
-            updates.push("is_active = @is_active");
-            queryParams.push({ name: 'is_active', type: TYPES.Bit, value: body.is_active });
-        }
-
-        if (updates.length === 0) {
-            const currentTruck = await executeQuery("SELECT * FROM RIP.APP_CAMIONES WHERE id = @id", [{ name: 'id', type: TYPES.Int, value: id }]);
-            if (currentTruck.length === 0) {
-                return new NextResponse('Camión no encontrado', { status: 404 });
-            }
-            return NextResponse.json(currentTruck[0]);
-        }
-
-        updates.push("updated_at = GETDATE()");
-
-        const query = `
-            UPDATE RIP.APP_CAMIONES
-            SET ${updates.join(', ')}
-            OUTPUT INSERTED.*
-            WHERE id = @id;
-        `;
-
-        const result = await executeQuery(query, queryParams);
-        if (result.length === 0) {
-            return new NextResponse('Camión no encontrado para actualizar', { status: 404 });
-        }
-
-        revalidateTag('trucks');
-
-        return NextResponse.json(result[0]);
-    } catch (error: any) {
-        if (error?.number === 2627 || error?.number === 2601) {
-            const duplicateValue = error.message.match(/\(([^)]+)\)/)?.[1];
-            return new NextResponse(`La placa '${duplicateValue}' ya existe.`, { status: 409 });
-        }
-        console.error('[API_TRUCKS_PATCH]', error);
-        return new NextResponse('Error al actualizar el camión', { status: 500 });
+export async function PATCH(
+  request: Request,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const id = parseInt(params.id, 10);
+    if (isNaN(id)) {
+      return new NextResponse("ID de camión inválido.", { status: 400 });
     }
+
+    const body = await request.json().catch(() => ({}));
+
+    // 1. Crear esquema para PATCH que es consistente con el `truckSchema`
+    const patchSchema = truckSchema.partial().extend({
+      is_active: z.boolean().optional(),
+    });
+
+    const validation = patchSchema.safeParse(body);
+    if (!validation.success) {
+      return new NextResponse(JSON.stringify(validation.error.format()), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    // ✨ 2. Usar los nombres de campo CORRECTOS: `placa` y `capacity`
+    const { placa, brand, model, capacity, is_active } = validation.data;
+
+    if (Object.keys(validation.data).length === 0) {
+      return new NextResponse("No se proporcionaron datos para actualizar.", { status: 400 });
+    }
+    
+    // ✨ 3. Actualizar la consulta SQL para usar las columnas correctas
+    const query = `
+      UPDATE RIP.APP_CAMIONES
+      SET 
+          placa = ISNULL(@placa, placa),
+          brand = ISNULL(@brand, brand),
+          model = ISNULL(@model, model),
+          capacity = ISNULL(@capacity, capacity),
+          is_active = ISNULL(@is_active, is_active),
+          updated_at = GETDATE()
+      OUTPUT INSERTED.*
+      WHERE id = @id;
+    `;
+    
+    // ✨ 4. Pasar los parámetros correctos a la consulta
+    const result = await executeQuery(query, [
+        { name: "id", type: TYPES.Int, value: id },
+        { name: "placa", type: TYPES.NVarChar, value: placa },
+        { name: "brand", type: TYPES.NVarChar, value: brand },
+        { name: "model", type: TYPES.NVarChar, value: model },
+        { name: "capacity", type: TYPES.Decimal, value: capacity },
+        { name: "is_active", type: TYPES.Bit, value: is_active },
+    ]);
+
+    if (result.length === 0) {
+      return new NextResponse("Camión no encontrado.", { status: 404 });
+    }
+
+    revalidateTag("trucks");
+    
+    return NextResponse.json(result[0]);
+  } catch (error: any) {
+    console.error("[API_TRUCKS_PATCH]", error);
+    if (error.message && error.message.includes("Violation of UNIQUE KEY constraint")) {
+         return new NextResponse(
+           JSON.stringify({ placa: ["La placa ingresada ya existe."] }),
+           { status: 409, headers: { "Content-Type": "application/json" } }
+         );
+    }
+    return new NextResponse("Error al actualizar el camión.", { status: 500 });
+  }
 }
 
 /**

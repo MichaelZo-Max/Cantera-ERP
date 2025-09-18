@@ -155,3 +155,27 @@ export const driverSchema = z.object({
     .transform((val) => (val === "" ? undefined : val)),
   customer_ids: z.array(z.number()).optional().default([]),
 });
+
+/**
+ * @description Esquema para la CREACIÓN y ACTUALIZACIÓN de un camión (truck).
+ */
+export const truckSchema = z.object({
+  // Corregido: 'placa' en lugar de 'plate'
+  placa: z
+    .string({ required_error: "La placa es obligatoria." })
+    .min(3, "La placa debe tener al menos 3 caracteres.")
+    .trim(),
+  brand: z
+    .string()
+    .optional()
+    .transform((val) => (val === "" ? undefined : val)),
+  model: z
+    .string()
+    .optional()
+    .transform((val) => (val === "" ? undefined : val)),
+  // Tu código usaba 'capacity'. Lo mantenemos para consistencia.
+  capacity: z.coerce
+    .number({ invalid_type_error: "La capacidad debe ser un número." })
+    .positive("La capacidad debe ser un valor positivo.")
+    .optional(),
+});
