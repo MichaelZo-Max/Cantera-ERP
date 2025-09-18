@@ -87,7 +87,10 @@ export const confirmExitSchema = z.object({
   notes: z.string().optional(),
   exitPhoto: z
     .any()
-    .refine((file) => file instanceof File, "La foto de salida es obligatoria."),
+    .refine(
+      (file) => file instanceof File,
+      "La foto de salida es obligatoria."
+    ),
 });
 
 /**
@@ -180,13 +183,7 @@ export const truckSchema = z.object({
     .optional(),
 });
 
-const userRoles = z.enum([
-  "ADMIN",
-  "CASHIER",
-  "YARD_MANAGER",
-  "SECURITY",
-  "REPORTS",
-]);
+const userRoles = z.enum(["ADMIN", "CASHIER", "YARD", "SECURITY", "REPORTS"]);
 
 /**
  * @description Esquema base para los datos de un usuario.
@@ -220,12 +217,9 @@ export const createUserSchema = userBaseSchema.extend({
 export const updateUserSchema = userBaseSchema.extend({
   password: z
     .string()
-    .refine(
-      (val) => val === undefined || val === "" || val.length >= 6,
-      {
-        message: "La nueva contraseña debe tener al menos 6 caracteres.",
-      }
-    )
+    .refine((val) => val === undefined || val === "" || val.length >= 6, {
+      message: "La nueva contraseña debe tener al menos 6 caracteres.",
+    })
     .optional()
     .transform((val) => (val === "" ? undefined : val)), // Transforma "" a undefined para la API
 });

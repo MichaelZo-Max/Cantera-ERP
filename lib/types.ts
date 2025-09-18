@@ -1,7 +1,7 @@
 // --- ENUMS y Tipos Base ---
 export type UnitBase = "M3" | "TON" | "SACO" | "UNIDAD";
 
-export type UserRole = "CASHIER" | "YARD" | "SECURITY" | "ADMIN" | "REPORTS";
+export type UserRole = "ADMIN" | "CASHIER" | "YARD" | "SECURITY" | "REPORTS";
 
 export type OrderStatus =
   | "AWAITING_PAYMENT"

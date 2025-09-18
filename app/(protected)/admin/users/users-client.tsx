@@ -66,7 +66,8 @@ export function UsersClientUI({ initialUsers }: { initialUsers: User[] }) {
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formErrors, setFormErrors] = useState<FormErrors>({}); // ✨ 4. Estado para errores
-  const { isOpen, options, confirm, handleConfirm, handleCancel } = useConfirmation();
+  const { isOpen, options, confirm, handleConfirm, handleCancel } =
+    useConfirmation();
 
   const filteredUsers = useMemo(
     () =>
@@ -79,7 +80,11 @@ export function UsersClientUI({ initialUsers }: { initialUsers: User[] }) {
   );
 
   const getInitials = (name: string) => {
-    return name.split(" ").map((n) => n[0]).join("").toUpperCase();
+    return name
+      .split(" ")
+      .map((n) => n[0])
+      .join("")
+      .toUpperCase();
   };
 
   const handleNewUser = useCallback(() => {
@@ -138,15 +143,19 @@ export function UsersClientUI({ initialUsers }: { initialUsers: User[] }) {
           if (res.status === 409 || res.status === 400) {
             setFormErrors(responseData);
           }
-          throw new Error(responseData.email?.[0] || "Ocurrió un error al guardar.");
+          throw new Error(
+            responseData.email?.[0] || "Ocurrió un error al guardar."
+          );
         }
 
         // Refrescar lista de usuarios para mantener UI sincronizada
         const fetchResponse = await fetch("/api/users");
         const updatedUsers = await fetchResponse.json();
         setUsers(updatedUsers);
-        
-        toast.success(`Usuario ${editingUser ? "actualizado" : "creado"} exitosamente.`);
+
+        toast.success(
+          `Usuario ${editingUser ? "actualizado" : "creado"} exitosamente.`
+        );
         setShowDialog(false);
       } catch (err: any) {
         toast.error("Error al guardar", { description: err.message });
@@ -367,7 +376,10 @@ export function UsersClientUI({ initialUsers }: { initialUsers: User[] }) {
                   setFormData({ ...formData, name: e.target.value })
                 }
                 placeholder="Ej: Ana Frank"
-                className={cn(formErrors.name && "border-red-500", "focus-ring")}
+                className={cn(
+                  formErrors.name && "border-red-500",
+                  "focus-ring"
+                )}
               />
               {formErrors.name && (
                 <p className="text-xs text-red-500 flex items-center gap-1 mt-1">
@@ -389,7 +401,10 @@ export function UsersClientUI({ initialUsers }: { initialUsers: User[] }) {
                   setFormData({ ...formData, email: e.target.value })
                 }
                 placeholder="usuario@ejemplo.com"
-                className={cn(formErrors.email && "border-red-500", "focus-ring")}
+                className={cn(
+                  formErrors.email && "border-red-500",
+                  "focus-ring"
+                )}
               />
               {formErrors.email && (
                 <p className="text-xs text-red-500 flex items-center gap-1 mt-1">
@@ -397,7 +412,7 @@ export function UsersClientUI({ initialUsers }: { initialUsers: User[] }) {
                 </p>
               )}
             </div>
-            
+
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {/* --- CAMPO ROL --- */}
               <div className="space-y-2">
@@ -410,29 +425,34 @@ export function UsersClientUI({ initialUsers }: { initialUsers: User[] }) {
                     setFormData({ ...formData, role: value })
                   }
                 >
-                  <SelectTrigger className={cn(formErrors.role && "border-red-500", "focus-ring")}>
+                  <SelectTrigger
+                    className={cn(
+                      formErrors.role && "border-red-500",
+                      "focus-ring"
+                    )}
+                  >
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="ADMIN">Administrador</SelectItem>
                     <SelectItem value="CASHIER">Cajero</SelectItem>
-                    <SelectItem value="YARD_MANAGER">Jefe de Patio</SelectItem>
+                    <SelectItem value="YARD">Jefe de Patio</SelectItem>
                     <SelectItem value="SECURITY">Vigilancia</SelectItem>
                     <SelectItem value="REPORTS">Reportes</SelectItem>
                   </SelectContent>
                 </Select>
-                 {formErrors.role && (
-                    <p className="text-xs text-red-500 flex items-center gap-1 mt-1">
-                      <AlertCircle className="h-3 w-3" /> {formErrors.role[0]}
-                    </p>
-                 )}
+                {formErrors.role && (
+                  <p className="text-xs text-red-500 flex items-center gap-1 mt-1">
+                    <AlertCircle className="h-3 w-3" /> {formErrors.role[0]}
+                  </p>
+                )}
               </div>
 
               {/* --- CAMPO CONTRASEÑA --- */}
               <div className="space-y-2">
                 <Label htmlFor="password">
                   {editingUser ? "Nueva Contraseña" : "Contraseña"}
-                   {!editingUser && <span className="text-red-500"> *</span>}
+                  {!editingUser && <span className="text-red-500"> *</span>}
                 </Label>
                 <Input
                   id="password"
@@ -441,14 +461,19 @@ export function UsersClientUI({ initialUsers }: { initialUsers: User[] }) {
                   onChange={(e) =>
                     setFormData({ ...formData, password: e.target.value })
                   }
-                  placeholder={editingUser ? "Dejar en blanco para no cambiar" : "••••••••"}
-                  className={cn(formErrors.password && "border-red-500", "focus-ring")}
+                  placeholder={
+                    editingUser ? "Dejar en blanco para no cambiar" : "••••••••"
+                  }
+                  className={cn(
+                    formErrors.password && "border-red-500",
+                    "focus-ring"
+                  )}
                 />
                 {formErrors.password && (
-                    <p className="text-xs text-red-500 flex items-center gap-1 mt-1">
-                      <AlertCircle className="h-3 w-3" /> {formErrors.password[0]}
-                    </p>
-                 )}
+                  <p className="text-xs text-red-500 flex items-center gap-1 mt-1">
+                    <AlertCircle className="h-3 w-3" /> {formErrors.password[0]}
+                  </p>
+                )}
               </div>
             </div>
 

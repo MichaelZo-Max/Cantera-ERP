@@ -1,19 +1,20 @@
 // app/api/users/[id]/route.ts
-import { NextResponse } from "next/server";
+import { NextResponse, NextRequest } from "next/server";
 import { executeQuery, TYPES } from "@/lib/db";
 import bcrypt from "bcryptjs";
-import { revalidateTag } from "next/cache"; // Importamos revalidateTag
+import { revalidateTag } from "next/cache";
 import { updateUserSchema } from "@/lib/validations";
 import { z } from "zod";
+import { withAuthorization } from "@/lib/authz";
 
 export const dynamic = "force-dynamic";
 
 /**
  * @route GET /api/users/[id]
- * @desc Obtener un usuario por ID
+ * @desc Obtener un usuario por ID (SOLO ADMIN)
  */
-export async function GET(
-  request: Request,
+async function handlerGET(
+  request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
@@ -34,10 +35,10 @@ export async function GET(
 
 /**
  * @route PATCH /api/users/[id]
- * @desc Actualizar un usuario dinámicamente
+ * @desc Actualizar un usuario dinámicamente (SOLO ADMIN)
  */
-export async function PATCH(
-  request: Request,
+async function handlerPATCH(
+  request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
@@ -48,7 +49,6 @@ export async function PATCH(
 
     const body = await request.json().catch(() => ({}));
 
-    // ✨ 2. Crear esquema para PATCH: campos opcionales + is_active
     const patchSchema = updateUserSchema.partial().extend({
       is_active: z.boolean().optional(),
     });
@@ -61,9 +61,7 @@ export async function PATCH(
       });
     }
 
-    // ✨ 3. Usar los datos validados en lugar del 'body' crudo
     const validatedData = validation.data;
-
     const updates: string[] = [];
     const queryParams: any[] = [{ name: "id", type: TYPES.Int, value: id }];
 
@@ -99,7 +97,6 @@ export async function PATCH(
         value: validatedData.is_active,
       });
     }
-    // La contraseña solo se actualiza si se proporciona una válida
     if (validatedData.password) {
       const salt = await bcrypt.genSalt(10);
       const password_hash = await bcrypt.hash(validatedData.password, salt);
@@ -118,11 +115,11 @@ export async function PATCH(
     updates.push("updated_at = GETDATE()");
 
     const query = `
-            UPDATE RIP.APP_USUARIOS
-            SET ${updates.join(", ")}
-            OUTPUT INSERTED.id, INSERTED.email, INSERTED.name, INSERTED.role, INSERTED.is_active
-            WHERE id = @id;
-        `;
+      UPDATE RIP.APP_USUARIOS
+      SET ${updates.join(", ")}
+      OUTPUT INSERTED.id, INSERTED.email, INSERTED.name, INSERTED.role, INSERTED.is_active
+      WHERE id = @id;
+    `;
 
     const result = await executeQuery(query, queryParams);
     if (result.length === 0) {
@@ -135,7 +132,6 @@ export async function PATCH(
     return NextResponse.json(result[0]);
   } catch (error: any) {
     console.error("[API_USERS_PATCH]", error);
-    // ✨ 4. Manejo de error específico para email duplicado al actualizar
     if (
       error.message &&
       error.message.includes("Violation of UNIQUE KEY constraint")
@@ -151,23 +147,22 @@ export async function PATCH(
 
 /**
  * @route DELETE /api/users/[id]
- * @desc Desactivar un usuario (borrado lógico)
+ * @desc Desactivar un usuario (borrado lógico) (SOLO ADMIN)
  */
-export async function DELETE(
-  request: Request,
+async function handlerDELETE(
+  request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
     const query = `
-            UPDATE RIP.APP_USUARIOS
-            SET is_active = 0, updated_at = GETDATE()
-            WHERE id = @id;
-        `;
+      UPDATE RIP.APP_USUARIOS
+      SET is_active = 0, updated_at = GETDATE()
+      WHERE id = @id;
+    `;
     await executeQuery(query, [
       { name: "id", type: TYPES.Int, value: params.id },
     ]);
 
-    // ✨ INVALIDACIÓN DEL CACHÉ
     revalidateTag("users");
 
     return NextResponse.json({ message: "Usuario desactivado correctamente" });
@@ -176,3 +171,8 @@ export async function DELETE(
     return new NextResponse("Error al desactivar el usuario", { status: 500 });
   }
 }
+
+// Exporta los handlers envueltos con la autorización, permitiendo solo a los administradores
+export const GET = withAuthorization(["ADMIN"], handlerGET);
+export const PATCH = withAuthorization(["ADMIN"], handlerPATCH);
+export const DELETE = withAuthorization(["ADMIN"], handlerDELETE);
