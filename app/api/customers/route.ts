@@ -2,13 +2,15 @@
 import { NextResponse } from "next/server";
 import { executeQuery, TYPES } from "@/lib/db";
 import { revalidateTag } from "next/cache";
+import { customerSchema } from "@/lib/validations"; // ✨ 1. Importar el esquema
+import { z } from "zod";
 
 export const dynamic = "force-dynamic";
 
 // ---------- GET: lista de clientes que tu UI muestra ----------
 export async function GET() {
   try {
-    // CAMBIO: Se consulta la vista RIP.VW_APP_CLIENTES en lugar de la tabla directamente.
+    // Se consulta la vista que ya formatea los datos como los necesita el front.
     const sql = `
       SELECT
         id,
@@ -23,7 +25,7 @@ export async function GET() {
     `;
     const rows = await executeQuery<any>(sql);
 
-    // El mapeo ahora es más directo porque la vista ya tiene los nombres correctos.
+    // Mapeo directo desde los resultados de la vista.
     const out = rows.map((r: any) => ({
       id: r.id,
       name: r.name ?? "",
@@ -41,60 +43,40 @@ export async function GET() {
   }
 }
 
-// ---------- POST: crea cliente desde los campos del formulario del front ----------
-// Esta función ya estaba correcta, se mantiene igual.
+// ---------- POST: crea un nuevo cliente con validación de backend ----------
 export async function POST(req: Request) {
   try {
     const body = await req.json().catch(() => ({}));
 
-    const name = String(body?.name ?? "").trim();
-    const rif = (body?.rif ?? "").toString().trim() || null;
-    const address = (body?.address ?? "").toString().trim() || null;
-    const phone = (body?.phone ?? "").toString().trim() || null;
-    const email = (body?.email ?? "").toString().trim() || null;
-
-    if (!name) {
-      return new NextResponse("El campo name es obligatorio", {
+    // ✨ 2. Validar el body con Zod. Esta es la capa de seguridad principal.
+    const validation = customerSchema.safeParse(body);
+    if (!validation.success) {
+      // Si la validación falla, se retorna un error 400 con los detalles.
+      return new NextResponse(JSON.stringify(validation.error.format()), {
         status: 400,
+        headers: { "Content-Type": "application/json" },
       });
     }
 
+    // ✨ 3. Usar los datos ya validados y limpios por Zod.
+    const { name, rif, address, phone, email } = validation.data;
+
+    // Obtener el siguiente código de cliente disponible.
     const nextCodeRows = await executeQuery<{ nextCode: number }>(`
       SELECT ISNULL(MAX(CODCLIENTE), 0) + 1 AS nextCode
       FROM dbo.CLIENTES;
     `);
     const codCliente = nextCodeRows[0]?.nextCode ?? 1;
 
+    // Insertar el nuevo cliente y luego seleccionarlo desde la vista para devolver el objeto completo.
     const sql = `
       INSERT INTO dbo.CLIENTES (
-        CODCLIENTE,
-        NOMBRECLIENTE,
-        NIF20,
-        DIRECCION1,
-        TELEFONO1,
-        E_MAIL,
-        DESCATALOGADO
-      )
-      VALUES (
-        @codCliente,
-        @nombreCliente,
-        @nif20,
-        @direccion1,
-        @telefono1,
-        @e_mail,
-        'F'
+        CODCLIENTE, NOMBRECLIENTE, NIF20, DIRECCION1, TELEFONO1, E_MAIL, DESCATALOGADO
+      ) VALUES (
+        @codCliente, @nombreCliente, @nif20, @direccion1, @telefono1, @e_mail, 'F'
       );
 
-      SELECT
-        CODCLIENTE,
-        NOMBRECLIENTE,
-        NIF20,
-        DIRECCION1,
-        TELEFONO1,
-        E_MAIL,
-        DESCATALOGADO
-      FROM dbo.CLIENTES
-      WHERE CODCLIENTE = @codCliente;
+      SELECT * FROM RIP.VW_APP_CLIENTES WHERE id = @codCliente;
     `;
 
     const params = [
@@ -134,27 +116,32 @@ export async function POST(req: Request) {
     const rows = await executeQuery<any>(sql, params);
     const r = rows[0];
 
-    const saved = {
-      id: r.CODCLIENTE,
-      name: r.NOMBRECLIENTE ?? "",
-      rif: r.NIF20 ?? null,
-      address: r.DIRECCION1 ?? null,
-      phone: r.TELEFONO1 ?? null,
-      email: r.E_MAIL ?? null,
-      is_active: (r.DESCATALOGADO ?? "F").toString().toUpperCase() !== "T",
+    // Mapear la respuesta para asegurar consistencia con GET.
+    const savedCustomer = {
+      id: r.id,
+      name: r.name ?? "",
+      rif: r.rfc ?? null,
+      address: r.address ?? null,
+      phone: r.phone ?? null,
+      email: r.email ?? null,
+      is_active: r.is_active,
     };
 
+    // Invalidar el caché para que la lista de clientes se actualice en el front.
     revalidateTag("customers");
 
-    return NextResponse.json(saved, { status: 201 });
+    return NextResponse.json(savedCustomer, { status: 201 });
   } catch (e: any) {
+    // Manejar errores específicos de la base de datos, como claves únicas duplicadas.
     if (e?.number === 2627 || e?.number === 2601) {
       return new NextResponse(
-        "Cliente duplicado (CODCLIENTE / NIF20 / E_MAIL ya existe)",
-        { status: 409 }
+        "Un cliente con el mismo RIF o Email ya existe.",
+        { status: 409 } // 409 Conflict es más apropiado para duplicados.
       );
     }
     console.error("[API_CUSTOMERS_POST]", e);
-    return new NextResponse("Error al crear cliente", { status: 500 });
+    return new NextResponse("Error interno al crear el cliente.", {
+      status: 500,
+    });
   }
 }

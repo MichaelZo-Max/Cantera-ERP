@@ -89,3 +89,31 @@ export const confirmExitSchema = z.object({
     .any()
     .refine((file) => file instanceof File, "La foto de salida es obligatoria."),
 });
+
+/**
+ * @description Esquema para la CREACIÓN y ACTUALIZACIÓN de un cliente.
+ * Define las reglas de validación para el formulario de clientes.
+ */
+export const customerSchema = z.object({
+  name: z
+    .string({ required_error: "El nombre es obligatorio." })
+    .min(3, "El nombre debe tener al menos 3 caracteres.")
+    .trim(),
+  rif: z
+    .string()
+    .optional()
+    .transform((val) => (val === "" ? undefined : val)), // Transforma "" a undefined
+  address: z
+    .string()
+    .optional()
+    .transform((val) => (val === "" ? undefined : val)),
+  email: z
+    .string()
+    .email("El formato del email no es válido.")
+    .optional()
+    .transform((val) => (val === "" ? undefined : val)),
+  phone: z
+    .string()
+    .optional()
+    .transform((val) => (val === "" ? undefined : val)),
+});

@@ -1,72 +1,70 @@
 // app/api/customers/[id]/route.ts
 import { NextResponse } from "next/server";
 import { executeQuery, TYPES } from "@/lib/db";
-import { revalidateTag } from "next/cache"; // Importamos revalidateTag
+import { revalidateTag } from "next/cache";
+import { customerSchema } from "@/lib/validations"; // ✨ 1. Importar el esquema
+import { z } from "zod";
 
 export const dynamic = "force-dynamic";
 
-// Utilidad para traer un cliente y mapearlo como lo espera el front
+// ✨ MEJORA: Utilidad para traer un cliente usando la VISTA para consistencia.
 async function fetchCustomerById(id: number) {
   const rows = await executeQuery<any>(
-    `
-    SELECT
-      CODCLIENTE,
-      NOMBRECLIENTE,
-      NIF20,
-      DIRECCION1,
-      TELEFONO1,
-      E_MAIL,
-      DESCATALOGADO
-    FROM dbo.CLIENTES
-    WHERE CODCLIENTE = @id;
-  `,
+    `SELECT * FROM RIP.VW_APP_CLIENTES WHERE id = @id;`,
     [{ name: "id", type: TYPES.Int, value: id }]
   );
   const r = rows[0];
   if (!r) return null;
+
+  // El mapeo es directo gracias a la vista.
   return {
-    id: r.CODCLIENTE,
-    name: r.NOMBRECLIENTE ?? "",
-    rif: r.NIF20 ?? null,
-    address: r.DIRECCION1 ?? null,
-    phone: r.TELEFONO1 ?? null,
-    email: r.E_MAIL ?? null,
-    is_active: (r.DESCATALOGADO ?? "F").toString().toUpperCase() !== "T",
+    id: r.id,
+    name: r.name ?? "",
+    rif: r.rfc ?? null,
+    address: r.address ?? null,
+    phone: r.phone ?? null,
+    email: r.email ?? null,
+    is_active: r.is_active,
   };
 }
 
-// ---------- PATCH: actualizar datos y/o cambiar estado (toggle) ----------
+// ---------- PATCH: actualizar datos y/o cambiar estado (toggle) con validación ----------
 export async function PATCH(
   req: Request,
-  { params }: { params: { id: string } }
+  { params: routeParams }: { params: { id: string } }
 ) {
   try {
-    const id = parseInt(params.id, 10);
+    const id = parseInt(routeParams.id, 10);
     if (Number.isNaN(id)) {
-      return new NextResponse("ID inválido", { status: 400 });
+      return new NextResponse("ID de cliente inválido.", { status: 400 });
     }
 
     const body = await req.json().catch(() => ({}));
 
-    // La página manda el mismo objeto Client + is_active cuando hace toggle:
-    // { ...customer, is_active: !is_active }
-    const name =
-      body?.name !== undefined ? String(body.name).trim() : undefined;
-    const rif = body?.rif !== undefined ? String(body.rif).trim() : undefined;
-    const address =
-      body?.address !== undefined ? String(body.address).trim() : undefined;
-    const phone =
-      body?.phone !== undefined ? String(body.phone).trim() : undefined;
-    const email =
-      body?.email !== undefined ? String(body.email).trim() : undefined;
+    // ✨ 2. Esquema para PATCH: .partial() hace todos los campos del formulario opcionales.
+    //    Se extiende para aceptar `is_active` que se usa para activar/desactivar.
+    const patchSchema = customerSchema.partial().extend({
+      is_active: z.boolean().optional(),
+    });
 
-    // is_active (boolean) → DESCATALOGADO 'F'/'T'
-    let descatalogadoValue: "F" | "T" | undefined = undefined;
-    if (typeof body?.is_active === "boolean") {
-      descatalogadoValue = body.is_active ? "F" : "T";
+    const validation = patchSchema.safeParse(body);
+    if (!validation.success) {
+      return new NextResponse(JSON.stringify(validation.error.format()), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      });
     }
 
-    // Construimos UPDATE dinámico solo con lo que venga definido
+    // ✨ 3. Usar los datos ya validados y limpios por Zod.
+    const { name, rif, address, phone, email, is_active } = validation.data;
+
+    // Convertir el booleano `is_active` al valor 'F'/'T' que espera la DB.
+    let descatalogadoValue: "F" | "T" | undefined = undefined;
+    if (typeof is_active === "boolean") {
+      descatalogadoValue = is_active ? "F" : "T";
+    }
+
+    // Construir la consulta UPDATE dinámicamente solo con los campos recibidos.
     const sets: string[] = [];
     const paramsArr: any[] = [{ name: "id", type: TYPES.Int, value: id }];
 
@@ -75,7 +73,7 @@ export async function PATCH(
       paramsArr.push({
         name: "nombreCliente",
         type: TYPES.NVarChar,
-        value: name || null,
+        value: name,
         options: { length: 200 },
       });
     }
@@ -84,7 +82,7 @@ export async function PATCH(
       paramsArr.push({
         name: "nif20",
         type: TYPES.NVarChar,
-        value: rif || null,
+        value: rif,
         options: { length: 20 },
       });
     }
@@ -93,7 +91,7 @@ export async function PATCH(
       paramsArr.push({
         name: "direccion1",
         type: TYPES.NVarChar,
-        value: address || null,
+        value: address,
         options: { length: 400 },
       });
     }
@@ -102,7 +100,7 @@ export async function PATCH(
       paramsArr.push({
         name: "telefono1",
         type: TYPES.NVarChar,
-        value: phone || null,
+        value: phone,
         options: { length: 50 },
       });
     }
@@ -111,7 +109,7 @@ export async function PATCH(
       paramsArr.push({
         name: "e_mail",
         type: TYPES.NVarChar,
-        value: email || null,
+        value: email,
         options: { length: 120 },
       });
     }
@@ -125,51 +123,44 @@ export async function PATCH(
       });
     }
 
+    // Si no se envió ningún dato para actualizar, simplemente devolvemos el cliente actual.
     if (sets.length === 0) {
-      // nada que actualizar → devolvemos el registro actual
-      const current = await fetchCustomerById(id);
-      if (!current)
-        return new NextResponse("Cliente no encontrado", { status: 404 });
-      return NextResponse.json(current);
+      const currentCustomer = await fetchCustomerById(id);
+      if (!currentCustomer) {
+        return new NextResponse("Cliente no encontrado.", { status: 404 });
+      }
+      return NextResponse.json(currentCustomer);
     }
 
     const sql = `
       UPDATE dbo.CLIENTES
       SET ${sets.join(", ")}
       WHERE CODCLIENTE = @id;
-
-      SELECT
-        CODCLIENTE,
-        NOMBRECLIENTE,
-        NIF20,
-        DIRECCION1,
-        TELEFONO1,
-        E_MAIL,
-        DESCATALOGADO
-      FROM dbo.CLIENTES
-      WHERE CODCLIENTE = @id;
     `;
 
-    const rows = await executeQuery<any>(sql, paramsArr);
-    const r = rows[0];
-    if (!r) return new NextResponse("Cliente no encontrado", { status: 404 });
+    await executeQuery<any>(sql, paramsArr);
 
-    const updated = {
-      id: r.CODCLIENTE,
-      name: r.NOMBRECLIENTE ?? "",
-      rif: r.NIF20 ?? null,
-      address: r.DIRECCION1 ?? null,
-      phone: r.TELEFONO1 ?? null,
-      email: r.E_MAIL ?? null,
-      is_active: (r.DESCATALOGADO ?? "F").toString().toUpperCase() !== "T",
-    };
+    // ✨ 4. Obtener y devolver el cliente actualizado desde la vista para asegurar consistencia.
+    const updatedCustomer = await fetchCustomerById(id);
+    if (!updatedCustomer) {
+      return new NextResponse("Cliente no encontrado después de actualizar.", {
+        status: 404,
+      });
+    }
 
-    // ✨ INVALIDACIÓN DEL CACHÉ
     revalidateTag("customers");
 
-    return NextResponse.json(updated);
-  } catch (e) {
+    return NextResponse.json(updatedCustomer);
+  } catch (e: any) {
+    if (e?.number === 2627 || e?.number === 2601) {
+      return new NextResponse(
+        "Un cliente con el mismo RIF o Email ya existe.",
+        { status: 409 }
+      );
+    }
     console.error("[API_CUSTOMERS_PATCH]", e);
-    return new NextResponse("Error al actualizar cliente", { status: 500 });
+    return new NextResponse("Error interno al actualizar el cliente.", {
+      status: 500,
+    });
   }
 }

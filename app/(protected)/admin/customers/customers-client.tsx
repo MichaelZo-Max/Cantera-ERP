@@ -2,7 +2,6 @@
 "use client";
 
 import type React from "react";
-// 1. Importar `useCallback` y `useMemo`
 import { useState, useCallback, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -30,13 +29,25 @@ import {
   Save,
   Phone,
   Mail,
-  MapPin, // Icono para la dirección
+  MapPin,
+  AlertCircle,
 } from "lucide-react";
 import { toast } from "sonner";
 import { LoadingSkeleton } from "@/components/ui/loading-skeleton";
 import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
 import { useConfirmation } from "@/hooks/use-confirmation";
 import { EmptyState } from "@/components/ui/empty-state";
+import { customerSchema } from "@/lib/validations"; // ✨ 1. Importar el esquema
+import type { ZodError } from "zod";
+
+// ✨ 2. Tipo para los errores del formulario
+type FormErrors = {
+  name?: string;
+  rif?: string;
+  address?: string;
+  email?: string;
+  phone?: string;
+};
 
 export function CustomersClientUI({
   initialCustomers,
@@ -57,12 +68,11 @@ export function CustomersClientUI({
     phone: "",
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [apiError, setApiError] = useState<string | null>(null);
+  const [formErrors, setFormErrors] = useState<FormErrors>({}); // ✨ 3. Estado para errores
 
   const { isOpen, options, confirm, handleConfirm, handleCancel } =
     useConfirmation();
 
-  // 2. Memorizar el resultado del filtro
   const filteredCustomers = useMemo(
     () =>
       customers.filter(
@@ -74,11 +84,10 @@ export function CustomersClientUI({
     [customers, searchTerm]
   );
 
-  // 3. Envolver las funciones en `useCallback`
   const handleNewCustomer = useCallback(() => {
     setEditingCustomer(null);
     setFormData({ name: "", rif: "", address: "", email: "", phone: "" });
-    setApiError(null);
+    setFormErrors({}); // Limpiar errores
     setShowDialog(true);
   }, []);
 
@@ -91,7 +100,7 @@ export function CustomersClientUI({
       email: customer.email || "",
       phone: customer.phone || "",
     });
-    setApiError(null);
+    setFormErrors({}); // Limpiar errores
     setShowDialog(true);
   }, []);
 
@@ -99,7 +108,25 @@ export function CustomersClientUI({
     async (e: React.FormEvent) => {
       e.preventDefault();
       setIsSubmitting(true);
-      setApiError(null);
+      setFormErrors({}); // Limpiar errores previos
+
+      // ✨ 4. Validación con Zod
+      const validation = customerSchema.safeParse(formData);
+
+      if (!validation.success) {
+        const errors: FormErrors = {};
+        validation.error.issues.forEach((issue) => {
+          errors[issue.path[0] as keyof FormErrors] = issue.message;
+        });
+        setFormErrors(errors);
+        setIsSubmitting(false);
+        toast.error("Error de validación", {
+          description: "Por favor, corrige los campos marcados.",
+        });
+        return;
+      }
+
+      const validatedData = validation.data; // Usar datos limpios
 
       const method = editingCustomer ? "PATCH" : "POST";
       const url = editingCustomer
@@ -110,7 +137,7 @@ export function CustomersClientUI({
         const res = await fetch(url, {
           method,
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(formData),
+          body: JSON.stringify(validatedData), // ✨ 5. Enviar datos validados
         });
 
         if (!res.ok) {
@@ -134,7 +161,6 @@ export function CustomersClientUI({
 
         setShowDialog(false);
       } catch (err: any) {
-        setApiError(err.message);
         toast.error("Error al guardar", { description: err.message });
       } finally {
         setIsSubmitting(false);
@@ -227,7 +253,7 @@ export function CustomersClientUI({
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-5 w-5" />
             <Input
-              placeholder="Buscar por name o RIF..."
+              placeholder="Buscar por nombre o RIF..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-12 h-12 text-lg focus-ring"
@@ -364,9 +390,13 @@ export function CustomersClientUI({
                     setFormData({ ...formData, name: e.target.value })
                   }
                   placeholder="Ej: Constructora XYZ C.A."
-                  required
-                  className="focus-ring"
+                  className={`focus-ring ${formErrors.name ? "border-red-500" : ""}`}
                 />
+                {formErrors.name && (
+                  <p className="text-xs text-red-500 flex items-center gap-1">
+                    <AlertCircle className="h-3 w-3" /> {formErrors.name}
+                  </p>
+                )}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="rif" className="font-semibold">
@@ -382,8 +412,13 @@ export function CustomersClientUI({
                     })
                   }
                   placeholder="Ej: J-12345678-9"
-                  className="focus-ring"
+                  className={`focus-ring ${formErrors.rif ? "border-red-500" : ""}`}
                 />
+                {formErrors.rif && (
+                   <p className="text-xs text-red-500 flex items-center gap-1">
+                    <AlertCircle className="h-3 w-3" /> {formErrors.rif}
+                  </p>
+                )}
               </div>
             </div>
             <div className="space-y-2">
@@ -397,8 +432,13 @@ export function CustomersClientUI({
                   setFormData({ ...formData, address: e.target.value })
                 }
                 placeholder="Dirección completa"
-                className="focus-ring"
+                className={`focus-ring ${formErrors.address ? "border-red-500" : ""}`}
               />
+              {formErrors.address && (
+                 <p className="text-xs text-red-500 flex items-center gap-1">
+                    <AlertCircle className="h-3 w-3" /> {formErrors.address}
+                  </p>
+              )}
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
@@ -413,8 +453,13 @@ export function CustomersClientUI({
                     setFormData({ ...formData, email: e.target.value })
                   }
                   placeholder="contacto@email.com"
-                  className="focus-ring"
+                  className={`focus-ring ${formErrors.email ? "border-red-500" : ""}`}
                 />
+                {formErrors.email && (
+                   <p className="text-xs text-red-500 flex items-center gap-1">
+                    <AlertCircle className="h-3 w-3" /> {formErrors.email}
+                  </p>
+                )}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="phone" className="font-semibold">
@@ -427,11 +472,15 @@ export function CustomersClientUI({
                     setFormData({ ...formData, phone: e.target.value })
                   }
                   placeholder="0414-1234567"
-                  className="focus-ring"
+                  className={`focus-ring ${formErrors.phone ? "border-red-500" : ""}`}
                 />
+                {formErrors.phone && (
+                  <p className="text-xs text-red-500 flex items-center gap-1">
+                    <AlertCircle className="h-3 w-3" /> {formErrors.phone}
+                  </p>
+                )}
               </div>
             </div>
-            {apiError && <p className="text-sm text-red-500">{apiError}</p>}
             <DialogFooter className="pt-4">
               <Button
                 type="button"
@@ -442,7 +491,7 @@ export function CustomersClientUI({
               </Button>
               <GradientButton
                 type="submit"
-                disabled={isSubmitting || !formData.name}
+                disabled={isSubmitting}
               >
                 {isSubmitting ? (
                   <>
