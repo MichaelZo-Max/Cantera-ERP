@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
     // 1. Buscar al usuario en la base de datos (CON LOS NOMBRES CORRECTOS)
     const userSql = `
       SELECT id, name, email, password_hash, role, is_active 
-      FROM CANTERA.RIP.APP_USUARIOS 
+      FROM RIP.APP_USUARIOS 
       WHERE email = @email
     `;
     const userParams = [{ name: "email", type: TYPES.NVarChar, value: email }];
@@ -62,7 +62,7 @@ export async function POST(req: NextRequest) {
 
     // 4. Preparar la respuesta y establecer la cookie segura
     const userResponse: User = {
-        id: String(user.id),
+        id: user.id,
         name: user.name,
         email: user.email,
         role: user.role,
