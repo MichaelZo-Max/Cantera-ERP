@@ -1,7 +1,7 @@
 import { AppLayout } from "@/components/app-layout";
 import { YardDeliveriesClientUI } from "./yard-deliveries-client";
 import { unstable_noStore as noStore } from "next/cache";
-import type { Delivery, Order, Truck, Driver } from "@/lib/types";
+import type { Delivery, Order } from "@/lib/types";
 import { executeQuery } from "@/lib/db";
 
 // Función auxiliar para mapear el estado de la base de datos a un estado conocido en la UI
@@ -17,8 +17,8 @@ const mapDbStatusToUi = (status: string): "PENDING" | "CARGADA" | "EXITED" => {
 async function getData() {
   noStore(); // Asegura que los datos sean siempre frescos.
 
-  // --- CONSULTA SQL UNIFICADA Y CORREGIDA ---
-  // El error estaba aquí. Ahora todas las sentencias SELECT tienen 36 columnas.
+  // --- CONSULTA SQL CORREGIDA ---
+  // El error estaba en el número de columnas del UNION. Ahora ambas SELECT tienen 32 columnas.
   const mainQuery = `
     -- CTE para calcular el total despachado por cada item de pedido a través de todos los viajes.
     WITH DispatchedTotals AS (
@@ -28,7 +28,7 @@ async function getData() {
         FROM RIP.APP_DESPACHOS_ITEMS
         GROUP BY pedido_item_id
     )
-    -- Consulta Principal de Despachos (36 columnas)
+    -- Consulta Principal de Despachos (32 columnas)
     SELECT
         'DELIVERY' as type,
         d.id as delivery_id, d.status as estado, d.notes, d.load_photo_url as loadPhoto, d.exit_photo_url as exitPhoto,
@@ -39,9 +39,7 @@ async function getData() {
         pi.id as pedido_item_id, pi.quantity as item_quantity, pi.unit as item_unit, pi.price_per_unit,
         prod.id as product_id, prod.name as product_name, prod.unit as product_unit,
         ISNULL(dt.total_dispatched, 0) as total_dispatched_quantity,
-        NULL as order_only_id, NULL as order_only_number, NULL as order_only_customer_id, NULL as order_only_client_name, NULL as order_only_status, NULL as order_only_created_at,
-        NULL as truck_only_id, NULL as truck_only_placa,
-        NULL as driver_only_id, NULL as driver_only_name
+        NULL as order_only_id, NULL as order_only_number, NULL as order_only_customer_id, NULL as order_only_client_name, NULL as order_only_status, NULL as order_only_created_at
     FROM RIP.APP_DESPACHOS d
     JOIN RIP.APP_PEDIDOS p ON p.id = d.order_id
     JOIN RIP.VW_APP_CLIENTES c ON c.id = p.customer_id
@@ -53,26 +51,14 @@ async function getData() {
 
     UNION ALL
 
-    -- Pedidos Activos (36 columnas)
+    -- Pedidos Activos (32 columnas)
     SELECT 
         'ACTIVE_ORDER' as type,
-        NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
-        p.id, p.order_number, p.customer_id, c.name, p.status, p.created_at,
-        NULL, NULL,
-        NULL, NULL
+        NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, -- 25 NULLs para coincidir
+        p.id, p.order_number, p.customer_id, c.name, p.status, p.created_at
     FROM RIP.APP_PEDIDOS p
     JOIN RIP.VW_APP_CLIENTES c ON c.id = p.customer_id
-    WHERE p.status IN ('PAID', 'PARTIALLY_DISPATCHED')
-
-    UNION ALL
-
-    -- Camiones Activos (36 columnas)
-    SELECT 'TRUCK' as type, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, id, placa, NULL, NULL FROM RIP.APP_CAMIONES WHERE is_active = 1
-
-    UNION ALL
-
-    -- Conductores Activos (36 columnas)
-    SELECT 'DRIVER' as type, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, id, name FROM RIP.APP_CHOFERES WHERE is_active = 1;
+    WHERE p.status IN ('PAID', 'PARTIALLY_DISPATCHED');
   `;
 
   const results = await executeQuery(mainQuery);
@@ -80,8 +66,6 @@ async function getData() {
   // Procesamiento de los resultados para construir los objetos
   const deliveriesMap = new Map<number, Delivery>();
   const activeOrders: Order[] = [];
-  const trucks: Truck[] = [];
-  const drivers: Driver[] = [];
 
   for (const row of results) {
     switch (row.type) {
@@ -136,12 +120,6 @@ async function getData() {
                 items: [],
             });
             break;
-        case 'TRUCK':
-            trucks.push({ id: row.truck_only_id, placa: row.truck_only_placa });
-            break;
-        case 'DRIVER':
-            drivers.push({ id: row.driver_only_id, name: row.driver_only_name });
-            break;
     }
   }
   
@@ -152,22 +130,18 @@ async function getData() {
   return { 
     deliveries: Array.from(deliveriesMap.values()).sort((a,b) => b.delivery_id - a.delivery_id), 
     activeOrders, 
-    trucks, 
-    drivers 
   };
 }
 
 export default async function YardDeliveriesPage() {
   try {
-    const { deliveries, activeOrders, trucks, drivers } = await getData();
+    const { deliveries, activeOrders } = await getData();
 
     return (
       <AppLayout title="Gestión de Patio">
         <YardDeliveriesClientUI
           initialDeliveries={deliveries}
           initialActiveOrders={activeOrders}
-          initialTrucks={trucks}
-          initialDrivers={drivers}
         />
       </AppLayout>
     );

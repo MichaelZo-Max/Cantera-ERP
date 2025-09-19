@@ -5,7 +5,7 @@ import Image from "next/image";
 import { toast } from "sonner";
 import { useAuth } from "@/components/auth-provider";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useForm, useFieldArray } from "react-hook-form";
+import { useForm, useFieldArray, useWatch } from "react-hook-form";
 import * as z from "zod";
 
 import type {
@@ -56,6 +56,7 @@ import {
   Truck as TruckIcon,
   Search,
   Package,
+  Loader2,
 } from "lucide-react";
 import { AnimatedCard } from "@/components/ui/animated-card";
 import { GradientButton } from "@/components/ui/gradient-button";
@@ -101,27 +102,14 @@ type Delivery = BaseDelivery & {
 interface YardClientProps {
   initialDeliveries: Delivery[];
   initialActiveOrders: Order[];
-  initialTrucks: TruckType[];
-  initialDrivers: Driver[];
 }
 
 // --- Reusable RHF Controlled Component ---
 const RHFSearchableSelect = ({
-  control,
-  name,
-  label,
-  options,
-  placeholder,
-  disabled,
-  className,
+  control, name, label, options, placeholder, disabled, className, loading
 }: {
-  control: any;
-  name: string;
-  label: string;
-  options: SearchableSelectOption[];
-  placeholder: string;
-  disabled?: boolean;
-  className?: string;
+  control: any; name: string; label: string; options: SearchableSelectOption[];
+  placeholder: string; disabled?: boolean; className?: string; loading?: boolean;
 }) => (
   <FormField
     control={control}
@@ -129,13 +117,17 @@ const RHFSearchableSelect = ({
     render={({ field }) => (
       <FormItem className={className}>
         <FormLabel>{label}</FormLabel>
-        <SearchableSelect
-          value={field.value}
-          onChange={field.onChange}
-          options={options}
-          placeholder={placeholder}
-          disabled={disabled}
-        />
+        <div className="relative flex items-center">
+          <SearchableSelect
+            value={field.value}
+            onChange={field.onChange}
+            options={options}
+            placeholder={placeholder}
+            disabled={disabled || loading}
+            className="w-full"
+          />
+          {loading && <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />}
+        </div>
         <FormMessage />
       </FormItem>
     )}
@@ -204,18 +196,18 @@ DeliveryCard.displayName = "DeliveryCard";
 export function YardDeliveriesClientUI({
   initialDeliveries,
   initialActiveOrders,
-  initialTrucks,
-  initialDrivers,
 }: YardClientProps) {
   const { user } = useAuth();
 
   // --- State Management ---
   const [deliveries, setDeliveries] = useState<Delivery[]>(initialDeliveries);
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedDelivery, setSelectedDelivery] = useState<Delivery | null>(
-    null
-  );
+  const [selectedDelivery, setSelectedDelivery] = useState<Delivery | null>(null);
   const [showModal, setShowModal] = useState(false);
+
+  const [authorizedTrucks, setAuthorizedTrucks] = useState<TruckType[]>([]);
+  const [authorizedDrivers, setAuthorizedDrivers] = useState<Driver[]>([]);
+  const [isLoadingTransport, setIsLoadingTransport] = useState(false);
 
   // --- React Hook Form Instances ---
   const createTripForm = useForm<CreateDeliveryFormValues>({
@@ -227,14 +219,52 @@ export function YardDeliveriesClientUI({
     resolver: zodResolver(confirmLoadSchema),
     defaultValues: { notes: "", loadedItems: [] },
   });
-
+  
+  // CORRECCIÓN: useFieldArray necesita name y control
   const { fields: loadedItemsFields, replace: replaceLoadedItems } =
     useFieldArray({
       control: confirmLoadForm.control,
       name: "loadedItems",
     });
 
+  // --- Lógica de Fetching para Transporte Autorizado ---
+  const selectedOrderId = useWatch({
+    control: createTripForm.control,
+    name: "order_id",
+  });
+
+  useEffect(() => {
+    const fetchAuthorizedTransport = async (orderId: string) => {
+      if (!orderId) {
+        setAuthorizedTrucks([]);
+        setAuthorizedDrivers([]);
+        return;
+      }
+
+      setIsLoadingTransport(true);
+      createTripForm.setValue("truck_id", "");
+      createTripForm.setValue("driver_id", "");
+
+      try {
+        const res = await fetch(`/api/orders/${orderId}`);
+        if (!res.ok) throw new Error("No se pudo cargar el transporte autorizado.");
+        const data = await res.json();
+        setAuthorizedTrucks(data.authorized_trucks || []);
+        setAuthorizedDrivers(data.authorized_drivers || []);
+      } catch (error: any) {
+        toast.error("Error al cargar datos", { description: error.message });
+        setAuthorizedTrucks([]);
+        setAuthorizedDrivers([]);
+      } finally {
+        setIsLoadingTransport(false);
+      }
+    };
+
+    fetchAuthorizedTransport(selectedOrderId);
+  }, [selectedOrderId, createTripForm]);
+
   // --- Derived State (Memoized) ---
+  // CORRECCIÓN: Añadido 'return' en los useMemo
   const filteredDeliveries = useMemo(() => {
     const query = searchQuery.toLowerCase();
     if (!query) return deliveries;
@@ -281,6 +311,8 @@ export function YardDeliveriesClientUI({
 
       setDeliveries((prev) => [newDelivery, ...prev]);
       createTripForm.reset();
+      setAuthorizedDrivers([]);
+      setAuthorizedTrucks([]);
     } catch (err: any) {
       toast.error("Error al crear el viaje", { description: err.message });
     }
@@ -398,7 +430,7 @@ export function YardDeliveriesClientUI({
                 <RHFSearchableSelect
                   control={createTripForm.control}
                   name="order_id"
-                  label="Pedido Activo"
+                  label="1. Pedido Activo"
                   placeholder="Seleccionar Pedido..."
                   options={initialActiveOrders.map((o) => ({
                     value: o.id.toString(),
@@ -408,22 +440,26 @@ export function YardDeliveriesClientUI({
                 <RHFSearchableSelect
                   control={createTripForm.control}
                   name="truck_id"
-                  label="Camión Disponible"
+                  label="2. Camión Autorizado"
                   placeholder="Seleccionar Camión..."
-                  options={initialTrucks.map((t) => ({
+                  options={authorizedTrucks.map((t) => ({
                     value: t.id.toString(),
                     label: t.placa,
                   }))}
+                  disabled={!selectedOrderId || isLoadingTransport}
+                  loading={isLoadingTransport}
                 />
                 <RHFSearchableSelect
                   control={createTripForm.control}
                   name="driver_id"
-                  label="Conductor"
+                  label="3. Conductor Autorizado"
                   placeholder="Seleccionar Conductor..."
-                  options={initialDrivers.map((d) => ({
+                  options={authorizedDrivers.map((d) => ({
                     value: d.id.toString(),
                     label: d.name,
                   }))}
+                  disabled={!selectedOrderId || isLoadingTransport}
+                  loading={isLoadingTransport}
                 />
                 <GradientButton
                   type="submit"
@@ -522,7 +558,7 @@ export function YardDeliveriesClientUI({
         </AnimatedCard>
       </div>
 
-      {/* Modal de Confirmación de Carga */}
+      {/* Modal de Confirmación de Carga (código existente sin cambios) */}
       <Dialog open={showModal} onOpenChange={setShowModal}>
         <DialogContent className="sm:max-w-xl max-h-[90vh] overflow-y-auto">
           {selectedDelivery && (

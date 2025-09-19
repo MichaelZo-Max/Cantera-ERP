@@ -537,3 +537,47 @@ END
 GO -- Fin del lote
 
 PRINT '¡Modificación completada! Las tablas para asociar camiones y choferes a las órdenes están listas.';
+-- =================================================================
+-- VISTA PARA OBTENER DETALLES DE LA ORDEN CON TRANSPORTE AUTORIZADO
+-- Propósito: Devuelve los datos de una orden y anida en formato JSON
+-- los camiones y choferes autorizados para la misma.
+-- =================================================================
+CREATE OR ALTER VIEW RIP.VW_APP_PEDIDOS_CON_TRANSPORTE
+AS
+SELECT
+    p.id,
+    p.order_number,
+    p.status,
+    p.customer_id,
+    c.NOMBRECLIENTE as customer_name,
+    p.created_at,
+    -- Subconsulta para obtener los camiones autorizados como un array JSON
+    (
+        SELECT
+            cam.id,
+            cam.placa,
+            cam.brand,
+            cam.model
+        FROM RIP.APP_PEDIDOS_CAMIONES pc
+        JOIN RIP.APP_CAMIONES cam ON pc.camion_id = cam.id
+        WHERE pc.pedido_id = p.id
+        FOR JSON PATH
+    ) AS authorized_trucks,
+    -- Subconsulta para obtener los choferes autorizados como un array JSON
+    (
+        SELECT
+            chof.id,
+            chof.name,
+            chof.docId
+        FROM RIP.APP_PEDIDOS_CHOFERES pch
+        JOIN RIP.APP_CHOFERES chof ON pch.chofer_id = chof.id
+        WHERE pch.pedido_id = p.id
+        FOR JSON PATH
+    ) AS authorized_drivers
+FROM
+    RIP.APP_PEDIDOS p
+JOIN
+    dbo.CLIENTES c ON p.customer_id = c.CODCLIENTE;
+GO
+
+PRINT '¡Vista RIP.VW_APP_PEDIDOS_CON_TRANSPORTE creada con éxito!';

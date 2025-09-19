@@ -1,7 +1,7 @@
 // app/api/orders/[id]/route.ts
 import { NextResponse } from "next/server"
 import { executeQuery, TYPES } from "@/lib/db"
-import { revalidateTag } from "next/cache" // Importamos revalidateTag
+import { revalidateTag } from "next/cache"
 
 export const dynamic = "force-dynamic"
 
@@ -16,6 +16,7 @@ export async function GET(request: Request, { params }: { params: { id: string }
       return new NextResponse("ID de pedido inválido", { status: 400 })
     }
 
+    // --- SIN CAMBIOS AQUÍ ---
     const orderQuery = `
         SELECT
             p.id, p.order_number, p.status, p.created_at, p.notes,
@@ -44,6 +45,33 @@ export async function GET(request: Request, { params }: { params: { id: string }
     `
     const itemsResult = await executeQuery(itemsQuery, [{ name: "id", type: TYPES.Int, value: id }])
 
+    // --- NUEVA CONSULTA PARA CAMIONES AUTORIZADOS ---
+    const authorizedTrucksQuery = `
+        SELECT
+            t.id,
+            t.placa,
+            t.brand,
+            t.model
+        FROM RIP.APP_PEDIDOS_CAMIONES pc
+        JOIN RIP.APP_CAMIONES t ON t.id = pc.camion_id
+        WHERE pc.pedido_id = @id;
+    `
+    const authorizedTrucksResult = await executeQuery(authorizedTrucksQuery, [{ name: "id", type: TYPES.Int, value: id }])
+
+    // --- NUEVA CONSULTA PARA CHOFERES AUTORIZADOS ---
+    const authorizedDriversQuery = `
+        SELECT
+            c.id,
+            c.name,
+            c.docId
+        FROM RIP.APP_PEDIDOS_CHOFERES pch
+        JOIN RIP.APP_CHOFERES c ON c.id = pch.chofer_id
+        WHERE pch.pedido_id = @id;
+    `
+    const authorizedDriversResult = await executeQuery(authorizedDriversQuery, [{ name: "id", type: TYPES.Int, value: id }])
+
+
+    // --- SIN CAMBIOS EN LAS CONSULTAS DE DESPACHOS ---
     const deliveriesQuery = `
         SELECT
             d.id, d.status, d.loaded_quantity, d.loaded_at, d.exited_at, d.notes,
@@ -70,6 +98,7 @@ export async function GET(request: Request, { params }: { params: { id: string }
 
     const order = orderResult[0]
 
+    // --- SIN CAMBIOS EN LA CONSTRUCCIÓN DE deliveriesWithItems ---
     const deliveriesWithItems = deliveriesResult.map((delivery: any) => ({
       id: delivery.id,
       estado: delivery.status,
@@ -96,6 +125,7 @@ export async function GET(request: Request, { params }: { params: { id: string }
         })),
     }))
 
+    // --- OBJETO FINAL MODIFICADO ---
     const populatedOrder = {
       id: order.id,
       order_number: order.order_number,
@@ -122,6 +152,9 @@ export async function GET(request: Request, { params }: { params: { id: string }
         },
       })),
       deliveries: deliveriesWithItems,
+      // --- NUEVOS CAMPOS AÑADIDOS AL OBJETO DE RESPUESTA ---
+      authorized_trucks: authorizedTrucksResult,
+      authorized_drivers: authorizedDriversResult,
     }
 
     return NextResponse.json(populatedOrder)

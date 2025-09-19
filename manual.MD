@@ -1,9 +1,3 @@
-¡Por supuesto! He actualizado el `manual.MD` para reflejar con precisión los últimos cambios que implementamos, especialmente la autorización de múltiples camiones y choferes desde la creación del pedido.
-
-Aquí tienes el documento actualizado:
-
----
-
 ## **FLUJO GENERAL DEL PROCESO**
 
 **1. CAJERO** → Crea el "contrato" de venta y autoriza el transporte (camiones y choferes).
