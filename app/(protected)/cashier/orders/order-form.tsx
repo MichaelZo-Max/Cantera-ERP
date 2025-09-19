@@ -78,33 +78,37 @@ export function OrderForm({
   onSubmit,
   isSubmitting,
 }: OrderFormProps) {
-  const [selectedcustomer_id, setSelectedcustomer_id] = useState<string>(
-    String(initialOrderData?.customer_id ?? "")
-  );
-  const [selectedDestinationId, setSelectedDestinationId] = useState<
-    string | undefined
-  >(initialOrderData?.destination_id?.toString() ?? undefined);
-  const [selectedTruckIds, setSelectedTruckIds] = useState<string[]>(
-    initialOrderData?.trucks?.map((t: TruckType) => t.id.toString()) ?? []
-  );
-  const [selectedDriverIds, setSelectedDriverIds] = useState<string[]>(
-    initialOrderData?.drivers?.map((d: Driver) => d.id.toString()) ?? []
-  );
-
+  // 1. Inicializa los estados como vacíos o con valores por defecto.
+  const [selectedcustomer_id, setSelectedcustomer_id] = useState<string>("");
+  const [selectedDestinationId, setSelectedDestinationId] = useState<string | undefined>(undefined);
+  const [selectedTruckIds, setSelectedTruckIds] = useState<string[]>([]);
+  const [selectedDriverIds, setSelectedDriverIds] = useState<string[]>([]);
   const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [currentQuantity, setCurrentQuantity] = useState<number>(0);
 
   useEffect(() => {
-    if (isEditing && initialOrderData?.items) {
-      const items = initialOrderData.items.map((item) => ({
-        id: crypto.randomUUID(),
-        product: item.product!,
-        quantity: item.quantity,
-        pricePerUnit: Number(item.price_per_unit),
-        subtotal: Number(item.quantity) * Number(item.price_per_unit),
-      }));
-      setOrderItems(items);
+    // Verifica que estemos en modo edición y que los datos iniciales existan.
+    if (isEditing && initialOrderData) {
+      // Establece el cliente y el destino
+      setSelectedcustomer_id(String(initialOrderData.customer_id ?? ""));
+      setSelectedDestinationId(initialOrderData.destination_id?.toString() ?? undefined);
+      
+      // Establece los camiones y choferes seleccionados
+      setSelectedTruckIds(initialOrderData.trucks?.map((t: TruckType) => t.id.toString()) ?? []);
+      setSelectedDriverIds(initialOrderData.drivers?.map((d: Driver) => d.id.toString()) ?? []);
+      
+      // Establece los items (productos) del pedido
+      if (initialOrderData.items) {
+        const items = initialOrderData.items.map((item) => ({
+          id: crypto.randomUUID(),
+          product: item.product!,
+          quantity: item.quantity,
+          pricePerUnit: Number(item.price_per_unit),
+          subtotal: Number(item.quantity) * Number(item.price_per_unit),
+        }));
+        setOrderItems(items);
+      }
     }
   }, [isEditing, initialOrderData]);
 
