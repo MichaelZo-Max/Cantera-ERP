@@ -156,265 +156,322 @@
     - El proceso del paso 2 se repite para los viajes 2 y 3.
     - Después del último viaje, el estado del pedido general se actualiza a `DISPATCHED_COMPLETE`.
 
----
+-- =================================================================
+-- SCRIPT DE DESPLIEGUE A PRODUCCIÓN (Versión Final Corregida)
+-- Propósito: Crea y ajusta el esquema, tablas y vistas para el aplicativo.
+-- =================================================================
 
-\-- =================================================================
-\-- SCRIPT DE DESPLIEGUE A PRODUCCIÓN (Versión Final Completa)
-\-- Propósito: Crea y ajusta el esquema, tablas y vistas para el aplicativo.
-\-- =================================================================
-
-\-- 1. CREACIÓN DEL ESQUEMA
-IF NOT EXISTS (SELECT \* FROM sys.schemas WHERE name = 'RIP')
+-- 1. CREACIÓN DEL ESQUEMA
+IF NOT EXISTS (SELECT * FROM sys.schemas WHERE name = 'RIP')
 BEGIN
-EXEC('CREATE SCHEMA RIP');
+    EXEC('CREATE SCHEMA RIP');
+    PRINT 'Esquema RIP creado.';
 END
 GO
 
-\-- 2. CREACIÓN DE TABLAS
-\-- Se crean las tablas en orden de dependencia.
+-- 2. CREACIÓN DE TABLAS
+-- Se crean las tablas en orden de dependencia.
 
-\-- Tabla de Usuarios
+-- Tabla de Usuarios
 IF OBJECT_ID('RIP.APP_USUARIOS', 'U') IS NULL
-CREATE TABLE RIP.APP_USUARIOS (
-id INT IDENTITY(1,1) PRIMARY KEY,
-email NVARCHAR(255) NOT NULL UNIQUE,
-name NVARCHAR(255) NOT NULL,
-role NVARCHAR(50) NOT NULL CHECK (role IN ('CASHIER', 'YARD', 'SECURITY', 'ADMIN', 'REPORTS')),
-password_hash NVARCHAR(255) NOT NULL,
-is_active BIT NOT NULL DEFAULT 1,
-created_at DATETIME NOT NULL DEFAULT GETDATE(),
-updated_at DATETIME NOT NULL DEFAULT GETDATE(),
-CODVENDEDOR INT NULL,
-FOREIGN KEY (CODVENDEDOR) REFERENCES dbo.VENDEDORES(CODVENDEDOR)
-);
+BEGIN
+    CREATE TABLE RIP.APP_USUARIOS (
+        id INT IDENTITY(1,1) PRIMARY KEY,
+        email NVARCHAR(255) NOT NULL UNIQUE,
+        name NVARCHAR(255) NOT NULL,
+        role NVARCHAR(50) NOT NULL CHECK (role IN ('CASHIER', 'YARD', 'SECURITY', 'ADMIN', 'REPORTS')),
+        password_hash NVARCHAR(255) NOT NULL,
+        is_active BIT NOT NULL DEFAULT 1,
+        created_at DATETIME NOT NULL DEFAULT GETDATE(),
+        updated_at DATETIME NOT NULL DEFAULT GETDATE(),
+        CODVENDEDOR INT NULL,
+        FOREIGN KEY (CODVENDEDOR) REFERENCES dbo.VENDEDORES(CODVENDEDOR)
+    );
+    PRINT 'Tabla RIP.APP_USUARIOS creada.';
+END
 GO
 
-\-- Tabla de Choferes
+-- Tabla de Choferes
 IF OBJECT_ID('RIP.APP_CHOFERES', 'U') IS NULL
 BEGIN
-CREATE TABLE RIP.APP_CHOFERES (
-id INT IDENTITY(1,1) PRIMARY KEY,
-name NVARCHAR(255) NOT NULL,
-docId NVARCHAR(50) NULL,
-phone NVARCHAR(50) NULL,
-is_active BIT NOT NULL DEFAULT 1,
-created_at DATETIME NOT NULL DEFAULT GETDATE(),
-updated_at DATETIME NOT NULL DEFAULT GETDATE()
-);
+    CREATE TABLE RIP.APP_CHOFERES (
+        id INT IDENTITY(1,1) PRIMARY KEY,
+        name NVARCHAR(255) NOT NULL,
+        docId NVARCHAR(50) NULL,
+        phone NVARCHAR(50) NULL,
+        is_active BIT NOT NULL DEFAULT 1,
+        created_at DATETIME NOT NULL DEFAULT GETDATE(),
+        updated_at DATETIME NOT NULL DEFAULT GETDATE()
+    );
+    PRINT 'Tabla RIP.APP_CHOFERES creada.';
 END
 GO
 
-\-- Tabla de Camiones
+-- Tabla de Camiones
 IF OBJECT_ID('RIP.APP_CAMIONES', 'U') IS NULL
-CREATE TABLE RIP.APP_CAMIONES (
-id INT IDENTITY(1,1) PRIMARY KEY,
-placa NVARCHAR(20) NOT NULL UNIQUE,
-brand NVARCHAR(100),
-model NVARCHAR(100),
-capacity DECIMAL(18, 2) NOT NULL,
-driver_name NVARCHAR(255), -- Obsoleto, usar driver_id
-driver_phone NVARCHAR(50), -- Obsoleto
-driver_id INT NULL,
-is_active BIT NOT NULL DEFAULT 1,
-created_at DATETIME NOT NULL DEFAULT GETDATE(),
-updated_at DATETIME NOT NULL DEFAULT GETDATE(),
-CONSTRAINT FK_APP_CAMIONES_CHOFERES FOREIGN KEY (driver_id) REFERENCES RIP.APP_CHOFERES(id)
-);
+BEGIN
+    CREATE TABLE RIP.APP_CAMIONES (
+        id INT IDENTITY(1,1) PRIMARY KEY,
+        placa NVARCHAR(20) NOT NULL UNIQUE,
+        brand NVARCHAR(100),
+        model NVARCHAR(100),
+        capacity DECIMAL(18, 2) NOT NULL,
+        driver_id INT NULL,
+        is_active BIT NOT NULL DEFAULT 1,
+        created_at DATETIME NOT NULL DEFAULT GETDATE(),
+        updated_at DATETIME NOT NULL DEFAULT GETDATE(),
+        CONSTRAINT FK_APP_CAMIONES_CHOFERES FOREIGN KEY (driver_id) REFERENCES RIP.APP_CHOFERES(id)
+    );
+    PRINT 'Tabla RIP.APP_CAMIONES creada.';
+END
 GO
 
-\-- Tabla de Destinos
+-- Tabla de Destinos
 IF OBJECT_ID('RIP.APP_DESTINOS', 'U') IS NULL
-CREATE TABLE RIP.APP_DESTINOS (
-id INT PRIMARY KEY IDENTITY(1,1),
-customer_id INT NOT NULL,
-name NVARCHAR(255) NOT NULL,
-address NVARCHAR(MAX) NULL,
-is_active BIT NOT NULL DEFAULT 1,
-created_at DATETIME DEFAULT GETDATE(),
-updated_at DATETIME DEFAULT GETDATE(),
-CONSTRAINT FK_APP_DESTINOS_CLIENTES FOREIGN KEY (customer_id) REFERENCES dbo.CLIENTES(CODCLIENTE)
-);
+BEGIN
+    CREATE TABLE RIP.APP_DESTINOS (
+        id INT PRIMARY KEY IDENTITY(1,1),
+        customer_id INT NOT NULL,
+        name NVARCHAR(255) NOT NULL,
+        address NVARCHAR(MAX) NULL,
+        is_active BIT NOT NULL DEFAULT 1,
+        created_at DATETIME DEFAULT GETDATE(),
+        updated_at DATETIME DEFAULT GETDATE(),
+        CONSTRAINT FK_APP_DESTINOS_CLIENTES FOREIGN KEY (customer_id) REFERENCES dbo.CLIENTES(CODCLIENTE)
+    );
+    PRINT 'Tabla RIP.APP_DESTINOS creada.';
+END
 GO
 
-\-- Tabla de Encabezados de Pedidos (Modificada)
+-- Tabla de Encabezados de Pedidos
 IF OBJECT_ID('RIP.APP_PEDIDOS', 'U') IS NULL
-CREATE TABLE RIP.APP_PEDIDOS (
-id INT IDENTITY(1,1) PRIMARY KEY,
-order_number AS 'ORD-' + RIGHT('00000000' + CAST(id AS VARCHAR(8)), 8) PERSISTED,
-customer_id INT NOT NULL,
-truck_id INT NOT NULL,
-destination_id INT NULL,
-status NVARCHAR(50) NOT NULL DEFAULT 'AWAITING_PAYMENT',
-notes NVARCHAR(MAX),
-created_by INT NOT NULL,
-created_at DATETIME NOT NULL DEFAULT GETDATE(),
-updated_at DATETIME NOT NULL DEFAULT GETDATE(),
-FOREIGN KEY (customer_id) REFERENCES dbo.CLIENTES(CODCLIENTE),
-FOREIGN KEY (truck_id) REFERENCES RIP.APP_CAMIONES(id),
-FOREIGN KEY (created_by) REFERENCES RIP.APP_USUARIOS(id),
-FOREIGN KEY (destination_id) REFERENCES RIP.APP_DESTINOS(id),
-CONSTRAINT CK_APP_PEDIDOS_status CHECK (status IN ('AWAITING_PAYMENT', 'PAID', 'PARTIALLY_DISPATCHED', 'DISPATCHED_COMPLETE', 'CANCELLED'))
-);
+BEGIN
+    CREATE TABLE RIP.APP_PEDIDOS (
+        id INT IDENTITY(1,1) PRIMARY KEY,
+        order_number AS 'ORD-' + RIGHT('00000000' + CAST(id AS VARCHAR(8)), 8) PERSISTED,
+        customer_id INT NOT NULL,
+        destination_id INT NULL,
+        status NVARCHAR(50) NOT NULL DEFAULT 'AWAITING_PAYMENT',
+        notes NVARCHAR(MAX),
+        created_by INT NOT NULL,
+        created_at DATETIME NOT NULL DEFAULT GETDATE(),
+        updated_at DATETIME NOT NULL DEFAULT GETDATE(),
+        FOREIGN KEY (customer_id) REFERENCES dbo.CLIENTES(CODCLIENTE),
+        FOREIGN KEY (created_by) REFERENCES RIP.APP_USUARIOS(id),
+        FOREIGN KEY (destination_id) REFERENCES RIP.APP_DESTINOS(id),
+        CONSTRAINT CK_APP_PEDIDOS_status CHECK (status IN ('AWAITING_PAYMENT', 'PAID', 'PARTIALLY_DISPATCHED', 'DISPATCHED_COMPLETE', 'CANCELLED'))
+    );
+    PRINT 'Tabla RIP.APP_PEDIDOS creada.';
+END
 ELSE
 BEGIN
-\-- Lógica para modificar la tabla si ya existe (como se hizo en el script de corrección)
-IF OBJECT_ID('CK_APP_PEDIDOS_status', 'C') IS NOT NULL ALTER TABLE RIP.APP_PEDIDOS DROP CONSTRAINT CK_APP_PEDIDOS_status;
-ALTER TABLE RIP.APP_PEDIDOS ADD CONSTRAINT CK_APP_PEDIDOS_status CHECK (status IN ('AWAITING_PAYMENT', 'PAID', 'PARTIALLY_DISPATCHED', 'DISPATCHED_COMPLETE', 'CANCELLED'));
+    -- CORRECCIÓN: Lógica mejorada para eliminar y recrear la restricción de forma segura.
+    IF EXISTS (SELECT 1 FROM sys.check_constraints WHERE name = 'CK_APP_PEDIDOS_status')
+    BEGIN
+        ALTER TABLE RIP.APP_PEDIDOS DROP CONSTRAINT CK_APP_PEDIDOS_status;
+    END
+    ALTER TABLE RIP.APP_PEDIDOS ADD CONSTRAINT CK_APP_PEDIDOS_status CHECK (status IN ('AWAITING_PAYMENT', 'PAID', 'PARTIALLY_DISPATCHED', 'DISPATCHED_COMPLETE', 'CANCELLED'));
+    PRINT 'Tabla RIP.APP_PEDIDOS actualizada.';
 END
 GO
 
-\-- Tabla de Líneas/Items de Pedidos (Modificada)
+-- Tabla de Líneas/Items de Pedidos
 IF OBJECT_ID('RIP.APP_PEDIDOS_ITEMS', 'U') IS NULL
-CREATE TABLE RIP.APP_PEDIDOS_ITEMS (
-id INT IDENTITY(1,1) PRIMARY KEY,
-order_id INT NOT NULL,
-product_id INT NOT NULL,
-quantity DECIMAL(18, 2) NOT NULL,
-price_per_unit DECIMAL(18, 2) NOT NULL,
-unit NVARCHAR(50) NULL,
-subtotal AS (quantity \* price_per_unit),
-FOREIGN KEY (order_id) REFERENCES RIP.APP_PEDIDOS(id),
-FOREIGN KEY (product_id) REFERENCES dbo.ARTICULOS(CODARTICULO)
-);
+BEGIN
+    CREATE TABLE RIP.APP_PEDIDOS_ITEMS (
+        id INT IDENTITY(1,1) PRIMARY KEY,
+        order_id INT NOT NULL,
+        product_id INT NOT NULL,
+        quantity DECIMAL(18, 2) NOT NULL,
+        price_per_unit DECIMAL(18, 2) NOT NULL,
+        unit NVARCHAR(50) NULL,
+        subtotal AS (quantity * price_per_unit),
+        FOREIGN KEY (order_id) REFERENCES RIP.APP_PEDIDOS(id) ON DELETE CASCADE,
+        FOREIGN KEY (product_id) REFERENCES dbo.ARTICULOS(CODARTICULO)
+    );
+    PRINT 'Tabla RIP.APP_PEDIDOS_ITEMS creada.';
+END
 ELSE
 BEGIN
-IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE Name = N'unit' AND Object_ID = Object_ID(N'RIP.APP_PEDIDOS_ITEMS'))
-BEGIN
-ALTER TABLE RIP.APP_PEDIDOS_ITEMS ADD unit NVARCHAR(50) NULL;
-END
+    IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE Name = N'unit' AND Object_ID = Object_ID(N'RIP.APP_PEDIDOS_ITEMS'))
+    BEGIN
+        ALTER TABLE RIP.APP_PEDIDOS_ITEMS ADD unit NVARCHAR(50) NULL;
+        PRINT 'Columna "unit" añadida a RIP.APP_PEDIDOS_ITEMS.';
+    END
 END
 GO
 
-\-- Tabla de Despachos
+-- Tabla de Despachos
 IF OBJECT_ID('RIP.APP_DESPACHOS', 'U') IS NULL
-CREATE TABLE RIP.APP_DESPACHOS (
-id INT IDENTITY(1,1) PRIMARY KEY,
-order_id INT NOT NULL,
-truck_id INT NULL, -- Columna añadida
-driver_id INT NULL, -- Columna añadida
-loaded_quantity DECIMAL(18, 2),
-loaded_by INT,
-loaded_at DATETIME,
-load_photo_url NVARCHAR(MAX) NULL,
-exited_by INT,
-exited_at DATETIME,
-exit_photo_url NVARCHAR(MAX) NULL,
-notes NVARCHAR(MAX),
-status NVARCHAR(50) NOT NULL DEFAULT 'PENDING',
-created_at DATETIME NOT NULL DEFAULT GETDATE(),
-updated_at DATETIME NOT NULL DEFAULT GETDATE(),
-FOREIGN KEY (order_id) REFERENCES RIP.APP_PEDIDOS(id),
-FOREIGN KEY (truck_id) REFERENCES RIP.APP_CAMIONES(id), -- Clave foránea para camiones
-FOREIGN KEY (driver_id) REFERENCES RIP.APP_CHOFERES(id), -- Clave foránea para choferes
-FOREIGN KEY (loaded_by) REFERENCES RIP.APP_USUARIOS(id),
-FOREIGN KEY (exited_by) REFERENCES RIP.APP_USUARIOS(id)
-);
+BEGIN
+    CREATE TABLE RIP.APP_DESPACHOS (
+        id INT IDENTITY(1,1) PRIMARY KEY,
+        order_id INT NOT NULL,
+        truck_id INT NULL,
+        driver_id INT NULL,
+        loaded_by INT,
+        loaded_at DATETIME,
+        load_photo_url NVARCHAR(MAX) NULL,
+        exited_by INT,
+        exited_at DATETIME,
+        exit_photo_url NVARCHAR(MAX) NULL,
+        notes NVARCHAR(MAX),
+        status NVARCHAR(50) NOT NULL DEFAULT 'PENDING',
+        created_at DATETIME NOT NULL DEFAULT GETDATE(),
+        updated_at DATETIME NOT NULL DEFAULT GETDATE(),
+        FOREIGN KEY (order_id) REFERENCES RIP.APP_PEDIDOS(id),
+        FOREIGN KEY (truck_id) REFERENCES RIP.APP_CAMIONES(id),
+        FOREIGN KEY (driver_id) REFERENCES RIP.APP_CHOFERES(id),
+        FOREIGN KEY (loaded_by) REFERENCES RIP.APP_USUARIOS(id),
+        FOREIGN KEY (exited_by) REFERENCES RIP.APP_USUARIOS(id)
+    );
+    PRINT 'Tabla RIP.APP_DESPACHOS creada.';
+END
 GO
 
-\-- Tabla de Detalle de Despachos (Nueva)
+-- Tabla de Detalle de Despachos
 IF OBJECT_ID('RIP.APP_DESPACHOS_ITEMS', 'U') IS NULL
-CREATE TABLE RIP.APP_DESPACHOS_ITEMS (
-id INT IDENTITY(1,1) PRIMARY KEY,
-despacho_id INT NOT NULL,
-pedido_item_id INT NOT NULL,
-dispatched_quantity DECIMAL(18, 2) NOT NULL,
-FOREIGN KEY (despacho_id) REFERENCES RIP.APP_DESPACHOS(id),
-FOREIGN KEY (pedido_item_id) REFERENCES RIP.APP_PEDIDOS_ITEMS(id)
-);
+BEGIN
+    CREATE TABLE RIP.APP_DESPACHOS_ITEMS (
+        id INT IDENTITY(1,1) PRIMARY KEY,
+        despacho_id INT NOT NULL,
+        pedido_item_id INT NOT NULL,
+        dispatched_quantity DECIMAL(18, 2) NOT NULL,
+        FOREIGN KEY (despacho_id) REFERENCES RIP.APP_DESPACHOS(id) ON DELETE CASCADE,
+        FOREIGN KEY (pedido_item_id) REFERENCES RIP.APP_PEDIDOS_ITEMS(id)
+    );
+    PRINT 'Tabla RIP.APP_DESPACHOS_ITEMS creada.';
+END
 GO
 
-\-- Tabla de Guías de Despacho (Nueva)
+-- Tabla de Guías de Despacho
 IF OBJECT_ID('RIP.APP_GUIAS_DESPACHO', 'U') IS NULL
-CREATE TABLE RIP.APP_GUIAS_DESPACHO (
-id INT IDENTITY(1,1) PRIMARY KEY,
-despacho_id INT NOT NULL UNIQUE,
-numero_guia NVARCHAR(100) NOT NULL,
-fecha_emision DATETIME NOT NULL DEFAULT GETDATE(),
-datos_transportista NVARCHAR(MAX),
-origen NVARCHAR(255),
-destino NVARCHAR(255),
-document_url NVARCHAR(MAX),
-created_by INT NOT NULL,
-created_at DATETIME NOT NULL DEFAULT GETDATE(),
-FOREIGN KEY (despacho_id) REFERENCES RIP.APP_DESPACHOS(id),
-FOREIGN KEY (created_by) REFERENCES RIP.APP_USUARIOS(id)
-);
+BEGIN
+    CREATE TABLE RIP.APP_GUIAS_DESPACHO (
+        id INT IDENTITY(1,1) PRIMARY KEY,
+        despacho_id INT NOT NULL UNIQUE,
+        numero_guia NVARCHAR(100) NOT NULL,
+        fecha_emision DATETIME NOT NULL DEFAULT GETDATE(),
+        datos_transportista NVARCHAR(MAX),
+        origen NVARCHAR(255),
+        destino NVARCHAR(255),
+        document_url NVARCHAR(MAX),
+        created_by INT NOT NULL,
+        created_at DATETIME NOT NULL DEFAULT GETDATE(),
+        FOREIGN KEY (despacho_id) REFERENCES RIP.APP_DESPACHOS(id),
+        FOREIGN KEY (created_by) REFERENCES RIP.APP_USUARIOS(id)
+    );
+    PRINT 'Tabla RIP.APP_GUIAS_DESPACHO creada.';
+END
 GO
 
-\-- 3. CREACIÓN DE VISTAS
-\-- Vista de Clientes
+-- Tabla de Unión Clientes-Choferes (Muchos a Muchos)
+IF OBJECT_ID('RIP.APP_CLIENTES_CHOFERES', 'U') IS NULL
+BEGIN
+    CREATE TABLE RIP.APP_CLIENTES_CHOFERES (
+        cliente_id INT NOT NULL,
+        chofer_id INT NOT NULL,
+        CONSTRAINT FK_CLIENTES_CHOFERES_CLIENTES FOREIGN KEY (cliente_id) REFERENCES dbo.CLIENTES(CODCLIENTE),
+        CONSTRAINT FK_CLIENTES_CHOFERES_CHOFERES FOREIGN KEY (chofer_id) REFERENCES RIP.APP_CHOFERES(id),
+        CONSTRAINT PK_APP_CLIENTES_CHOFERES PRIMARY KEY (cliente_id, chofer_id)
+    );
+    PRINT 'Tabla RIP.APP_CLIENTES_CHOFERES creada.';
+END
+GO
+
+-- Tabla de Unión Pedidos-Camiones (Muchos a Muchos)
+IF OBJECT_ID('RIP.APP_PEDIDOS_CAMIONES', 'U') IS NULL
+BEGIN
+    CREATE TABLE RIP.APP_PEDIDOS_CAMIONES (
+        pedido_id INT NOT NULL,
+        camion_id INT NOT NULL,
+        CONSTRAINT FK_PEDIDOS_CAMIONES_PEDIDOS FOREIGN KEY (pedido_id) REFERENCES RIP.APP_PEDIDOS(id) ON DELETE CASCADE,
+        CONSTRAINT FK_PEDIDOS_CAMIONES_CAMIONES FOREIGN KEY (camion_id) REFERENCES RIP.APP_CAMIONES(id) ON DELETE CASCADE,
+        CONSTRAINT PK_APP_PEDIDOS_CAMIONES PRIMARY KEY (pedido_id, camion_id)
+    );
+    PRINT 'Tabla RIP.APP_PEDIDOS_CAMIONES creada.';
+END
+GO
+
+-- Tabla de Unión Pedidos-Choferes (Muchos a Muchos)
+IF OBJECT_ID('RIP.APP_PEDIDOS_CHOFERES', 'U') IS NULL
+BEGIN
+    CREATE TABLE RIP.APP_PEDIDOS_CHOFERES (
+        pedido_id INT NOT NULL,
+        chofer_id INT NOT NULL,
+        CONSTRAINT FK_PEDIDOS_CHOFERES_PEDIDOS FOREIGN KEY (pedido_id) REFERENCES RIP.APP_PEDIDOS(id) ON DELETE CASCADE,
+        CONSTRAINT FK_PEDIDOS_CHOFERES_CHOFERES FOREIGN KEY (chofer_id) REFERENCES RIP.APP_CHOFERES(id) ON DELETE CASCADE,
+        CONSTRAINT PK_APP_PEDIDOS_CHOFERES PRIMARY KEY (pedido_id, chofer_id)
+    );
+    PRINT 'Tabla RIP.APP_PEDIDOS_CHOFERES creada.';
+END
+GO
+
+-- 3. CREACIÓN DE VISTAS
+
+-- Vista de Clientes
 CREATE OR ALTER VIEW RIP.VW_APP_CLIENTES AS
 SELECT
-CODCLIENTE AS id, NOMBRECLIENTE AS name, NIF20 AS rfc,
-DIRECCION1 AS address, TELEFONO1 AS phone, E_MAIL AS email,
-CASE WHEN DESCATALOGADO = 'F' THEN 1 ELSE 0 END AS is_active
+    CODCLIENTE AS id, NOMBRECLIENTE AS name, NIF20 AS rfc,
+    DIRECCION1 AS address, TELEFONO1 AS phone, E_MAIL AS email,
+    CASE WHEN DESCATALOGADO = 'F' THEN 1 ELSE 0 END AS is_active
 FROM
-dbo.CLIENTES;
+    dbo.CLIENTES;
 GO
 
-\-- Vista de Productos (Modificada)
+-- Vista de Productos
 CREATE OR ALTER VIEW RIP.VW_APP_PRODUCTOS AS
 WITH ULTIMOS_PRECIOS AS (
-SELECT
-L.CODARTICULO, L.PRECIO,
-ROW_NUMBER() OVER(PARTITION BY L.CODARTICULO ORDER BY C.FECHA DESC, C.NUMALBARAN DESC) AS RN
-FROM dbo.ALBVENTALIN L
-INNER JOIN dbo.ALBVENTACAB C ON L.NUMSERIE = C.NUMSERIE AND L.NUMALBARAN = C.NUMALBARAN AND L.N = C.N
-WHERE L.PRECIO \> 0
+    SELECT
+        L.CODARTICULO, L.PRECIO,
+        ROW_NUMBER() OVER(PARTITION BY L.CODARTICULO ORDER BY C.FECHA DESC, C.NUMALBARAN DESC) AS RN
+    FROM dbo.ALBVENTALIN L
+    INNER JOIN dbo.ALBVENTACAB C ON L.NUMSERIE = C.NUMSERIE AND L.NUMALBARAN = C.NUMALBARAN AND L.N = C.N
+    WHERE L.PRECIO > 0
 )
 SELECT
-A.CODARTICULO AS id,
-A.REFPROVEEDOR AS codigo,
-A.DESCRIPCION AS name,
-CASE
-WHEN A.UNIDADMEDIDA IN ('m3', 'Ton', 'kg') THEN 'GRANEL'
-WHEN A.UNIDADMEDIDA IN ('SACO', 'BOLSA', 'CUÑETE') THEN 'PAQUETE'
-WHEN A.FAMILIA LIKE '%SERVICIO%' THEN 'SERVICIO'
-ELSE 'UNIDAD'
-END AS sell_format,
-ISNULL(P.PRECIO, 0.00) AS price_per_unit,
-A.UNIDADMEDIDA AS unit,
-CASE WHEN A.DESCATALOGADO = 'F' THEN 1 ELSE 0 END AS is_active
+    A.CODARTICULO AS id,
+    A.REFPROVEEDOR AS codigo,
+    A.DESCRIPCION AS name,
+    CASE
+        WHEN A.UNIDADMEDIDA IN ('m3', 'Ton', 'kg') THEN 'GRANEL'
+        WHEN A.UNIDADMEDIDA IN ('SACO', 'BOLSA', 'CUÑETE') THEN 'PAQUETE'
+        WHEN A.FAMILIA LIKE '%SERVICIO%' THEN 'SERVICIO'
+        ELSE 'UNIDAD'
+    END AS sell_format,
+    ISNULL(P.PRECIO, 0.00) AS price_per_unit,
+    A.UNIDADMEDIDA AS unit,
+    CASE WHEN A.DESCATALOGADO = 'F' THEN 1 ELSE 0 END AS is_active
 FROM dbo.ARTICULOS A
 LEFT JOIN ULTIMOS_PRECIOS P ON A.CODARTICULO = P.CODARTICULO AND P.RN = 1;
 GO
 
-PRINT '¡Despliegue completado\! El esquema, las tablas y las vistas han sido creados/actualizados.';
--- =================================================================
--- SCRIPT CORREGIDO para eliminar la columna truck_id de APP_PEDIDOS
--- =================================================================
-
--- Paso 1: Eliminar la clave foránea (CONSTRAINT) usando el nombre del error.
-ALTER TABLE RIP.APP_PEDIDOS
-DROP CONSTRAINT FK**APP_PEDID**truck\_\_13739E55;
+-- CORRECCIÓN: Se añade la vista base de Pedidos que faltaba.
+CREATE OR ALTER VIEW RIP.VW_APP_PEDIDOS AS
+SELECT
+    p.id,
+    p.order_number,
+    p.customer_id,
+    c.NOMBRECLIENTE AS customer_name,
+    p.destination_id,
+    d.name AS destination_name,
+    p.status,
+    p.notes,
+    p.created_by,
+    u.name AS created_by_name,
+    p.created_at,
+    p.updated_at
+FROM
+    RIP.APP_PEDIDOS p
+JOIN
+    dbo.CLIENTES c ON p.customer_id = c.CODCLIENTE
+LEFT JOIN
+    RIP.APP_DESTINOS d ON p.destination_id = d.id
+LEFT JOIN
+    RIP.APP_USUARIOS u ON p.created_by = u.id;
 GO
 
--- Paso 2: Ahora que la columna está libre de dependencias, la eliminamos.
-ALTER TABLE RIP.APP_PEDIDOS
-DROP COLUMN truck_id;
-GO
-
-PRINT '¡Éxito! La clave foránea y la columna truck_id han sido eliminadas correctamente de RIP.APP_PEDIDOS.';
--- =================================================================
--- SCRIPT DE CORRECCIÓN FINAL Y ESTANDARIZACIÓN A INGLÉS
--- Propósito: Renombrar la columna de nombre del chofer a 'name'
--- y asegurar que la vista de despachos la use correctamente.
--- =================================================================
-
--- LOTE 1: ESTANDARIZAR LA COLUMNA DE NOMBRE A 'name'
--- =================================================================
--- Se renombra la columna 'nombre' a 'name' en la tabla de choferes
--- solo si la columna 'nombre' existe.
-IF EXISTS (SELECT 1 FROM sys.columns WHERE Name = N'nombre' AND Object_ID = Object_ID(N'RIP.APP_CHOFERES'))
-BEGIN
-EXEC sp_rename 'RIP.APP_CHOFERES.nombre', 'name', 'COLUMN';
-PRINT 'Éxito: La columna ''nombre'' ha sido renombrada a ''name'' en la tabla RIP.APP_CHOFERES.';
-END
-GO -- Fin del lote
-
--- LOTE 2: RECREAR LA VISTA DE DESPACHOS CON EL NOMBRE CORRECTO
--- =================================================================
--- Esta es la versión final que usa 'name' de la tabla de choferes.
+-- Vista de Despachos (Ahora funcionará al encontrar la vista VW_APP_PEDIDOS)
 CREATE OR ALTER VIEW RIP.VW_APP_DESPACHOS
 AS
 SELECT
@@ -430,118 +487,14 @@ SELECT
     d.load_photo_url AS loadPhoto,
     d.exited_at AS exitedAt,
     d.exit_photo_url AS exitPhoto,
-    -- CORRECCIÓN AQUÍ: Se cambió el alias de [order] a orderDetails
     (SELECT * FROM RIP.VW_APP_PEDIDOS p WHERE p.id = d.order_id FOR JSON PATH, WITHOUT_ARRAY_WRAPPER) AS orderDetails,
-    
-    -- JSON para el camión (truck)
     (SELECT t.id, t.placa, t.brand, t.model, t.capacity FROM RIP.APP_CAMIONES t WHERE t.id = d.truck_id FOR JSON PATH, WITHOUT_ARRAY_WRAPPER) AS truck,
-    
-    -- JSON para el conductor (driver)
     (SELECT dr.id, dr.name, dr.docId FROM RIP.APP_CHOFERES dr WHERE dr.id = d.driver_id FOR JSON PATH, WITHOUT_ARRAY_WRAPPER) AS driver
 FROM
     RIP.APP_DESPACHOS d;
 GO
 
-PRINT 'Vista RIP.VW_APP_DESPACHOS creada/actualizada con el nombre de columna estandarizado.';
-PRINT '¡Listo! La base de datos está ahora completamente alineada y estandarizada.';
--- LOTE 1: CREAR LA TABLA DE UNIÓN PARA LA RELACIÓN MUCHOS-A-MUCHOS
--- =================================================================
--- Propósito: Crear la tabla que permite que un chofer esté asociado a múltiples clientes.
-IF OBJECT_ID('RIP.APP_CLIENTES_CHOFERES', 'U') IS NULL
-BEGIN
-    CREATE TABLE RIP.APP_CLIENTES_CHOFERES (
-        -- Columna para el ID del cliente, apunta a la tabla original.
-        cliente_id INT NOT NULL,
-        -- Columna para el ID del chofer de nuestra aplicación.
-        chofer_id INT NOT NULL,
-
-        -- Llave foránea que apunta a la tabla REAL de clientes (dbo.CLIENTES).
-        CONSTRAINT FK_CLIENTES_CHOFERES_CLIENTES FOREIGN KEY (cliente_id) REFERENCES dbo.CLIENTES(CODCLIENTE),
-
-        -- Llave foránea que apunta a la tabla de choferes de la aplicación.
-        CONSTRAINT FK_CLIENTES_CHOFERES_CHOFERES FOREIGN KEY (chofer_id) REFERENCES RIP.APP_CHOFERES(id),
-
-        -- Llave primaria compuesta para asegurar que no se dupliquen las relaciones.
-        -- (Un chofer no puede estar asignado dos veces al mismo cliente).
-        CONSTRAINT PK_APP_CLIENTES_CHOFERES PRIMARY KEY (cliente_id, chofer_id)
-    );
-    PRINT '¡Éxito! La tabla RIP.APP_CLIENTES_CHOFERES ha sido creada.';
-END
-ELSE
-BEGIN
-    PRINT 'Información: La tabla RIP.APP_CLIENTES_CHOFERES ya existe.';
-END
-GO -- Fin del lote
-
--- =================================================================
--- SCRIPT DE MODIFICACIÓN: AÑADIR RELACIÓN M-M PARA CAMIONES Y CHOFERES POR ORDEN
--- Propósito: Permitir pre-seleccionar múltiples camiones y choferes al crear una orden.
--- =================================================================
-
--- LOTE 1: TABLA DE UNIÓN PARA ÓRDENES Y CAMIONES
--- =================================================================
--- Propósito: Almacena los camiones autorizados para una orden específica.
-IF OBJECT_ID('RIP.APP_PEDIDOS_CAMIONES', 'U') IS NULL
-BEGIN
-    CREATE TABLE RIP.APP_PEDIDOS_CAMIONES (
-        -- Columna para el ID de la orden.
-        pedido_id INT NOT NULL,
-        -- Columna para el ID del camión.
-        camion_id INT NOT NULL,
-
-        -- Llave foránea que apunta a la tabla de órdenes.
-        CONSTRAINT FK_PEDIDOS_CAMIONES_PEDIDOS FOREIGN KEY (pedido_id) REFERENCES RIP.APP_PEDIDOS(id) ON DELETE CASCADE,
-
-        -- Llave foránea que apunta a la tabla de camiones.
-        CONSTRAINT FK_PEDIDOS_CAMIONES_CAMIONES FOREIGN KEY (camion_id) REFERENCES RIP.APP_CAMIONES(id) ON DELETE CASCADE,
-
-        -- Llave primaria compuesta para asegurar que no se dupliquen las relaciones.
-        -- (Un camión no puede estar asignado dos veces a la misma orden).
-        CONSTRAINT PK_APP_PEDIDOS_CAMIONES PRIMARY KEY (pedido_id, camion_id)
-    );
-    PRINT '¡Éxito! La tabla RIP.APP_PEDIDOS_CAMIONES ha sido creada.';
-END
-ELSE
-BEGIN
-    PRINT 'Información: La tabla RIP.APP_PEDIDOS_CAMIONES ya existe.';
-END
-GO -- Fin del lote
-
-
--- LOTE 2: TABLA DE UNIÓN PARA ÓRDENES Y CHOFERES
--- =================================================================
--- Propósito: Almacena los choferes autorizados para una orden específica.
-IF OBJECT_ID('RIP.APP_PEDIDOS_CHOFERES', 'U') IS NULL
-BEGIN
-    CREATE TABLE RIP.APP_PEDIDOS_CHOFERES (
-        -- Columna para el ID de la orden.
-        pedido_id INT NOT NULL,
-        -- Columna para el ID del chofer.
-        chofer_id INT NOT NULL,
-
-        -- Llave foránea que apunta a la tabla de órdenes.
-        CONSTRAINT FK_PEDIDOS_CHOFERES_PEDIDOS FOREIGN KEY (pedido_id) REFERENCES RIP.APP_PEDIDOS(id) ON DELETE CASCADE,
-
-        -- Llave foránea que apunta a la tabla de choferes.
-        CONSTRAINT FK_PEDIDOS_CHOFERES_CHOFERES FOREIGN KEY (chofer_id) REFERENCES RIP.APP_CHOFERES(id) ON DELETE CASCADE,
-
-        -- Llave primaria compuesta para asegurar que no se dupliquen las relaciones.
-        CONSTRAINT PK_APP_PEDIDOS_CHOFERES PRIMARY KEY (pedido_id, chofer_id)
-    );
-    PRINT '¡Éxito! La tabla RIP.APP_PEDIDOS_CHOFERES ha sido creada.';
-END
-ELSE
-BEGIN
-    PRINT 'Información: La tabla RIP.APP_PEDIDOS_CHOFERES ya existe.';
-END
-GO -- Fin del lote
-
-PRINT '¡Modificación completada! Las tablas para asociar camiones y choferes a las órdenes están listas.';
--- =================================================================
--- VISTA PARA OBTENER DETALLES DE LA ORDEN CON TRANSPORTE AUTORIZADO
--- Propósito: Devuelve los datos de una orden y anida en formato JSON
--- los camiones y choferes autorizados para la misma.
--- =================================================================
+-- Vista de Pedidos con Transporte Autorizado
 CREATE OR ALTER VIEW RIP.VW_APP_PEDIDOS_CON_TRANSPORTE
 AS
 SELECT
@@ -551,24 +504,17 @@ SELECT
     p.customer_id,
     c.NOMBRECLIENTE as customer_name,
     p.created_at,
-    -- Subconsulta para obtener los camiones autorizados como un array JSON
     (
         SELECT
-            cam.id,
-            cam.placa,
-            cam.brand,
-            cam.model
+            cam.id, cam.placa, cam.brand, cam.model
         FROM RIP.APP_PEDIDOS_CAMIONES pc
         JOIN RIP.APP_CAMIONES cam ON pc.camion_id = cam.id
         WHERE pc.pedido_id = p.id
         FOR JSON PATH
     ) AS authorized_trucks,
-    -- Subconsulta para obtener los choferes autorizados como un array JSON
     (
         SELECT
-            chof.id,
-            chof.name,
-            chof.docId
+            chof.id, chof.name, chof.docId
         FROM RIP.APP_PEDIDOS_CHOFERES pch
         JOIN RIP.APP_CHOFERES chof ON pch.chofer_id = chof.id
         WHERE pch.pedido_id = p.id
@@ -580,4 +526,4 @@ JOIN
     dbo.CLIENTES c ON p.customer_id = c.CODCLIENTE;
 GO
 
-PRINT '¡Vista RIP.VW_APP_PEDIDOS_CON_TRANSPORTE creada con éxito!';
+PRINT '¡Despliegue completado! El esquema, las tablas y las vistas han sido creados/actualizados.';
