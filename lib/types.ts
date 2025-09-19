@@ -117,6 +117,8 @@ export interface Order {
   notes?: string;
   items: OrderItem[];
   deliveries?: Delivery[];
+  trucks?: Truck[];
+  drivers?: Driver[]; 
 }
 
 export interface Delivery {

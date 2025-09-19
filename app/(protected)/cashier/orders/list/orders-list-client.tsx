@@ -1,30 +1,13 @@
+// app/(protected)/cashier/orders/list/orders-list-client.tsx
 "use client";
 
 import { useState, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-  CardContent,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import type {
-  Order,
-  OrderProgress,
-  OrderItem,
-  DeliveryItem,
-} from "@/lib/types";
-import {
-  Search,
-  Eye,
-  FileText,
-  Calendar,
-  User,
-  Truck,
-  Package,
-} from "lucide-react";
+import type { Order, OrderProgress, OrderItem, DeliveryItem } from "@/lib/types";
+import { Search, FileText, Calendar, User, Truck, Package, Pencil } from "lucide-react";
 import Link from "next/link";
 import { PageHeader } from "@/components/page-header";
 import { AnimatedCard } from "@/components/ui/animated-card";
@@ -92,48 +75,31 @@ const calculateOrderProgress = (order: Order): OrderProgress => {
   const completedTrips =
     order.deliveries?.filter((d) => d.estado === "EXITED").length || 0;
   const totalTrips = order.deliveries?.length || 0;
-
-  return {
-    order_id: String(order.id),
-    totalItems,
-    dispatchedItems,
-    pendingItems: totalItems - dispatchedItems,
-    completedTrips,
-    totalTrips,
-    status: order.status,
-  };
+  return { order_id: String(order.id), totalItems, dispatchedItems, pendingItems: totalItems - dispatchedItems, completedTrips, totalTrips, status: order.status };
 };
 
-export function OrdersListClientUI({
-  initialOrders,
-}: {
-  initialOrders: Order[];
-}) {
+export function OrdersListClientUI({ initialOrders }: { initialOrders: Order[] }) {
   const [searchTerm, setSearchTerm] = useState("");
-  const [orders] = useState<Order[]>(initialOrders);
 
   const filteredOrders = useMemo(() => {
-    if (!searchTerm) return orders;
-    return orders.filter((order) => {
-      const q = searchTerm.toLowerCase();
-      const orderNumber = order.order_number?.toLowerCase() ?? "";
-      const clientName = order.client?.name?.toLowerCase() ?? "";
-      return orderNumber.includes(q) || clientName.includes(q);
-    });
-  }, [orders, searchTerm]);
+    if (!searchTerm) return initialOrders;
+    const q = searchTerm.toLowerCase();
+    return initialOrders.filter(order =>
+      (order.order_number?.toLowerCase() ?? "").includes(q) ||
+      (order.client?.name?.toLowerCase() ?? "").includes(q)
+    );
+  }, [initialOrders, searchTerm]);
 
   return (
     <div className="space-y-6">
       <PageHeader
         title="Pedidos"
-        description="Consulta y gestiona los pedidos con seguimiento de múltiples viajes"
+        description="Consulta y gestiona los pedidos"
         actions={
           <Button asChild>
-            <Link
-              href="/cashier/orders"
-              className="flex items-center space-x-2"
-            >
-              <FileText className="h-4 w-4" />
+            {/* El enlace para "Nuevo Pedido" ahora apunta a /orders/new */}
+            <Link href="/cashier/orders/new">
+              <FileText className="h-4 w-4 mr-2" />
               <span>Nuevo Pedido</span>
             </Link>
           </Button>
@@ -143,7 +109,7 @@ export function OrdersListClientUI({
       <AnimatedCard>
         <CardContent className="pt-6">
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground h-4 w-4" />
             <Input
               placeholder="Buscar por número de pedido o cliente…"
               value={searchTerm}
@@ -158,96 +124,49 @@ export function OrdersListClientUI({
         <EmptyState
           icon={<FileText className="h-12 w-12" />}
           title="No se encontraron pedidos"
-          description={
-            searchTerm
-              ? "Intenta con otros términos de búsqueda."
-              : "Crea un nuevo pedido para comenzar."
-          }
+          description={searchTerm ? "Intenta con otros términos de búsqueda." : "Crea un nuevo pedido para comenzar."}
         />
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {filteredOrders.map((order, index) => {
-            const createdAt = new Date(order.created_at as unknown as string);
             const statusConfig = getStatusConfig(order.status);
             const progress = calculateOrderProgress(order);
-            const progressPercentage =
-              progress.totalItems > 0
-                ? (progress.dispatchedItems / progress.totalItems) * 100
-                : 0;
+            const progressPercentage = progress.totalItems > 0 ? (progress.dispatchedItems / progress.totalItems) * 100 : 0;
 
             return (
-              <AnimatedCard
-                key={order.id}
-                hoverEffect="lift"
-                animateIn
-                delay={index * 50}
-                className="flex flex-col"
-              >
+              <AnimatedCard key={order.id} hoverEffect="lift" animateIn delay={index * 50} className="flex flex-col">
                 <CardHeader>
                   <div className="flex justify-between items-start">
-                    <div>
-                      <CardTitle className="text-lg font-bold bg-gradient-to-r from-foreground to-muted-foreground bg-clip-text text-transparent">
-                        {order.order_number}
-                      </CardTitle>
-                    </div>
-                    <Badge className={statusConfig.color}>
-                      {statusConfig.label}
-                    </Badge>
+                    <CardTitle className="text-lg">{order.order_number}</CardTitle>
+                    <Badge className={statusConfig.color}>{statusConfig.label}</Badge>
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-3 flex-grow">
-                  <div className="flex items-center space-x-2">
-                    <User className="h-4 w-4 text-muted-foreground" />
-                    <span className="font-medium">{order.client?.name}</span>
-                  </div>
-                  <div className="flex items-center space-x-2 text-sm text-muted-foreground">
-                    <Calendar className="h-4 w-4" />
-                    <span>
-                      {createdAt.toLocaleDateString("es-VE", {
-                        year: "numeric",
-                        month: "long",
-                        day: "numeric",
-                      })}
-                    </span>
-                  </div>
-
+                  <div className="flex items-center space-x-2"><User className="h-4 w-4 text-muted-foreground" /> <span className="font-medium">{order.client?.name}</span></div>
+                  <div className="flex items-center space-x-2 text-sm text-muted-foreground"><Calendar className="h-4 w-4" /> <span>{new Date(order.created_at).toLocaleDateString("es-VE")}</span></div>
                   {progress.totalTrips > 0 && (
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between text-sm">
-                        <div className="flex items-center space-x-1">
-                          <Truck className="h-3 w-3 text-muted-foreground" />
-                          <span className="text-muted-foreground">Viajes:</span>
+                      <div className="space-y-2 pt-2">
+                        <div className="flex items-center justify-between text-sm">
+                          <div className="flex items-center space-x-1.5"><Truck className="h-4 w-4 text-muted-foreground" /><span>Viajes:</span></div>
+                          <span className="font-medium">{progress.completedTrips}/{progress.totalTrips}</span>
                         </div>
-                        <span className="font-medium">
-                          {progress.completedTrips}/{progress.totalTrips}
-                        </span>
-                      </div>
-                      <div className="flex items-center justify-between text-sm">
-                        <div className="flex items-center space-x-1">
-                          <Package className="h-3 w-3 text-muted-foreground" />
-                          <span className="text-muted-foreground">
-                            Despachado:
-                          </span>
+                        <div className="flex items-center justify-between text-sm">
+                          <div className="flex items-center space-x-1.5"><Package className="h-4 w-4 text-muted-foreground" /><span>Despachado:</span></div>
+                          <span className="font-medium">{progress.dispatchedItems.toFixed(1)}/{progress.totalItems.toFixed(1)}</span>
                         </div>
-                        <span className="font-medium">
-                          {progress.dispatchedItems.toFixed(1)}/
-                          {progress.totalItems.toFixed(1)}
-                        </span>
+                        <Progress value={progressPercentage} className="h-2" />
                       </div>
-                      <Progress value={progressPercentage} className="h-2" />
-                    </div>
-                  )}
-
-                  {order.notes && (
-                    <div className="mt-2 p-2 bg-muted/30 rounded-md text-xs text-muted-foreground">
-                      <strong>Notas:</strong> {order.notes}
-                    </div>
-                  )}
+                    )}
                 </CardContent>
                 <CardFooter className="pt-4 border-t flex justify-between items-center">
-                  <p className="text-xl font-bold text-foreground">
-                    ${Number(order.total ?? 0).toFixed(2)}
-                  </p>
+                  <p className="text-xl font-bold">${Number(order.total ?? 0).toFixed(2)}</p>
+                  {/* El enlace para "Editar" ahora apunta a /orders/[id] */}
+                  <Button asChild variant="outline" size="sm">
+                    <Link href={`/cashier/orders/${order.id}`}>
+                      <Pencil className="h-4 w-4 mr-2" />
+                      Editar
+                    </Link>
+                  </Button>
                 </CardFooter>
               </AnimatedCard>
             );
