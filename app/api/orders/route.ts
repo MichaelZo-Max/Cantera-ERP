@@ -144,6 +144,15 @@ export async function POST(req: Request) {
       ]);
     }
 
+    // **CAMBIO:** Obtener el order_number para devolverlo en la respuesta.
+    const getOrderNumberSql = `
+      SELECT order_number FROM RIP.APP_PEDIDOS WHERE id = @order_id;
+    `;
+    const orderNumberResult = await executeQuery(getOrderNumberSql, [
+      { name: "order_id", type: TYPES.Int, value: newOrderId },
+    ]);
+    
+    const newOrderNumber = orderNumberResult[0]?.order_number;
 
     revalidateTag("orders");
 
@@ -151,6 +160,7 @@ export async function POST(req: Request) {
       {
         message: "Orden creada con éxito",
         order_id: newOrderId,
+        order_number: newOrderNumber, // <-- **CAMBIO:** Se añade el número de orden a la respuesta
       },
       { status: 201 }
     );
