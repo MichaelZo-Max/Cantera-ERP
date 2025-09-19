@@ -18,7 +18,7 @@ export type DeliveryStatus =
 // --- Entidades Principales (Alineadas con la Base de Datos) ---
 
 export interface User {
-  id: string;
+  id: Number;
   email: string;
   name: string;
   role: UserRole;

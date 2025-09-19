@@ -11,7 +11,6 @@ import { createOrderSchema } from "@/lib/validations";
  */
 export async function GET() {
   try {
-
     const sql = `
       SELECT
           p.id,
@@ -89,7 +88,7 @@ export async function POST(req: Request) {
         OUTPUT INSERTED.id
         VALUES (@customer_id, @destination_id, 'PAID', @created_by);
     `;
-
+    
     const headerResult = await executeQuery(orderHeaderSql, [
       { name: "customer_id", type: TYPES.Int, value: customer_id },
       { name: "destination_id", type: TYPES.Int, value: destination_id },
@@ -115,7 +114,11 @@ export async function POST(req: Request) {
         { name: "product_id", type: TYPES.Int, value: item.product_id },
         { name: "quantity", type: TYPES.Decimal, value: item.quantity },
         { name: "unit", type: TYPES.NVarChar, value: item.unit },
-        { name: "price_per_unit", type: TYPES.Decimal, value: item.price_per_unit },
+        {
+          name: "price_per_unit",
+          type: TYPES.Decimal,
+          value: item.price_per_unit,
+        },
       ]);
     }
 
@@ -151,7 +154,7 @@ export async function POST(req: Request) {
     const orderNumberResult = await executeQuery(getOrderNumberSql, [
       { name: "order_id", type: TYPES.Int, value: newOrderId },
     ]);
-    
+
     const newOrderNumber = orderNumberResult[0]?.order_number;
 
     revalidateTag("orders");

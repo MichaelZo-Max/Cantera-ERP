@@ -22,7 +22,7 @@ export async function getUser(): Promise<{ user: User | null }> {
     // Aseguramos que los tipos del payload coincidan con el tipo User.
     const user: User = {
       // Convertimos el ID a string para que coincida con el tipo
-      id: String(payload.id),
+      id: Number(payload.id),
       email: payload.email as string,
       name: payload.name as string, // Asegúrate de que tu token incluya el name
       // Hacemos un type assertion a UserRole para que coincida
