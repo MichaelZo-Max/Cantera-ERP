@@ -472,3 +472,68 @@ BEGIN
     PRINT 'Información: La tabla RIP.APP_CLIENTES_CHOFERES ya existe.';
 END
 GO -- Fin del lote
+
+-- =================================================================
+-- SCRIPT DE MODIFICACIÓN: AÑADIR RELACIÓN M-M PARA CAMIONES Y CHOFERES POR ORDEN
+-- Propósito: Permitir pre-seleccionar múltiples camiones y choferes al crear una orden.
+-- =================================================================
+
+-- LOTE 1: TABLA DE UNIÓN PARA ÓRDENES Y CAMIONES
+-- =================================================================
+-- Propósito: Almacena los camiones autorizados para una orden específica.
+IF OBJECT_ID('RIP.APP_PEDIDOS_CAMIONES', 'U') IS NULL
+BEGIN
+    CREATE TABLE RIP.APP_PEDIDOS_CAMIONES (
+        -- Columna para el ID de la orden.
+        pedido_id INT NOT NULL,
+        -- Columna para el ID del camión.
+        camion_id INT NOT NULL,
+
+        -- Llave foránea que apunta a la tabla de órdenes.
+        CONSTRAINT FK_PEDIDOS_CAMIONES_PEDIDOS FOREIGN KEY (pedido_id) REFERENCES RIP.APP_PEDIDOS(id) ON DELETE CASCADE,
+
+        -- Llave foránea que apunta a la tabla de camiones.
+        CONSTRAINT FK_PEDIDOS_CAMIONES_CAMIONES FOREIGN KEY (camion_id) REFERENCES RIP.APP_CAMIONES(id) ON DELETE CASCADE,
+
+        -- Llave primaria compuesta para asegurar que no se dupliquen las relaciones.
+        -- (Un camión no puede estar asignado dos veces a la misma orden).
+        CONSTRAINT PK_APP_PEDIDOS_CAMIONES PRIMARY KEY (pedido_id, camion_id)
+    );
+    PRINT '¡Éxito! La tabla RIP.APP_PEDIDOS_CAMIONES ha sido creada.';
+END
+ELSE
+BEGIN
+    PRINT 'Información: La tabla RIP.APP_PEDIDOS_CAMIONES ya existe.';
+END
+GO -- Fin del lote
+
+
+-- LOTE 2: TABLA DE UNIÓN PARA ÓRDENES Y CHOFERES
+-- =================================================================
+-- Propósito: Almacena los choferes autorizados para una orden específica.
+IF OBJECT_ID('RIP.APP_PEDIDOS_CHOFERES', 'U') IS NULL
+BEGIN
+    CREATE TABLE RIP.APP_PEDIDOS_CHOFERES (
+        -- Columna para el ID de la orden.
+        pedido_id INT NOT NULL,
+        -- Columna para el ID del chofer.
+        chofer_id INT NOT NULL,
+
+        -- Llave foránea que apunta a la tabla de órdenes.
+        CONSTRAINT FK_PEDIDOS_CHOFERES_PEDIDOS FOREIGN KEY (pedido_id) REFERENCES RIP.APP_PEDIDOS(id) ON DELETE CASCADE,
+
+        -- Llave foránea que apunta a la tabla de choferes.
+        CONSTRAINT FK_PEDIDOS_CHOFERES_CHOFERES FOREIGN KEY (chofer_id) REFERENCES RIP.APP_CHOFERES(id) ON DELETE CASCADE,
+
+        -- Llave primaria compuesta para asegurar que no se dupliquen las relaciones.
+        CONSTRAINT PK_APP_PEDIDOS_CHOFERES PRIMARY KEY (pedido_id, chofer_id)
+    );
+    PRINT '¡Éxito! La tabla RIP.APP_PEDIDOS_CHOFERES ha sido creada.';
+END
+ELSE
+BEGIN
+    PRINT 'Información: La tabla RIP.APP_PEDIDOS_CHOFERES ya existe.';
+END
+GO -- Fin del lote
+
+PRINT '¡Modificación completada! Las tablas para asociar camiones y choferes a las órdenes están listas.';

@@ -33,20 +33,26 @@ export const createOrderItemSchema = z.object({
  * Sincronizado con los campos que la API route realmente utiliza.
  */
 export const createOrderSchema = z.object({
-  customer_id: z
-    .number({
-      required_error: "El cliente es requerido.",
-    })
-    .int()
-    .positive("El ID de cliente debe ser un entero positivo."),
-
-  total: z.number().nonnegative("El total no puede ser negativo."),
-
+  customer_id: z.number().int().positive("El cliente es requerido."),
   destination_id: z.number().int().positive().nullable().optional(),
-
   items: z
-    .array(createOrderItemSchema)
-    .min(1, "El pedido debe tener al menos un producto."),
+    .array(
+      z.object({
+        product_id: z.number().int().positive(),
+        quantity: z.number().positive("La cantidad debe ser mayor a cero."),
+        price_per_unit: z.number().nonnegative(),
+        unit: z.string().min(1, "La unidad es requerida."),
+      })
+    )
+    .min(1, "El pedido debe tener al menos un item."),
+  total: z.number().nonnegative(),
+  // 👇 AÑADIR ESTAS LÍNEAS
+  truck_ids: z
+    .array(z.number().int().positive())
+    .min(1, "Debes seleccionar al menos un camión."),
+  driver_ids: z
+    .array(z.number().int().positive())
+    .min(1, "Debes seleccionar al menos un chofer."),
 });
 
 /**

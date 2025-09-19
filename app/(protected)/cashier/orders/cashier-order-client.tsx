@@ -26,12 +26,14 @@ import {
   Calculator,
   CreditCard,
   ShoppingCart,
-  MapPin,
+  Truck, // Ícono de camión
+  User, // Ícono de usuario/chofer
   Package,
   ListOrdered,
 } from "lucide-react";
 import { toast } from "sonner";
-import type { Client, Product, UnitBase, Destination } from "@/lib/types";
+// 👇 1. Importa los tipos 'Truck' y 'Driver'
+import type { Client, Product, UnitBase, Destination, Truck as TruckType, Driver } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { AnimatedCard } from "@/components/ui/animated-card";
@@ -47,14 +49,19 @@ interface OrderItem {
   subtotal: number;
 }
 
+// 👇 2. Actualiza las props para recibir los nuevos catálogos
 export function CashierOrderClientUI({
   initialClients,
   initialProducts,
   initialDestinations,
+  initialTrucks,
+  initialDrivers,
 }: {
   initialClients: Client[];
   initialProducts: Product[];
   initialDestinations: Destination[];
+  initialTrucks: TruckType[];
+  initialDrivers: Driver[];
 }) {
   const router = useRouter();
 
@@ -62,12 +69,20 @@ export function CashierOrderClientUI({
   const [clients] = useState<Client[]>(initialClients);
   const [products] = useState<Product[]>(initialProducts);
   const [destinations] = useState<Destination[]>(initialDestinations);
+  // 👇 3. Añade estados para camiones y choferes
+  const [trucks] = useState<TruckType[]>(initialTrucks);
+  const [drivers] = useState<Driver[]>(initialDrivers);
+
 
   // Estados para la selección
   const [selectedcustomer_id, setSelectedcustomer_id] = useState<string>("");
   const [selectedDestinationId, setSelectedDestinationId] = useState<
     string | undefined
   >();
+  // 👇 4. Añade estados para los camiones y choferes seleccionados (permitiendo múltiple)
+  const [selectedTruckIds, setSelectedTruckIds] = useState<string[]>([]);
+  const [selectedDriverIds, setSelectedDriverIds] = useState<string[]>([]);
+
 
   // Estados para el constructor de items
   const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
@@ -128,11 +143,16 @@ export function CashierOrderClientUI({
     [products]
   );
 
-  // Lógica de envío
+  // 👇 5. Lógica de envío actualizada
   const handleCreateOrder = useCallback(async () => {
-    if (!selectedcustomer_id || orderItems.length === 0) {
+    if (
+      !selectedcustomer_id ||
+      orderItems.length === 0 ||
+      selectedTruckIds.length === 0 ||
+      selectedDriverIds.length === 0
+    ) {
       toast.error(
-        "Por favor, completa todos los campos requeridos: Cliente y al menos un producto."
+        "Completa todos los campos: Cliente, al menos un producto, un camión y un chofer."
       );
       return;
     }
@@ -152,6 +172,9 @@ export function CashierOrderClientUI({
           unit: item.product.unit || "UNIDAD",
         })),
         total: total,
+        // Envía los arrays de IDs
+        truck_ids: selectedTruckIds.map(id => parseInt(id, 10)),
+        driver_ids: selectedDriverIds.map(id => parseInt(id, 10)),
       };
 
       const res = await fetch("/api/orders", {
@@ -179,12 +202,18 @@ export function CashierOrderClientUI({
     } finally {
       setIsSubmitting(false);
     }
-  }, [selectedcustomer_id, selectedDestinationId, orderItems, total, router]);
+  }, [selectedcustomer_id, selectedDestinationId, orderItems, total, router, selectedTruckIds, selectedDriverIds]);
 
+  // 👇 6. Condición de envío actualizada
   const canSubmit = useMemo(
-    () => !!selectedcustomer_id && orderItems.length > 0,
-    [selectedcustomer_id, orderItems]
+    () =>
+      !!selectedcustomer_id &&
+      orderItems.length > 0 &&
+      selectedTruckIds.length > 0 &&
+      selectedDriverIds.length > 0,
+    [selectedcustomer_id, orderItems, selectedTruckIds, selectedDriverIds]
   );
+
 
   return (
     <div className="max-w-7xl mx-auto space-y-6">
@@ -234,6 +263,49 @@ export function CashierOrderClientUI({
                     options={filteredDestinations.map((dest) => ({
                       value: dest.id.toString(),
                       label: dest.name,
+                    }))}
+                  />
+                </div>
+              </div>
+            </CardContent>
+          </AnimatedCard>
+
+          {/* 👇 7. Nueva Tarjeta para Camiones y Choferes */}
+          <AnimatedCard>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Truck className="text-primary" />
+                Autorización de Transporte
+              </CardTitle>
+              <CardDescription>
+                Selecciona los camiones y choferes autorizados para este pedido.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Camiones Autorizados *</Label>
+                  <SearchableSelect
+                    isMulti // Habilita la selección múltiple
+                    value={selectedTruckIds}
+                    onChange={setSelectedTruckIds}
+                    placeholder="Selecciona uno o más camiones..."
+                    options={trucks.map((truck) => ({
+                      value: truck.id.toString(),
+                      label: `${truck.placa} (${truck.brand || 'N/A'})`,
+                    }))}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Choferes Autorizados *</Label>
+                  <SearchableSelect
+                    isMulti // Habilita la selección múltiple
+                    value={selectedDriverIds}
+                    onChange={setSelectedDriverIds}
+                    placeholder="Selecciona uno o más choferes..."
+                    options={drivers.map((driver) => ({
+                      value: driver.id.toString(),
+                      label: driver.name,
                     }))}
                   />
                 </div>

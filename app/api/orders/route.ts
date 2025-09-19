@@ -54,7 +54,7 @@ export async function GET() {
 
 /**
  * @route   POST /api/orders
- * @desc    Crear un nuevo pedido (sin asignación de camión).
+ * @desc    Crear un nuevo pedido y asociar camiones/choferes.
  * @access  Private
  */
 export async function POST(req: Request) {
@@ -80,18 +80,19 @@ export async function POST(req: Request) {
       );
     }
 
-    // Ahora, gracias al cambio en validations.ts, 'total' será reconocido aquí
-    const { customer_id, items, total } = validation.data;
+    // 👇 1. Extrae los nuevos arrays del cuerpo validado
+    const { customer_id, destination_id, items, total, truck_ids, driver_ids } =
+      validation.data;
 
     const orderHeaderSql = `
-        INSERT INTO RIP.APP_PEDIDOS (customer_id, total, status, created_by)
+        INSERT INTO RIP.APP_PEDIDOS (customer_id, destination_id, status, created_by)
         OUTPUT INSERTED.id
-        VALUES (@customer_id, @total, 'PAID', @created_by);
+        VALUES (@customer_id, @destination_id, 'PAID', @created_by);
     `;
 
     const headerResult = await executeQuery(orderHeaderSql, [
       { name: "customer_id", type: TYPES.Int, value: customer_id },
-      { name: "total", type: TYPES.Decimal, value: total },
+      { name: "destination_id", type: TYPES.Int, value: destination_id },
       { name: "created_by", type: TYPES.Int, value: user.id },
     ]);
 
@@ -103,6 +104,7 @@ export async function POST(req: Request) {
 
     const newOrderId = headerResult[0].id;
 
+    // Insertar los items del pedido (esto no cambia)
     for (const item of items) {
       const itemSql = `
           INSERT INTO RIP.APP_PEDIDOS_ITEMS (order_id, product_id, quantity, unit, price_per_unit)
@@ -113,13 +115,35 @@ export async function POST(req: Request) {
         { name: "product_id", type: TYPES.Int, value: item.product_id },
         { name: "quantity", type: TYPES.Decimal, value: item.quantity },
         { name: "unit", type: TYPES.NVarChar, value: item.unit },
-        {
-          name: "price_per_unit",
-          type: TYPES.Decimal,
-          value: item.price_per_unit,
-        },
+        { name: "price_per_unit", type: TYPES.Decimal, value: item.price_per_unit },
       ]);
     }
+
+    // 👇 2. Insertar las relaciones en las tablas de unión
+    // Asociar Camiones
+    for (const camion_id of truck_ids) {
+      const truckSql = `
+        INSERT INTO RIP.APP_PEDIDOS_CAMIONES (pedido_id, camion_id)
+        VALUES (@pedido_id, @camion_id);
+      `;
+      await executeQuery(truckSql, [
+        { name: "pedido_id", type: TYPES.Int, value: newOrderId },
+        { name: "camion_id", type: TYPES.Int, value: camion_id },
+      ]);
+    }
+
+    // Asociar Choferes
+    for (const chofer_id of driver_ids) {
+      const driverSql = `
+        INSERT INTO RIP.APP_PEDIDOS_CHOFERES (pedido_id, chofer_id)
+        VALUES (@pedido_id, @chofer_id);
+      `;
+      await executeQuery(driverSql, [
+        { name: "pedido_id", type: TYPES.Int, value: newOrderId },
+        { name: "chofer_id", type: TYPES.Int, value: chofer_id },
+      ]);
+    }
+
 
     revalidateTag("orders");
 

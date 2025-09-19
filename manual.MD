@@ -1,10 +1,16 @@
+¡Por supuesto! He actualizado el `manual.MD` para reflejar con precisión los últimos cambios que implementamos, especialmente la autorización de múltiples camiones y choferes desde la creación del pedido.
+
+Aquí tienes el documento actualizado:
+
+---
+
 ## **FLUJO GENERAL DEL PROCESO**
 
-**1. CAJERO** → Crea orden y autoriza despacho
-**2. PATIO** → Confirma carga real con foto
-**3. VIGILANCIA** → Autoriza salida y genera guía
-**4. ADMIN** → Mantiene catálogos actualizados
-**5. REPORTES** → Analiza operaciones y exporta datos
+**1. CAJERO** → Crea el "contrato" de venta y autoriza el transporte (camiones y choferes).
+**2. PATIO** → Selecciona un camión autorizado, crea el viaje, y confirma la carga real con foto.
+**3. VIGILANCIA** → Autoriza la salida del viaje y genera la guía de despacho.
+**4. ADMIN** → Mantiene los catálogos del sistema actualizados.
+**5. REPORTES** → Analiza las operaciones y exporta datos clave.
 
 ---
 
@@ -12,177 +18,120 @@
 
 ### **🏪 CAJERO - Comanda y Pago**
 
-**Objetivo**: Crear órdenes pagadas y autorizar despachos
+**Objetivo**: Crear la orden de venta (el "contrato"), procesar el pago y autorizar qué vehículos y personal pueden realizar los despachos.
 
 **Flujo diario**:
 
-1. **Seleccionar cliente y destino** desde los dropdowns
-2. **Construir orden**:
-
-3. Buscar producto en ProductPicker
-4. Seleccionar formato (m³, ton, bolsa, etc.)
-5. Ingresar cantidad con QuantityInput
-6. Agregar a la tabla (se calcula precio automáticamente)
-
-7. **Revisar totales** (subtotal + impuestos)
-8. **Procesar pago**:
-
-9. Seleccionar método (Efectivo/Tarjeta/Transferencia)
-10. Ingresar referencia si aplica
-
-11. **Asociar camión**:
-
-12. Ingresar placa con formato automático (AAA-123A)
-13. Tomar foto opcional del camión
-
-14. **Autorizar despacho** → Crea el primer viaje con estado PENDIENTE
+1.  **Seleccionar cliente y destino** desde los buscadores.
+2.  **Construir la orden**:
+    * Buscar y añadir productos con sus cantidades.
+    * El sistema calcula los precios y subtotales automáticamente.
+3.  **Autorizar Transporte**:
+    * En la sección de "Autorización de Transporte", **seleccionar uno o más camiones** de la lista de vehículos disponibles.
+    * **Seleccionar uno o más choferes** autorizados para realizar los retiros.
+4.  **Revisar totales** y procesar el pago (Efectivo, Tarjeta, etc.).
+5.  **Crear Pedido** → La orden queda registrada con estado `PAID` y con una lista de transporte autorizado, lista para que el patio la procese.
 
 **Casos especiales**:
 
-- Órdenes con múltiples productos
-- Descuentos o precios especiales
-- Clientes nuevos (coordinar con Admin)
+* Órdenes que serán retiradas por varios camiones diferentes.
+* Clientes que envían distintos choferes para una misma orden.
 
 ---
 
-### **🚛 PATIO - Confirmación de Carga**
+### **🚛 PATIO - Creación de Viaje y Carga**
 
-**Objetivo**: Confirmar cantidad real cargada y documentar con foto
+**Objetivo**: Crear un viaje (despacho) para un camión autorizado y confirmar la cantidad real cargada.
 
 **Flujo diario**:
 
-1. **Ver lista de viajes pendientes** en tarjetas grandes
-2. **Seleccionar viaje** tocando la tarjeta
-3. **En modal de confirmación**:
-
-4. Verificar datos del viaje (cliente, destino, material)
-5. Ingresar **cantidad real cargada**
-6. Sistema muestra tolerancia (±5%) y si está dentro del rango
-7. **Tomar foto obligatoria** del camión cargado
-8. Agregar observaciones si hay diferencias
-
-9. **Confirmar carga** → Cambia estado a CARGADO
+1.  **Ver lista de órdenes pagadas** que esperan ser despachadas.
+2.  **Seleccionar la orden** que el camión ha venido a retirar.
+3.  **En modal de creación de viaje**:
+    * Seleccionar la **placa del camión** que ha llegado (el sistema solo mostrará los autorizados por el cajero).
+    * Seleccionar el **nombre del chofer** presente.
+    * **Crear el Viaje** → Esto genera un nuevo despacho con estado `LOADING`.
+4.  **En modal de confirmación de carga**:
+    * Ingresar la **cantidad real cargada**.
+    * El sistema valida si la cantidad está dentro de la tolerancia permitida.
+    * **Tomar foto obligatoria** del camión cargado.
+    * Agregar observaciones si es necesario.
+5.  **Confirmar Carga** → El estado del viaje cambia a `CARGADO`.
 
 **Alertas importantes**:
 
-- ⚠️ Cantidad fuera de tolerancia (requiere observaciones)
-- ⚠️ Foto obligatoria (no puede confirmar sin ella)
-- ✅ Carga dentro de tolerancia (proceso normal)
+* ⚠️ Cantidad fuera de tolerancia (requiere justificación).
+* ⚠️ Foto obligatoria (no se puede confirmar sin ella).
+* ✅ Carga dentro de la tolerancia (proceso normal).
 
 ---
 
 ### **🛡️ VIGILANCIA - Control de Salida**
 
-**Objetivo**: Autorizar salidas y generar documentación oficial
+**Objetivo**: Autorizar salidas de viajes cargados y generar la documentación legal.
 
 **Flujo diario**:
 
-1. **Búsqueda rápida**:
-
-1. Por placa del camión
-1. Por ID de viaje
-1. Por name del cliente
-
-1. **Verificar información**:
-
-1. Ver foto tomada en el patio
-1. Confirmar datos: material, cantidad, cliente, destino
-1. Verificar que el viaje esté CARGADO
-
-1. **Autorizar salida**:
-
-1. **Tomar foto obligatoria** de salida (placa visible)
-1. Sistema genera automáticamente la Guía de Despacho
-1. Cambia estado a COMPLETADO
+1.  **Búsqueda rápida** del viaje por placa, ID o cliente.
+2.  **Verificar información**:
+    * Revisar la foto de la carga tomada en el patio.
+    * Confirmar que el estado del viaje sea `CARGADO`.
+3.  **Autorizar salida**:
+    * **Tomar foto obligatoria** de la salida del camión.
+    * El sistema genera automáticamente la **Guía de Despacho**.
+    * El estado del viaje cambia a `EXITED` (o `COMPLETADO`).
+    * El estado general de la orden se actualiza (`PARTIALLY_DISPATCHED` o `DISPATCHED_COMPLETE`).
 
 **Validaciones de seguridad**:
 
-- ❌ No permite salida si viaje no está CARGADO
-- ❌ Alerta si orden no está PAGADA
-- ❌ Requiere foto de salida obligatoria
+* ❌ No permite la salida si el viaje no está `CARGADO`.
+* ❌ Requiere foto de salida obligatoria.
 
 ---
 
 ### **⚙️ ADMIN - Gestión de Catálogos**
 
-**Objetivo**: Mantener actualizados todos los catálogos del sistema
+**(Sin cambios en este flujo)**
 
-**Pestañas disponibles**:
-
-1. **Productos**: Crear/editar materiales (arena, grava, etc.)
-2. **Formatos**: Definir unidades y factores de conversión
-3. **Clientes**: Gestionar base de clientes
-4. **Destinos**: Mantener direcciones de entrega
-5. **Camiones**: Registrar vehículos y placas
-6. **Choferes**: Base de datos de conductores
-7. **Usuarios**: Gestión de accesos por rol
-
-**Funciones por pestaña**:
-
-- **Buscar** en tiempo real
-- **Crear nuevo** con formulario validado
-- **Editar** registros existentes
-- **Activar/Desactivar** sin eliminar datos
+**Objetivo**: Mantener actualizados todos los catálogos del sistema (Productos, Clientes, Destinos, Camiones, Choferes, Usuarios).
 
 ---
 
 ### **📊 REPORTES - Análisis y Exportación**
 
-**Objetivo**: Generar reportes personalizados y métricas de negocio
+**(Sin cambios en este flujo)**
 
-**Filtros disponibles**:
-
-- **Rango de fechas** (desde/hasta)
-- **Cliente específico**
-- **Producto/material**
-- **Estado** (Pendiente, Cargado, Completado)
-
-**Métricas automáticas**:
-
-- 💰 Total vendido ($)
-- 📦 Cantidad despachada (m³/ton)
-- 🚛 Viajes completados
-
-**Exportación**:
-
-- **CSV**: Para análisis en Excel
-- **PDF**: Para reportes oficiales con métricas
+**Objetivo**: Generar reportes personalizados y métricas de negocio con filtros por fecha, cliente, producto y estado.
 
 ---
 
-## **EJEMPLO DE CASO DE USO COMPLETO**
+## **EJEMPLO DE CASO DE USO COMPLETO (ACTUALIZADO)**
 
-### **Escenario**: Cliente "Constructora ABC" pide 10m³ de arena
+### **Escenario**: "Constructora ABC" pide 30m³ de arena, que serán retirados por dos camiones distintos.
 
-1. **CAJERO** (9:00 AM):
+1.  **CAJERO** (9:00 AM):
+    * Selecciona cliente "Constructora ABC" y destino "Obra Residencial Norte".
+    * Agrega: Arena fina, 30m³.
+    * Total: $15,000 + impuestos.
+    * Pago: Transferencia #TXN123456.
+    * **Autoriza Transporte**:
+        * Camiones: `ABC-123A`, `XYZ-789B`.
+        * Choferes: `Juan Pérez`, `Carlos Gómez`.
+    * **Crea Pedido** → Orden #152 queda en estado `PAID`.
 
-1. Selecciona cliente "Constructora ABC"
-1. Destino "Obra Residencial Norte"
-1. Agrega: Arena fina, 10m³, $500/m³
-1. Total: $5,000 + impuestos
-1. Pago: Transferencia #TXN123456
-1. Camión: Placa ABC-123A + foto
-1. **Autoriza despacho** → Viaje #001 PENDIENTE
+2.  **PATIO** (10:30 AM):
+    * Llega el camión `ABC-123A` con `Juan Pérez`.
+    * El operador selecciona la Orden #152.
+    * Selecciona el camión `ABC-123A` y al chofer `Juan Pérez` de la lista de autorizados.
+    * **Crea el Viaje** → Se genera el Despacho #801.
+    * Confirma la carga: 15.1m³ (dentro de tolerancia).
+    * Toma la foto del camión cargado.
+    * **Confirma Carga** → Viaje #801 queda `CARGADO`. La orden #152 pasa a `PARTIALLY_DISPATCHED`.
 
-1. **PATIO** (10:30 AM):
+3.  **VIGILANCIA** (11:15 AM):
+    * Busca por placa "ABC-123A".
+    * Ve la foto del patio y los datos del viaje #801.
+    * Toma la foto de salida.
+    * **Autoriza Salida** → Viaje #801 queda `EXITED`. Se genera su Guía de Despacho.
 
-1. Ve viaje #001 en lista pendiente
-1. Confirma carga: 9.8m³ (dentro de tolerancia ±5%)
-1. Toma foto del camión cargado
-1. **Confirma carga** → Viaje #001 CARGADO
-
-1. **VIGILANCIA** (11:15 AM):
-
-1. Busca por placa "ABC-123A"
-1. Ve foto del patio y datos del viaje
-1. Toma foto de salida con placa visible
-1. **Autoriza salida** → Viaje #001 COMPLETADO
-1. Sistema genera Guía de Despacho automáticamente
-
-1. **REPORTES** (Fin del día):
-
-1. Filtra por fecha de hoy
-1. Ve: 1 viaje completado, $5,000 vendidos, 9.8m³ despachados
-1. Exporta reporte diario en PDF
-
-El sistema garantiza trazabilidad completa con fotos en cada etapa y documentación automática, eliminando errores manuales y proporcionando control total del proceso de despacho.
+*(El proceso se repetiría para el segundo camión `XYZ-789B` cuando llegue, creando un nuevo despacho asociado a la misma orden #152)*
