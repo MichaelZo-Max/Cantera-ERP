@@ -1,4 +1,3 @@
-// app/(protected)/cashier/orders/[id]/order-client.tsx
 "use client";
 
 import { useState, useCallback, useMemo, useEffect } from "react";
@@ -42,35 +41,36 @@ export function OrderClient({ isEditing, initialOrderData, catalogs }: OrderClie
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const [selectedcustomer_id, setSelectedcustomer_id] = useState<string>(
-    String(initialOrderData?.customer_id ?? "")
-  );
-  const [selectedDestinationId, setSelectedDestinationId] = useState<string | undefined>(
-    initialOrderData?.destination_id?.toString() ?? undefined
-  );
-  const [selectedTruckIds, setSelectedTruckIds] = useState<string[]>(
-    initialOrderData?.trucks?.map((t: TruckType) => t.id.toString()) ?? []
-  );
-  const [selectedDriverIds, setSelectedDriverIds] = useState<string[]>(
-    initialOrderData?.drivers?.map((d: Driver) => d.id.toString()) ?? []
-  );
-
+  // --- Estados del formulario ---
+  const [selectedcustomer_id, setSelectedcustomer_id] = useState<string>("");
+  const [selectedDestinationId, setSelectedDestinationId] = useState<string | undefined>();
+  const [selectedTruckIds, setSelectedTruckIds] = useState<string[]>([]);
+  const [selectedDriverIds, setSelectedDriverIds] = useState<string[]>([]);
   const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [currentQuantity, setCurrentQuantity] = useState<number>(0);
 
+  // Efecto para inicializar el estado del formulario cuando se edita
   useEffect(() => {
-    if (isEditing && initialOrderData?.items) {
-      setOrderItems(initialOrderData.items.map(item => ({
+    if (isEditing && initialOrderData) {
+      setSelectedcustomer_id(String(initialOrderData.customer_id ?? ""));
+      setSelectedDestinationId(initialOrderData.destination_id?.toString() ?? undefined);
+      
+      // ✨ CORRECCIÓN: Usar las propiedades correctas devueltas por tu API
+      setSelectedTruckIds(initialOrderData.trucks?.map((t: TruckType) => t.id.toString()) ?? []);
+      setSelectedDriverIds(initialOrderData.drivers?.map((d: Driver) => d.id.toString()) ?? []);
+      
+      setOrderItems(initialOrderData.items?.map(item => ({
         id: crypto.randomUUID(),
         product: item.product!,
         quantity: item.quantity,
         pricePerUnit: Number(item.price_per_unit),
         subtotal: Number(item.quantity) * Number(item.price_per_unit),
-      })));
+      })) ?? []);
     }
   }, [isEditing, initialOrderData]);
 
+  // --- Lógica de cálculo y manipulación ---
   const filteredDestinations = useMemo(() => {
     if (!selectedcustomer_id) return [];
     return catalogs.destinations.filter(d => d.customer_id.toString() === selectedcustomer_id);
@@ -107,8 +107,12 @@ export function OrderClient({ isEditing, initialOrderData, catalogs }: OrderClie
     setCurrentQuantity(product ? 1 : 0);
   }, [catalogs.products]);
 
+  // --- Lógica de envío ---
   const handleSubmit = useCallback(async () => {
-    // ... (validation logic remains the same)
+    if (!selectedcustomer_id || orderItems.length === 0 || selectedTruckIds.length === 0 || selectedDriverIds.length === 0) {
+      toast.error("Completa todos los campos: Cliente, al menos un producto, un camión y un chofer.");
+      return;
+    }
 
     setIsSubmitting(true);
     const orderData = {
@@ -141,7 +145,7 @@ export function OrderClient({ isEditing, initialOrderData, catalogs }: OrderClie
       }
 
       const result = await res.json();
-      toast.success(`Pedido #${result.order_number} ${isEditing ? 'actualizado' : 'creado'} con éxito.`);
+      toast.success(`Pedido #${result.order_number || initialOrderData?.order_number} ${isEditing ? 'actualizado' : 'creado'} con éxito.`);
       router.push("/cashier/orders/list");
       router.refresh();
     } catch (err: any) {
@@ -150,7 +154,7 @@ export function OrderClient({ isEditing, initialOrderData, catalogs }: OrderClie
       setIsSubmitting(false);
     }
   }, [isEditing, initialOrderData, selectedcustomer_id, selectedDestinationId, orderItems, total, selectedTruckIds, selectedDriverIds, router]);
-
+  
   const canSubmit = useMemo(() => (
     !!selectedcustomer_id && orderItems.length > 0 && selectedTruckIds.length > 0 && selectedDriverIds.length > 0
   ), [selectedcustomer_id, orderItems, selectedTruckIds, selectedDriverIds]);

@@ -56,6 +56,12 @@ export const createOrderSchema = z.object({
 });
 
 /**
+ * @description Esquema para la ACTUALIZACIÓN de un pedido existente.
+ * Es idéntico al de creación, ya que se reemplazan todos los datos.
+ */
+export const orderUpdateSchema = createOrderSchema;
+
+/**
  * @description Esquema para la CREACIÓN de un nuevo despacho (viaje).
  */
 export const createDeliverySchema = z.object({
