@@ -51,7 +51,6 @@ export const createOrderSchema = z.object({
     .array(z.number().int().positive())
     .min(1, "Debes seleccionar al menos un chofer."),
   
-  // --- 👇 CAMPOS NUEVOS PARA LA FACTURA (AÑADIDOS) ---
   invoice_series: z.string().optional().nullable(),
   invoice_number: z.coerce.number().optional().nullable(),
   invoice_n: z.coerce.number().optional().nullable(),

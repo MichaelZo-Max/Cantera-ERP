@@ -1,16 +1,14 @@
+// app/api/orders/route.ts
 import { NextResponse } from "next/server";
 import { getUser } from "@/lib/auth";
 import { executeQuery, TYPES } from "@/lib/db";
 import { revalidateTag } from "next/cache";
 import { createOrderSchema } from "@/lib/validations";
 
-/**
- * @route   GET /api/orders
- * @desc    Obtener una lista de todos los pedidos.
- * @access  Private
- */
+// ... (La función GET no necesita cambios)
 export async function GET() {
   try {
+    // --- 👇 CORRECCIÓN: Se ha modificado la consulta SQL ---
     const sql = `
       SELECT
           p.id,
@@ -18,16 +16,21 @@ export async function GET() {
           p.status,
           p.created_at,
           c.name AS client_name,
+          f.NUMSERIE AS invoice_serie,    -- Se usa la columna correcta de FACTURASVENTA
+          f.NUMFACTURA AS invoice_folio,  -- Se usa la columna correcta de FACTURASVENTA
           (SELECT SUM(pi.quantity * pi.price_per_unit)
            FROM RIP.APP_PEDIDOS_ITEMS pi
            WHERE pi.order_id = p.id) AS total,
-          -- Información de despachos para calcular progreso
           (SELECT COUNT(*) FROM RIP.APP_DESPACHOS d WHERE d.order_id = p.id) AS total_deliveries,
           (SELECT COUNT(*) FROM RIP.APP_DESPACHOS d WHERE d.order_id = p.id AND d.status = 'EXITED') AS completed_deliveries
       FROM
           RIP.APP_PEDIDOS AS p
       JOIN
           RIP.VW_APP_CLIENTES AS c ON p.customer_id = c.id
+      LEFT JOIN 
+          dbo.FACTURASVENTA AS f ON p.invoice_series = f.NUMSERIE 
+                                 AND p.invoice_number = f.NUMFACTURA 
+                                 AND p.invoice_n = f.N -- El JOIN ahora usa la clave compuesta correcta
       ORDER BY
           p.created_at DESC;
     `;
@@ -79,20 +82,27 @@ export async function POST(req: Request) {
       );
     }
 
-    // 👇 1. Extrae los nuevos arrays del cuerpo validado
-    const { customer_id, destination_id, items, total, truck_ids, driver_ids } =
-      validation.data;
+    // --- 👇 CORRECCIÓN: Extraer los campos correctos de la factura ---
+    const { 
+        customer_id, destination_id, items, total, truck_ids, driver_ids, 
+        invoice_series, invoice_number, invoice_n 
+    } = validation.data;
 
+    // --- 👇 CORRECCIÓN: Usar los campos correctos en la consulta INSERT ---
     const orderHeaderSql = `
-        INSERT INTO RIP.APP_PEDIDOS (customer_id, destination_id, status, created_by)
+        INSERT INTO RIP.APP_PEDIDOS (customer_id, destination_id, status, created_by, invoice_series, invoice_number, invoice_n)
         OUTPUT INSERTED.id
-        VALUES (@customer_id, @destination_id, 'PAID', @created_by);
+        VALUES (@customer_id, @destination_id, 'PAID', @created_by, @invoice_series, @invoice_number, @invoice_n);
     `;
     
     const headerResult = await executeQuery(orderHeaderSql, [
       { name: "customer_id", type: TYPES.Int, value: customer_id },
       { name: "destination_id", type: TYPES.Int, value: destination_id },
       { name: "created_by", type: TYPES.Int, value: user.id },
+      // --- 👇 CORRECCIÓN: Pasar los parámetros correctos de la factura ---
+      { name: "invoice_series", type: TYPES.NVarChar, value: invoice_series },
+      { name: "invoice_number", type: TYPES.Int, value: invoice_number },
+      { name: "invoice_n", type: TYPES.Int, value: invoice_n },
     ]);
 
     if (!headerResult || headerResult.length === 0 || !headerResult[0].id) {
@@ -122,8 +132,7 @@ export async function POST(req: Request) {
       ]);
     }
 
-    // 👇 2. Insertar las relaciones en las tablas de unión
-    // Asociar Camiones
+    // Asociar Camiones (esto no cambia)
     for (const camion_id of truck_ids) {
       const truckSql = `
         INSERT INTO RIP.APP_PEDIDOS_CAMIONES (pedido_id, camion_id)
@@ -135,7 +144,7 @@ export async function POST(req: Request) {
       ]);
     }
 
-    // Asociar Choferes
+    // Asociar Choferes (esto no cambia)
     for (const chofer_id of driver_ids) {
       const driverSql = `
         INSERT INTO RIP.APP_PEDIDOS_CHOFERES (pedido_id, chofer_id)
@@ -146,8 +155,7 @@ export async function POST(req: Request) {
         { name: "chofer_id", type: TYPES.Int, value: chofer_id },
       ]);
     }
-
-    // **CAMBIO:** Obtener el order_number para devolverlo en la respuesta.
+    
     const getOrderNumberSql = `
       SELECT order_number FROM RIP.APP_PEDIDOS WHERE id = @order_id;
     `;
@@ -163,7 +171,7 @@ export async function POST(req: Request) {
       {
         message: "Orden creada con éxito",
         order_id: newOrderId,
-        order_number: newOrderNumber, // <-- **CAMBIO:** Se añade el número de orden a la respuesta
+        order_number: newOrderNumber,
       },
       { status: 201 }
     );
