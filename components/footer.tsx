@@ -1,19 +1,27 @@
-// components/footer.tsx
-import Link from 'next/link';
+"use client"
 
-export function Footer() {
-  const currentYear = new Date().getFullYear();
+import { cn } from "@/lib/utils"
 
+export const Footer = ({ className }: { className?: string }) => {
   return (
-    <footer className="bg-background/50 border-t border-border/50 mt-auto py-4">
-      <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-8 text-center text-xs text-muted-foreground">
-        <div className="flex flex-col sm:flex-row justify-center items-center gap-2 sm:gap-4">
-            <p>&copy; {currentYear} Cantera ERP. Todos los derechos reservados.</p>
+    // Se cambió "bg-card" a "bg-card/80 backdrop-blur-sm" para que coincida con el header.
+    <footer className={cn("bg-card/80 backdrop-blur-sm border-t border-border/50", className)}>
+      <div className="max-w-7xl mx-auto py-4 px-4 sm:px-6 lg:px-8">
+        <div className="flex justify-between items-center text-sm text-muted-foreground">
+          <p>&copy; {new Date().getFullYear()} Cantera ERP. Todos los derechos reservados.</p>
+          <p>
+            Hecho con ❤️ por{" "}
+            <a
+              href="https://redesip.com"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-semibold text-primary hover:underline"
+            >
+              RedesIP
+            </a>
+          </p>
         </div>
-        <p className="mt-3">
-          Hecho por <a href="https://redesip.org" target="_blank" rel="noopener noreferrer" className="text-primary font-semibold hover:underline">@redesip</a>
-        </p>
       </div>
     </footer>
-  );
+  )
 }

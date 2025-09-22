@@ -1,4 +1,3 @@
-// components/app-layout.tsx
 "use client"
 
 import type { ReactNode } from "react"
@@ -38,7 +37,7 @@ export function AppLayout({ children, title }: AppLayoutProps) {
   const p = pathname || "/"
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div className="min-h-screen flex flex-col">
       <header className="bg-card/80 backdrop-blur-sm shadow-sm border-b border-border/50 sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-8">
           <div className="flex justify-between items-center h-16 sm:h-20">

@@ -4,84 +4,84 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
-  /* Modern design tokens with sophisticated gray-purple palette */
+  /* Paleta de colores de Redesip - Tema Claro */
   --background: #ffffff;
-  --foreground: #1f2937;
+  --foreground: #202020;
   --card: #f1f5f9;
-  --card-foreground: #1f2937;
+  --card-foreground: #202020;
   --popover: #ffffff;
-  --popover-foreground: #1f2937;
-  --primary: #1f2937;
+  --popover-foreground: #202020;
+  --primary: #86bb25;
   --primary-foreground: #ffffff;
-  --secondary: #8b5cf6;
+  --secondary: #555652;
   --secondary-foreground: #ffffff;
   --muted: #6b7280;
   --muted-foreground: #4b5563;
-  --accent: #6366f1;
+  --accent: #86bb25;
   --accent-foreground: #ffffff;
   --destructive: #ea580c;
   --destructive-foreground: #ffffff;
   --border: #e5e7eb;
   --input: #e2e8f0;
-  --ring: rgba(99, 102, 241, 0.5);
-  --chart-1: #6366f1;
-  --chart-2: #8b5cf6;
+  --ring: rgba(134, 187, 37, 0.5);
+  --chart-1: #86bb25;
+  --chart-2: #555652;
   --chart-3: #ea580c;
   --chart-4: #f97316;
   --chart-5: #4b5563;
   --radius: 0.5rem;
   --sidebar: #f1f5f9;
-  --sidebar-foreground: #1f2937;
+  --sidebar-foreground: #202020;
   --sidebar-primary: #ffffff;
-  --sidebar-primary-foreground: #1f2937;
-  --sidebar-accent: #6366f1;
+  --sidebar-primary-foreground: #202020;
+  --sidebar-accent: #86bb25;
   --sidebar-accent-foreground: #ffffff;
   --sidebar-border: #e5e7eb;
-  --sidebar-ring: rgba(99, 102, 241, 0.5);
+  --sidebar-ring: rgba(134, 187, 37, 0.5);
 
-  /* Modern gradient variables */
-  --gradient-from: #f8fafc;
-  --gradient-to: #f1f5f9;
-  --gradient-accent: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+  /* Variables de gradiente con el verde de Redesip */
+  --gradient-from: #f0f7e4;
+  --gradient-to: #e6f0d8;
+  --gradient-accent: linear-gradient(135deg, #86bb25 0%, #a2c456 100%);
 }
 
 .dark {
-  /* Dark theme with sophisticated contrast */
-  --background: #0f172a;
-  --foreground: #f8fafc;
-  --card: #1e293b;
-  --card-foreground: #f8fafc;
-  --popover: #0f172a;
-  --popover-foreground: #f8fafc;
-  --primary: #6366f1;
+  /* Paleta de colores de Redesip - Tema Oscuro */
+  --background: #202020;
+  --foreground: #ffffff;
+  --card: #2a2a2a;
+  --card-foreground: #ffffff;
+  --popover: #202020;
+  --popover-foreground: #ffffff;
+  --primary: #86bb25;
   --primary-foreground: #ffffff;
-  --secondary: #8b5cf6;
+  --secondary: #555652;
   --secondary-foreground: #ffffff;
   --muted: #475569;
   --muted-foreground: #cbd5e1;
-  --accent: #8b5cf6;
+  --accent: #86bb25;
   --accent-foreground: #ffffff;
   --destructive: #f97316;
   --destructive-foreground: #ffffff;
   --border: #334155;
   --input: #334155;
-  --ring: rgba(139, 92, 246, 0.5);
-  --chart-1: #6366f1;
-  --chart-2: #8b5cf6;
+  --ring: rgba(134, 187, 37, 0.5);
+  --chart-1: #86bb25;
+  --chart-2: #555652;
   --chart-3: #f97316;
   --chart-4: #ea580c;
   --chart-5: #64748b;
-  --sidebar: #1e293b;
-  --sidebar-foreground: #f8fafc;
-  --sidebar-primary: #6366f1;
+  --sidebar: #2a2a2a;
+  --sidebar-foreground: #ffffff;
+  --sidebar-primary: #86bb25;
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #8b5cf6;
+  --sidebar-accent: #86bb25;
   --sidebar-accent-foreground: #ffffff;
   --sidebar-border: #334155;
-  --sidebar-ring: rgba(139, 92, 246, 0.5);
-  --gradient-from: #0f172a;
-  --gradient-to: #1e293b;
-  --gradient-accent: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+  --sidebar-ring: rgba(134, 187, 37, 0.5);
+  --gradient-from: #202020;
+  --gradient-to: #2a2a2a;
+  --gradient-accent: linear-gradient(135deg, #86bb25 0%, #a2c456 100%);
 }
 
 @theme inline {
@@ -188,10 +188,10 @@
   @keyframes pulse-glow {
     0%,
     100% {
-      box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.4);
+      box-shadow: 0 0 0 0 rgba(134, 187, 37, 0.4);
     }
     50% {
-      box-shadow: 0 0 0 10px rgba(99, 102, 241, 0);
+      box-shadow: 0 0 0 10px rgba(134, 187, 37, 0);
     }
   }
 
