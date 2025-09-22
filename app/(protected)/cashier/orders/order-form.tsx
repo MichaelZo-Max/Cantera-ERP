@@ -83,21 +83,31 @@ export function OrderForm({
   isSubmitting,
 }: OrderFormProps) {
   const [selectedcustomer_id, setSelectedcustomer_id] = useState<string>("");
-  const [selectedDestinationId, setSelectedDestinationId] = useState<string | undefined>(undefined);
+  const [selectedDestinationId, setSelectedDestinationId] = useState<
+    string | undefined
+  >(undefined);
   const [selectedTruckIds, setSelectedTruckIds] = useState<string[]>([]);
   const [selectedDriverIds, setSelectedDriverIds] = useState<string[]>([]);
   const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [currentQuantity, setCurrentQuantity] = useState<number>(0);
-  const [selectedInvoice, setSelectedInvoice] = useState<string | undefined>(undefined);
+  const [selectedInvoice, setSelectedInvoice] = useState<string | undefined>(
+    undefined
+  );
 
   useEffect(() => {
     if (isEditing && initialOrderData) {
       setSelectedcustomer_id(String(initialOrderData.customer_id ?? ""));
-      setSelectedDestinationId(initialOrderData.destination_id?.toString() ?? undefined);
-      setSelectedTruckIds(initialOrderData.trucks?.map((t: TruckType) => t.id.toString()) ?? []);
-      setSelectedDriverIds(initialOrderData.drivers?.map((d: Driver) => d.id.toString()) ?? []);
-      
+      setSelectedDestinationId(
+        initialOrderData.destination_id?.toString() ?? undefined
+      );
+      setSelectedTruckIds(
+        initialOrderData.trucks?.map((t: TruckType) => t.id.toString()) ?? []
+      );
+      setSelectedDriverIds(
+        initialOrderData.drivers?.map((d: Driver) => d.id.toString()) ?? []
+      );
+
       if (initialOrderData.items) {
         const items = initialOrderData.items.map((item) => ({
           id: crypto.randomUUID(),
@@ -111,9 +121,12 @@ export function OrderForm({
 
       if (
         initialOrderData.invoice_series &&
-        initialOrderData.invoice_number !== null && 
-        typeof initialOrderData.invoice_number !== 'undefined'
+        initialOrderData.invoice_number !== null &&
+        typeof initialOrderData.invoice_number !== "undefined" &&
+        initialOrderData.invoice_n !== null && // Se comprueba que invoice_n exista
+        typeof initialOrderData.invoice_n !== "undefined"
       ) {
+        // Se construye el valor único que coincide con el 'value' del SearchableSelect
         const invoiceValue = `${initialOrderData.invoice_series}|${initialOrderData.invoice_number}|${initialOrderData.invoice_n}`;
         setSelectedInvoice(invoiceValue);
       }
@@ -167,7 +180,7 @@ export function OrderForm({
   );
 
   const handleSubmit = () => {
-     if (
+    if (
       !selectedcustomer_id ||
       orderItems.length === 0 ||
       selectedTruckIds.length === 0 ||
@@ -181,7 +194,7 @@ export function OrderForm({
 
     let invoiceData = {};
     if (selectedInvoice) {
-      const [series, number, n] = selectedInvoice.split('|');
+      const [series, number, n] = selectedInvoice.split("|");
       invoiceData = {
         invoice_series: series,
         invoice_number: parseInt(number, 10),
@@ -204,7 +217,7 @@ export function OrderForm({
       truck_ids: selectedTruckIds.map((id) => parseInt(id, 10)),
       driver_ids: selectedDriverIds.map((id) => parseInt(id, 10)),
       // ✅ CORRECCIÓN 2: Combinar los datos de la factura con el resto de la orden
-      ...invoiceData, 
+      ...invoiceData,
     };
     onSubmit(orderData);
   };
@@ -241,7 +254,10 @@ export function OrderForm({
                     setSelectedInvoice(undefined);
                   }}
                   placeholder="Selecciona un cliente..."
-                  options={initialClients.map((client) => ({ value: client.id.toString(), label: client.name }))}
+                  options={initialClients.map((client) => ({
+                    value: client.id.toString(),
+                    label: client.name,
+                  }))}
                 />
               </div>
               <div className="space-y-2">
@@ -250,23 +266,38 @@ export function OrderForm({
                   value={selectedDestinationId}
                   onChange={setSelectedDestinationId}
                   placeholder="Selecciona un destino..."
-                  disabled={!selectedcustomer_id || filteredDestinations.length === 0}
-                  options={filteredDestinations.map((dest) => ({ value: dest.id.toString(), label: dest.name }))}
+                  disabled={
+                    !selectedcustomer_id || filteredDestinations.length === 0
+                  }
+                  options={filteredDestinations.map((dest) => ({
+                    value: dest.id.toString(),
+                    label: dest.name,
+                  }))}
                 />
               </div>
             </div>
             <div className="mt-4 space-y-2">
-              <Label className="flex items-center gap-2"><FileText size={16}/> Vincular Factura (Opcional)</Label>
+              <Label className="flex items-center gap-2">
+                <FileText size={16} /> Vincular Factura (Opcional)
+              </Label>
               <SearchableSelect
                 value={selectedInvoice}
                 onChange={setSelectedInvoice}
                 placeholder="Selecciona una factura disponible..."
                 disabled={!selectedcustomer_id}
                 options={initialInvoices
-                  .filter(inv => inv.customer_name === initialClients.find(c => c.id.toString() === selectedcustomer_id)?.name)
-                  .map(inv => ({
+                  .filter(
+                    (inv) =>
+                      inv.customer_name ===
+                      initialClients.find(
+                        (c) => c.id.toString() === selectedcustomer_id
+                      )?.name
+                  )
+                  .map((inv) => ({
                     value: `${inv.invoice_series}|${inv.invoice_number}|${inv.invoice_n}`,
-                    label: `Factura ${inv.invoice_series}-${inv.invoice_number} ($${inv.total_usd.toFixed(2)})`,
+                    label: `Factura ${inv.invoice_series}-${
+                      inv.invoice_number
+                    } ($${inv.total_usd.toFixed(2)})`,
                   }))}
               />
             </div>

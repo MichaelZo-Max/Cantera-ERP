@@ -13,7 +13,6 @@ export async function GET(request: Request, { params }: { params: { id: string }
       return new NextResponse("ID de pedido inválido", { status: 400 });
     }
 
-    // 1. Obtener datos principales del pedido (la consulta ya es correcta)
     const orderQuery = `
       SELECT
           p.id, p.order_number, p.status, p.created_at, p.notes,
