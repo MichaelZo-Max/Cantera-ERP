@@ -58,8 +58,6 @@ export async function GET(request: Request, { params }: { params: { id: string }
       JOIN RIP.APP_CHOFERES c ON c.id = pch.chofer_id WHERE pch.pedido_id = @id;
     `;
     const driversResult = await executeQuery(driversQuery, [{ name: "id", type: TYPES.Int, value: id }]);
-
-    // --- 👇 CORRECCIÓN CLAVE: Construir el objeto final sin anidar la factura ---
     const finalResponse = {
       ...order, // <-- El objeto base ya tiene invoice_series, etc.
       items: itemsResult.map((item: any) => ({

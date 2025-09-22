@@ -52,33 +52,32 @@ export function OrderClient({ isEditing, initialOrderData, catalogs }: OrderClie
   const [currentQuantity, setCurrentQuantity] = useState<number>(0);
   const [selectedInvoice, setSelectedInvoice] = useState<string | undefined>();
 
-  // Efecto para inicializar el estado del formulario cuando se edita
-  useEffect(() => {
-    if (isEditing && initialOrderData) {
-      setSelectedcustomer_id(String(initialOrderData.customer_id ?? ""));
-      setSelectedDestinationId(initialOrderData.destination_id?.toString() ?? undefined);
-      
-      // ✨ CORRECCIÓN: Usar las propiedades correctas devueltas por tu API
-      setSelectedTruckIds(initialOrderData.trucks?.map((t: TruckType) => t.id.toString()) ?? []);
-      setSelectedDriverIds(initialOrderData.drivers?.map((d: Driver) => d.id.toString()) ?? []);
-      
-      setOrderItems(initialOrderData.items?.map(item => ({
-        id: crypto.randomUUID(),
-        product: item.product!,
-        quantity: item.quantity,
-        pricePerUnit: Number(item.price_per_unit),
-        subtotal: Number(item.quantity) * Number(item.price_per_unit),
-      })) ?? []);
-      if (
-        initialOrderData.invoice_series &&
-        initialOrderData.invoice_number !== null && 
-        typeof initialOrderData.invoice_number !== 'undefined'
-      ) {
-        const invoiceValue = `${initialOrderData.invoice_series}|${initialOrderData.invoice_number}|${initialOrderData.invoice_n}`;
-        setSelectedInvoice(invoiceValue);
-      }
+useEffect(() => {
+  if (isEditing && initialOrderData) {
+    setSelectedcustomer_id(String(initialOrderData.customer_id ?? ""));
+    setSelectedDestinationId(initialOrderData.destination_id?.toString() ?? undefined);
+    setSelectedTruckIds(initialOrderData.trucks?.map((t: TruckType) => t.id.toString()) ?? []);
+    setSelectedDriverIds(initialOrderData.drivers?.map((d: Driver) => d.id.toString()) ?? []);
+    setOrderItems(initialOrderData.items?.map(item => ({
+      id: crypto.randomUUID(),
+      product: item.product!,
+      quantity: item.quantity,
+      pricePerUnit: Number(item.price_per_unit),
+      subtotal: Number(item.quantity) * Number(item.price_per_unit),
+    })) ?? []);
+
+    if (
+      initialOrderData.invoice_series &&
+      initialOrderData.invoice_number !== null &&
+      typeof initialOrderData.invoice_number !== 'undefined' &&
+      initialOrderData.invoice_n !== null && // <--- Añadir esta línea
+      typeof initialOrderData.invoice_n !== 'undefined' // <--- Y esta línea
+    ) {
+      const invoiceValue = `${initialOrderData.invoice_series}|${initialOrderData.invoice_number}|${initialOrderData.invoice_n}`;
+      setSelectedInvoice(invoiceValue);
     }
-  }, [isEditing, initialOrderData]);
+  }
+}, [isEditing, initialOrderData]);
 
   // --- Lógica de cálculo y manipulación ---
   const filteredDestinations = useMemo(() => {
