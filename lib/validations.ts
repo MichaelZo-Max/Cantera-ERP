@@ -1,5 +1,3 @@
-// lib/validations.ts
-
 import { z } from "zod";
 
 /**
@@ -46,13 +44,17 @@ export const createOrderSchema = z.object({
     )
     .min(1, "El pedido debe tener al menos un item."),
   total: z.number().nonnegative(),
-  // 👇 AÑADIR ESTAS LÍNEAS
   truck_ids: z
     .array(z.number().int().positive())
     .min(1, "Debes seleccionar al menos un camión."),
   driver_ids: z
     .array(z.number().int().positive())
     .min(1, "Debes seleccionar al menos un chofer."),
+  
+  // --- 👇 CAMPOS NUEVOS PARA LA FACTURA (AÑADIDOS) ---
+  invoice_series: z.string().optional().nullable(),
+  invoice_number: z.coerce.number().optional().nullable(),
+  invoice_n: z.coerce.number().optional().nullable(),
 });
 
 /**
