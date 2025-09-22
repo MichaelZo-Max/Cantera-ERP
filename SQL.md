@@ -527,3 +527,84 @@ JOIN
 GO
 
 PRINT '¡Despliegue completado! El esquema, las tablas y las vistas han sido creados/actualizados.';
+
+-- PASO 1: Modificar la intercalación de la columna existente.
+ALTER TABLE RIP.APP_PEDIDOS
+ALTER COLUMN invoice_series NVARCHAR(10) COLLATE Latin1_General_CS_AI NULL; -- <-- Usa la intercalación que averiguaste.
+GO
+
+-- PASO 2: Ahora sí, crear la restricción de clave foránea.
+-- Si la restricción ya existía, puede que este paso dé error, pero el paso anterior es el importante.
+BEGIN TRY
+    ALTER TABLE RIP.APP_PEDIDOS
+    ADD CONSTRAINT FK_APP_PEDIDOS_FACTURASVENTA
+    FOREIGN KEY (invoice_series, invoice_number, invoice_n)
+    REFERENCES dbo.FACTURASVENTA(NUMSERIE, NUMFACTURA, N);
+
+    PRINT '¡SOLUCIONADO! La columna fue modificada y la relación creada exitosamente.';
+END TRY
+BEGIN CATCH
+    PRINT 'La columna fue modificada. La restricción ya existía o hubo otro problema al crearla.';
+END CATCH
+GO
+
+USE [CANTERA]
+GO
+/****** Object:  UserDefinedFunction [rip].[F_GET_COTIZACION_RIP]    Script Date: 22/09/2025 9:35:38 ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+CREATE FUNCTION [rip].[F_GET_COTIZACION_RIP](
+   	@IMPORTE FLOAT
+		, @FECHA DATE
+		, @FACTOR_REAL FLOAT
+		, @ORIGEN INT
+		, @DESTINO INt
+)
+RETURNS FLOAT
+AS
+BEGIN
+	DECLARE @VALOR FLOAT
+	DECLARE @MULTIPLICO AS NCHAR(1)=(SELECT NUMERADOR FROM MONEDAS WITH(NOLOCK) WHERE CODMONEDA=@DESTINO )
+		--DECLARE @PPAL AS INT=(SELECT CODMONEDA FROM MONEDAS WITH(NOLOCK) WHERE PRINCIPAL='T' )
+	SELECT 
+		@VALOR= CASE	
+			WHEN @ORIGEN=@DESTINO THEN @IMPORTE --CUANDO EL ORIGEN Y DESTINO SON IGUALES NO SE CONVIERTE
+			--WHEN @ORIGEN<>@DESTINO AND @DESTINO=@PPAL THEN @IMPORTE*@FACTOR_REAL --CUANDO EL DESTINO ES LA PPAL
+			WHEN @ORIGEN<>@DESTINO AND @MULTIPLICO='F' THEN @IMPORTE*@FACTOR_REAL*dbo.F_GET_COTIZACION(@FECHA, @DESTINO) --CUANDO SON DIFERENTES DEBO LLEVAR A LA MONEDA PPAL Y LUEGO A LA MONEDA DESTINO
+			ELSE @IMPORTE*@FACTOR_REAL/dbo.F_GET_COTIZACION(@FECHA, @DESTINO) END --CUANDO SON DIFERENTES DEBO LLEVAR A LA MONEDA PPAL Y LUEGO A LA MONEDA DESTINO
+
+
+  RETURN(@VALOR)
+END
+
+CREATE OR ALTER VIEW RIP.VW_APP_FACTURAS_DISPONIBLES AS
+SELECT
+    FV.NUMSERIE AS invoice_series,
+    FV.NUMFACTURA AS invoice_number,
+    FV.N AS invoice_n,
+    C.NOMBRECLIENTE AS customer_name,
+    FV.FECHA AS invoice_date,
+    -- Usamos la función oficial para mostrar el total de la factura en USD
+    ROUND(RIP.F_GET_COTIZACION_RIP(FV.TOTALNETO, FV.FECHA, FV.FACTORMONEDA, FV.CODMONEDA, 2), 2) AS total_usd
+FROM
+    dbo.FACTURASVENTA FV
+INNER JOIN
+    dbo.CLIENTES C ON FV.CODCLIENTE = C.CODCLIENTE
+LEFT JOIN
+    RIP.APP_PEDIDOS P ON FV.NUMSERIE = P.invoice_series
+                      AND FV.NUMFACTURA = P.invoice_number
+                      AND FV.N = P.invoice_n
+WHERE
+    P.id IS NULL; -- La condición clave: solo trae facturas SIN una orden asociada
+GO
+
+PRINT 'Vista RIP.VW_APP_FACTURAS_DISPONIBLES creada/actualizada.';
+
+3. Flujo de Uso Sugerido
+En tu frontend, al momento de crear o editar una orden, debes hacer una consulta a la nueva vista RIP.VW_APP_FACTURAS_DISPONIBLES para poblar un buscador o una lista desplegable.
+
+El usuario selecciona la factura deseada de esa lista.
+
+Al guardar la orden en RIP.APP_PEDIDOS, simplemente incluyes los valores de invoice_series, invoice_number y invoice_n que seleccionó el usuario.
