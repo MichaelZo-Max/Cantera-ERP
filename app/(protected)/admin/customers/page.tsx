@@ -1,41 +1,67 @@
 // app/(protected)/admin/customers/page.tsx
+import { AppLayout } from "@/components/app-layout";
+import type { Client } from "@/lib/types";
+import { CustomersClientUI } from "./customers-client";
 
 export const dynamic = "force-dynamic";
 
-import { AppLayout } from "@/components/app-layout";
-import type { Client } from "@/lib/types";
-import { CustomersClientUI } from "./customers-client"; // Importamos el nuevo componente de cliente
+type ApiResponse = {
+  data: Client[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+};
 
-// Función para obtener los datos en el servidor
-async function getCustomers(): Promise<{ customers: Client[] }> {
+async function getCustomers(
+  page: number,
+  limit: number,
+  q?: string
+): Promise<ApiResponse> {
   try {
-    const baseUrl = process.env.NEXT_PUBLIC_API_URL;
-    const res = await fetch(`${baseUrl}/api/customers`, {
-      next: { tags: ["customers"] },
+    const params = new URLSearchParams({
+      page: String(page),
+      limit: String(limit),
     });
-    if (!res.ok) {
-      throw new Error("Failed to fetch customers");
+    if (q) {
+      params.set("q", q);
     }
 
-    const customers = await res.json();
-    return { customers };
+    const baseUrl = process.env.NEXT_PUBLIC_API_URL;
+    const res = await fetch(`${baseUrl}/api/customers?${params.toString()}`, {
+      cache: "no-store",
+    });
+
+    if (!res.ok) {
+      console.error(`API Error: ${res.status} ${res.statusText}`);
+      throw new Error("Failed to fetch customers");
+    }
+    return res.json();
   } catch (error) {
-    console.error("Error cargando clientes en el servidor:", error);
-    return { customers: [] };
+    console.error("Error loading customers on server:", error);
+    return { data: [], total: 0, page: 1, limit: 10, totalPages: 0 };
   }
 }
 
-// Esta página ahora es un Server Component (no tiene "use client")
-export default async function CustomersPage() {
-  // Obtenemos los datos directamente en el servidor
-  const { customers } = await getCustomers();
+export default async function CustomersPage({
+  searchParams,
+}: {
+  searchParams: { [key: string]: string | string[] | undefined };
+}) {
+  const page =
+    typeof searchParams.page === "string" ? Number(searchParams.page) : 1;
+  const limit =
+    typeof searchParams.limit === "string" ? Number(searchParams.limit) : 10;
+  const q = typeof searchParams.q === "string" ? searchParams.q : undefined;
+
+  const customersData = await getCustomers(page, limit, q);
 
   return (
     <AppLayout title="Gestión de Clientes">
-      {/* Renderizamos el componente de cliente y le pasamos los datos iniciales.
-        El HTML de la lista de clientes ya viene pre-renderizado desde el servidor.
-      */}
-      <CustomersClientUI initialCustomers={customers} />
+      <CustomersClientUI
+        data={customersData.data}
+        pageCount={customersData.totalPages}
+      />
     </AppLayout>
   );
 }
