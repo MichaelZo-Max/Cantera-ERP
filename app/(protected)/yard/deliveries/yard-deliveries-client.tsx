@@ -249,8 +249,8 @@ export function YardDeliveriesClientUI({
         const res = await fetch(`/api/orders/${orderId}`);
         if (!res.ok) throw new Error("No se pudo cargar el transporte autorizado.");
         const data = await res.json();
-        setAuthorizedTrucks(data.authorized_trucks || []);
-        setAuthorizedDrivers(data.authorized_drivers || []);
+        setAuthorizedTrucks(data.trucks || []);
+        setAuthorizedDrivers(data.drivers || []);
       } catch (error: any) {
         toast.error("Error al cargar datos", { description: error.message });
         setAuthorizedTrucks([]);
@@ -326,7 +326,7 @@ export function YardDeliveriesClientUI({
       formData.append("status", "CARGADA");
       formData.append("notes", values.notes || "");
       formData.append("itemsJson", JSON.stringify(values.loadedItems));
-      formData.append("userId", user.id);
+      formData.append("userId", user.id.toString());
       formData.append("photoFile", values.loadPhoto);
 
       const res = await fetch(

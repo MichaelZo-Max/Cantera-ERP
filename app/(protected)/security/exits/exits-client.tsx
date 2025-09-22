@@ -217,7 +217,7 @@ export function SecurityExitsClientUI({
       const formData = new FormData();
       formData.append("status", "EXITED"); 
       formData.append("notes", exitNotes);
-      if (user?.id) formData.append("userId", user.id);
+      if (user?.id) formData.append("userId", user.id.toString());
       formData.append("photoFile", exitPhoto);
 
       // CORREGIDO: usa delivery_id
