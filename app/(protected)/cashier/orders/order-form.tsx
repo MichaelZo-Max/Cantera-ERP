@@ -30,6 +30,7 @@ import {
   User,
   Package,
   ListOrdered,
+  FileText,
 } from "lucide-react";
 import { toast } from "sonner";
 import type {
@@ -40,6 +41,7 @@ import type {
   Truck as TruckType,
   Driver,
   Order,
+  Invoice,
 } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
 import { SearchableSelect } from "@/components/ui/searchable-select";
@@ -61,6 +63,7 @@ interface OrderFormProps {
   initialDestinations: Destination[];
   initialTrucks: TruckType[];
   initialDrivers: Driver[];
+  initialInvoices: Invoice[];
   isEditing?: boolean;
   initialOrderData?: Order | null;
   onSubmit: (data: any) => Promise<void>;
@@ -73,6 +76,7 @@ export function OrderForm({
   initialDestinations,
   initialTrucks,
   initialDrivers,
+  initialInvoices,
   isEditing = false,
   initialOrderData,
   onSubmit,
@@ -86,6 +90,7 @@ export function OrderForm({
   const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [currentQuantity, setCurrentQuantity] = useState<number>(0);
+  const [selectedInvoice, setSelectedInvoice] = useState<string | undefined>(undefined);
 
   useEffect(() => {
     // Verifica que estemos en modo edición y que los datos iniciales existan.
@@ -171,6 +176,16 @@ export function OrderForm({
       return;
     }
 
+    let invoiceData = {};
+    if (selectedInvoice) {
+      const [series, number, n] = selectedInvoice.split('|');
+      invoiceData = {
+        invoice_series: series,
+        invoice_number: parseInt(number, 10),
+        invoice_n: parseInt(n, 10),
+      };
+    }
+
     const orderData = {
       customer_id: parseInt(selectedcustomer_id, 10),
       destination_id: selectedDestinationId
@@ -201,6 +216,60 @@ export function OrderForm({
   return (
     <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 items-start p-2">
       <div className="lg:col-span-3 space-y-6">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <ShoppingCart className="text-primary" />
+              Datos Generales
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {/* --- 👇 MODIFICADO PARA INCLUIR EL CAMPO DE FACTURA --- */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Cliente *</Label>
+                <SearchableSelect
+                  value={selectedcustomer_id}
+                  onChange={(value) => {
+                    setSelectedcustomer_id(value);
+                    setSelectedDestinationId(undefined);
+                    setSelectedInvoice(undefined); // Limpia la factura si cambia el cliente
+                  }}
+                  placeholder="Selecciona un cliente..."
+                  options={initialClients.map((client) => ({ value: client.id.toString(), label: client.name }))}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Destino (Opcional)</Label>
+                <SearchableSelect
+                  value={selectedDestinationId}
+                  onChange={setSelectedDestinationId}
+                  placeholder="Selecciona un destino..."
+                  disabled={!selectedcustomer_id || filteredDestinations.length === 0}
+                  options={filteredDestinations.map((dest) => ({ value: dest.id.toString(), label: dest.name }))}
+                />
+              </div>
+            </div>
+            {/* --- 👇 NUEVO CAMPO PARA VINCULAR FACTURA --- */}
+            <div className="mt-4 space-y-2">
+              <Label className="flex items-center gap-2"><FileText size={16}/> Vincular Factura (Opcional)</Label>
+              <SearchableSelect
+                value={selectedInvoice}
+                onChange={setSelectedInvoice}
+                placeholder="Selecciona una factura disponible..."
+                disabled={!selectedcustomer_id}
+                options={initialInvoices
+                  // Filtra facturas para que coincidan con el cliente seleccionado
+                  .filter(inv => inv.customer_name === initialClients.find(c => c.id.toString() === selectedcustomer_id)?.name)
+                  .map(inv => ({
+                    // Usamos un separador para crear un valor único
+                    value: `${inv.invoice_series}|${inv.invoice_number}|${inv.invoice_n}`,
+                    label: `Factura ${inv.invoice_series}-${inv.invoice_number} ($${inv.total_usd.toFixed(2)})`,
+                  }))}
+              />
+            </div>
+          </CardContent>
+        </Card>
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">

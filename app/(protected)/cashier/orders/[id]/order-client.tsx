@@ -7,9 +7,9 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { QuantityInput } from "@/components/forms/quantity-input";
-import { Plus, Trash2, Calculator, CreditCard, ShoppingCart, Truck, User, Package, ListOrdered } from "lucide-react";
+import { Plus, Trash2, Calculator, CreditCard, ShoppingCart, Truck, User, Package, ListOrdered, FileText } from "lucide-react";
 import { toast } from "sonner";
-import type { Client, Product, UnitBase, Destination, Truck as TruckType, Driver, Order } from "@/lib/types";
+import type { Client, Product, UnitBase, Destination, Truck as TruckType, Driver, Order, Invoice } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { GradientButton } from "@/components/ui/gradient-button";
@@ -29,6 +29,7 @@ interface Catalogs {
   destinations: Destination[];
   trucks: TruckType[];
   drivers: Driver[];
+  invoices: Invoice[];
 }
 
 interface OrderClientProps {
@@ -49,6 +50,7 @@ export function OrderClient({ isEditing, initialOrderData, catalogs }: OrderClie
   const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [currentQuantity, setCurrentQuantity] = useState<number>(0);
+  const [selectedInvoice, setSelectedInvoice] = useState<string | undefined>();
 
   // Efecto para inicializar el estado del formulario cuando se edita
   useEffect(() => {
@@ -67,6 +69,10 @@ export function OrderClient({ isEditing, initialOrderData, catalogs }: OrderClie
         pricePerUnit: Number(item.price_per_unit),
         subtotal: Number(item.quantity) * Number(item.price_per_unit),
       })) ?? []);
+      if (initialOrderData.invoice_series && initialOrderData.invoice_number && initialOrderData.invoice_n) {
+          const invoiceValue = `${initialOrderData.invoice_series}|${initialOrderData.invoice_number}|${initialOrderData.invoice_n}`;
+          setSelectedInvoice(invoiceValue);
+      }
     }
   }, [isEditing, initialOrderData]);
 
@@ -115,6 +121,17 @@ export function OrderClient({ isEditing, initialOrderData, catalogs }: OrderClie
     }
 
     setIsSubmitting(true);
+
+    let invoiceData = {};
+    if (selectedInvoice) {
+        const [series, number, n] = selectedInvoice.split('|');
+        invoiceData = {
+            invoice_series: series,
+            invoice_number: parseInt(number, 10),
+            invoice_n: parseInt(n, 10),
+        };
+    }
+
     const orderData = {
       customer_id: parseInt(selectedcustomer_id, 10),
       destination_id: selectedDestinationId ? parseInt(selectedDestinationId, 10) : null,
@@ -127,6 +144,7 @@ export function OrderClient({ isEditing, initialOrderData, catalogs }: OrderClie
       total: total,
       truck_ids: selectedTruckIds.map(id => parseInt(id, 10)),
       driver_ids: selectedDriverIds.map(id => parseInt(id, 10)),
+      ...invoiceData,
     };
 
     const url = isEditing ? `/api/orders/${initialOrderData?.id}` : "/api/orders";
@@ -162,6 +180,54 @@ export function OrderClient({ isEditing, initialOrderData, catalogs }: OrderClie
   return (
     <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 items-start">
       <div className="lg:col-span-3 space-y-6">
+                <Card>
+          <CardHeader><CardTitle className="flex items-center gap-2"><ShoppingCart />Datos Generales</CardTitle></CardHeader>
+          <CardContent>
+             <div className="grid md:grid-cols-2 gap-4">
+               <div className="space-y-2">
+                  <Label>Cliente *</Label>
+                  <SearchableSelect
+                    value={selectedcustomer_id}
+                    onChange={(value) => {
+                      setSelectedcustomer_id(value);
+                      setSelectedDestinationId(undefined);
+                      setSelectedInvoice(undefined); // Limpia la factura al cambiar de cliente
+                    }}
+                    placeholder="Selecciona un cliente..."
+                    options={catalogs.clients.map(client => ({ value: client.id.toString(), label: client.name }))}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Destino (Opcional)</Label>
+                  <SearchableSelect
+                    value={selectedDestinationId}
+                    onChange={setSelectedDestinationId}
+                    placeholder="Selecciona un destino..."
+                    disabled={!selectedcustomer_id || filteredDestinations.length === 0}
+                    options={filteredDestinations.map(dest => ({ value: dest.id.toString(), label: dest.name }))}
+                  />
+                </div>
+             </div>
+            {/* --- 👇 NUEVO CAMPO PARA VINCULAR FACTURA --- */}
+            <div className="mt-4 space-y-2">
+              <Label className="flex items-center gap-2"><FileText size={16}/> Vincular Factura (Opcional)</Label>
+              <SearchableSelect
+                value={selectedInvoice}
+                onChange={setSelectedInvoice}
+                placeholder="Selecciona una factura disponible..."
+                disabled={!selectedcustomer_id}
+                options={catalogs.invoices
+                  // Filtra facturas para que coincidan con el cliente seleccionado
+                  .filter(inv => inv.customer_name === catalogs.clients.find(c => c.id.toString() === selectedcustomer_id)?.name)
+                  .map(inv => ({
+                    // Usamos un separador para crear un valor único
+                    value: `${inv.invoice_series}|${inv.invoice_number}|${inv.invoice_n}`,
+                    label: `Factura ${inv.invoice_series}-${inv.invoice_number} ($${inv.total_usd.toFixed(2)})`,
+                  }))}
+              />
+            </div>
+          </CardContent>
+        </Card>
         <Card>
           <CardHeader><CardTitle>Datos Generales</CardTitle></CardHeader>
           <CardContent className="grid md:grid-cols-2 gap-4">

@@ -5,7 +5,8 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { OrderForm } from "./order-form";
-import type { Client, Product, Destination, Truck, Driver } from "@/lib/types";
+// Asegúrate de que tu archivo de tipos exporte 'Invoice'
+import type { Client, Product, Destination, Truck, Driver, Invoice } from "@/lib/types";
 
 // Define las props que recibirá este componente cliente
 interface OrderFormClientProps {
@@ -14,6 +15,7 @@ interface OrderFormClientProps {
   destinations: Destination[];
   trucks: Truck[];
   drivers: Driver[];
+  invoices: Invoice[]; // <-- Añadido
 }
 
 export function OrderFormClient({
@@ -22,6 +24,7 @@ export function OrderFormClient({
   destinations,
   trucks,
   drivers,
+  invoices, // <-- Recibimos las facturas
 }: OrderFormClientProps) {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -37,14 +40,17 @@ export function OrderFormClient({
       });
 
       if (!response.ok) {
-        throw new Error("No se pudo crear el pedido");
+        const errorData = await response.json();
+        throw new Error(errorData.message || "No se pudo crear el pedido");
       }
 
       toast.success("¡Pedido creado exitosamente!");
-      router.push("/cashier/orders/list"); // Redirige a la lista de pedidos
-      router.refresh(); // Actualiza los datos de la cache
-    } catch (error) {
-      toast.error("Error al crear el pedido.");
+      router.push("/cashier/orders/list");
+      router.refresh();
+    } catch (error: any) {
+      toast.error("Error al crear el pedido.", {
+        description: error.message
+      });
       console.error(error);
     } finally {
       setIsSubmitting(false);
@@ -53,16 +59,15 @@ export function OrderFormClient({
 
   return (
     <OrderForm
-      // Corrige los nombres de las props a 'initial...'
       initialClients={clients}
       initialProducts={products}
       initialDestinations={destinations}
       initialTrucks={trucks}
       initialDrivers={drivers}
-      // Pasa las props requeridas para el manejo del formulario
+      initialInvoices={invoices} // <-- Pasamos las facturas al formulario
       onSubmit={handleCreateOrder}
       isSubmitting={isSubmitting}
-      isEditing={false} // Indica que es un formulario de creación
+      isEditing={false}
     />
   );
 }
