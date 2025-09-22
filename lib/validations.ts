@@ -53,7 +53,7 @@ export const createOrderSchema = z.object({
   
   invoice_series: z.string().optional().nullable(),
   invoice_number: z.coerce.number().optional().nullable(),
-  invoice_n: z.coerce.number().optional().nullable(),
+  invoice_n: z.string().optional().nullable(),
 });
 
 /**

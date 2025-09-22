@@ -198,7 +198,7 @@ export function OrderForm({
       invoiceData = {
         invoice_series: series,
         invoice_number: parseInt(number, 10),
-        invoice_n: parseInt(n, 10),
+        invoice_n: n,
       };
     }
 

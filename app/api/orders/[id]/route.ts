@@ -120,7 +120,7 @@ export async function PUT(request: Request, { params }: { params: { id: string }
         { name: "total", type: TYPES.Decimal, value: orderData.total },
         { name: "invoice_series", type: TYPES.NVarChar, value: orderData.invoice_series },
         { name: "invoice_number", type: TYPES.Int, value: orderData.invoice_number },
-        { name: "invoice_n", type: TYPES.Int, value: orderData.invoice_n },
+        { name: "invoice_n", type: TYPES.NVarChar, value: orderData.invoice_n },
     ]);
 
     await executeQuery(`DELETE FROM RIP.APP_PEDIDOS_ITEMS WHERE order_id = @id`, [{ name: "id", type: TYPES.Int, value: id }]);

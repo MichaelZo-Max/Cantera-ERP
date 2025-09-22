@@ -1,7 +1,7 @@
 -- =================================================================
--- SCRIPT DE DESPLIEGUE A PRODUCCIÓN (Versión Final Integrada)
+-- SCRIPT DE DESPLIEGUE A PRODUCCIÓN (Versión Final con Sintaxis Clásica)
 -- Propósito: Crea y ajusta el esquema, tablas, funciones y vistas para el aplicativo.
--- Este script es idempotente y puede ejecutarse múltiples veces.
+-- Este script es idempotente y utiliza DROP/CREATE para máxima compatibilidad.
 -- =================================================================
 
 -- 1. CREACIÓN DEL ESQUEMA
@@ -99,17 +99,13 @@ BEGIN
         created_by INT NOT NULL,
         created_at DATETIME NOT NULL DEFAULT GETDATE(),
         updated_at DATETIME NOT NULL DEFAULT GETDATE(),
-        -- Campos para enlazar a factura existente
-        invoice_series NVARCHAR(10) COLLATE Latin1_General_CS_AI NULL,
+        invoice_series NVARCHAR(4) COLLATE Latin1_General_CS_AI NULL,
         invoice_number INT NULL,
-        invoice_n INT NULL,
-        -- Foreign Keys
+        invoice_n NCHAR(1) COLLATE Modern_Spanish_CI_AS NULL,
         FOREIGN KEY (customer_id) REFERENCES dbo.CLIENTES(CODCLIENTE),
         FOREIGN KEY (created_by) REFERENCES RIP.APP_USUARIOS(id),
         FOREIGN KEY (destination_id) REFERENCES RIP.APP_DESTINOS(id),
-        -- Check Constraint
         CONSTRAINT CK_APP_PEDIDOS_status CHECK (status IN ('AWAITING_PAYMENT', 'PAID', 'PARTIALLY_DISPATCHED', 'DISPATCHED_COMPLETE', 'CANCELLED')),
-        -- Foreign Key a FacturasVenta
         CONSTRAINT FK_APP_PEDIDOS_FACTURASVENTA FOREIGN KEY (invoice_series, invoice_number, invoice_n) REFERENCES dbo.FACTURASVENTA(NUMSERIE, NUMFACTURA, N)
     );
     PRINT 'Tabla RIP.APP_PEDIDOS creada.';
@@ -117,7 +113,7 @@ END
 ELSE
 BEGIN
     PRINT 'Tabla RIP.APP_PEDIDOS ya existe. Verificando y aplicando actualizaciones...';
-    -- Actualizar la restricción de STATUS
+    
     IF EXISTS (SELECT 1 FROM sys.check_constraints WHERE name = 'CK_APP_PEDIDOS_status')
     BEGIN
         ALTER TABLE RIP.APP_PEDIDOS DROP CONSTRAINT CK_APP_PEDIDOS_status;
@@ -125,33 +121,45 @@ BEGIN
     ALTER TABLE RIP.APP_PEDIDOS ADD CONSTRAINT CK_APP_PEDIDOS_status CHECK (status IN ('AWAITING_PAYMENT', 'PAID', 'PARTIALLY_DISPATCHED', 'DISPATCHED_COMPLETE', 'CANCELLED'));
     PRINT ' -> Restricción CK_APP_PEDIDOS_status actualizada.';
 
-    -- Añadir columnas de factura si no existen
     IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE Name = N'invoice_series' AND Object_ID = Object_ID(N'RIP.APP_PEDIDOS'))
     BEGIN
-        ALTER TABLE RIP.APP_PEDIDOS ADD invoice_series NVARCHAR(10) COLLATE Latin1_General_CS_AI NULL;
+        ALTER TABLE RIP.APP_PEDIDOS ADD invoice_series NVARCHAR(4) COLLATE Latin1_General_CS_AI NULL;
         PRINT ' -> Columna "invoice_series" añadida.';
     END
+    ELSE
+    BEGIN
+        ALTER TABLE RIP.APP_PEDIDOS ALTER COLUMN invoice_series NVARCHAR(4) COLLATE Latin1_General_CS_AI NULL;
+        PRINT ' -> Columna "invoice_series" actualizada a la definición correcta.';
+    END
+
     IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE Name = N'invoice_number' AND Object_ID = Object_ID(N'RIP.APP_PEDIDOS'))
     BEGIN
         ALTER TABLE RIP.APP_PEDIDOS ADD invoice_number INT NULL;
         PRINT ' -> Columna "invoice_number" añadida.';
     END
+
     IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE Name = N'invoice_n' AND Object_ID = Object_ID(N'RIP.APP_PEDIDOS'))
     BEGIN
-        ALTER TABLE RIP.APP_PEDIDOS ADD invoice_n INT NULL;
+        ALTER TABLE RIP.APP_PEDIDOS ADD invoice_n NCHAR(1) COLLATE Modern_Spanish_CI_AS NULL;
         PRINT ' -> Columna "invoice_n" añadida.';
     END
-
-    -- Añadir la clave foránea si no existe
-    IF NOT EXISTS (SELECT * FROM sys.foreign_keys WHERE object_id = OBJECT_ID(N'[RIP].[FK_APP_PEDIDOS_FACTURASVENTA]') AND parent_object_id = OBJECT_ID(N'[RIP].[APP_PEDIDOS]'))
+    ELSE
     BEGIN
-        -- Es posible que la intercalación de la columna existente no coincida. Se ajusta primero.
-        ALTER TABLE RIP.APP_PEDIDOS ALTER COLUMN invoice_series NVARCHAR(10) COLLATE Latin1_General_CS_AI NULL;
-        ALTER TABLE RIP.APP_PEDIDOS ADD CONSTRAINT FK_APP_PEDIDOS_FACTURASVENTA
-        FOREIGN KEY (invoice_series, invoice_number, invoice_n)
-        REFERENCES dbo.FACTURASVENTA(NUMSERIE, NUMFACTURA, N);
-        PRINT ' -> Restricción FK_APP_PEDIDOS_FACTURASVENTA creada.';
+        ALTER TABLE RIP.APP_PEDIDOS ALTER COLUMN invoice_n NCHAR(1) COLLATE Modern_Spanish_CI_AS NULL;
+        PRINT ' -> Columna "invoice_n" actualizada a la definición correcta.';
     END
+
+    IF EXISTS (SELECT * FROM sys.foreign_keys WHERE object_id = OBJECT_ID(N'[RIP].[FK_APP_PEDIDOS_FACTURASVENTA]'))
+    BEGIN
+        ALTER TABLE RIP.APP_PEDIDOS DROP CONSTRAINT FK_APP_PEDIDOS_FACTURASVENTA;
+        PRINT ' -> Restricción FK_APP_PEDIDOS_FACTURASVENTA eliminada para ser recreada.';
+    END
+    
+    ALTER TABLE RIP.APP_PEDIDOS ADD CONSTRAINT FK_APP_PEDIDOS_FACTURASVENTA
+    FOREIGN KEY (invoice_series, invoice_number, invoice_n)
+    REFERENCES dbo.FACTURASVENTA(NUMSERIE, NUMFACTURA, N);
+    PRINT ' -> Restricción FK_APP_PEDIDOS_FACTURASVENTA creada/actualizada.';
+    
     PRINT 'Tabla RIP.APP_PEDIDOS actualizada.';
 END
 GO
@@ -289,27 +297,34 @@ END
 GO
 
 -- 3. CREACIÓN DE FUNCIONES
-CREATE OR ALTER FUNCTION [rip].[F_GET_COTIZACION_RIP](
-    @IMPORTE FLOAT
-    , @FECHA DATE
-    , @FACTOR_REAL FLOAT
-    , @ORIGEN INT
-    , @DESTINO INT
+
+IF OBJECT_ID('[rip].[F_GET_COTIZACION_RIP]', 'FN') IS NOT NULL
+BEGIN
+    DROP FUNCTION [rip].[F_GET_COTIZACION_RIP];
+END
+GO
+
+CREATE FUNCTION [rip].[F_GET_COTIZACION_RIP](
+    @IMPORTE FLOAT, 
+    @FECHA DATE, 
+    @FACTOR_REAL FLOAT, 
+    @ORIGEN INT, 
+    @DESTINO INT
 )
 RETURNS FLOAT
 AS
 BEGIN
-    DECLARE @VALOR FLOAT
-    DECLARE @MULTIPLICO AS NCHAR(1)=(SELECT NUMERADOR FROM MONEDAS WITH(NOLOCK) WHERE CODMONEDA=@DESTINO )
+    DECLARE @VALOR FLOAT;
+    DECLARE @MULTIPLICO AS NCHAR(1) = (SELECT NUMERADOR FROM MONEDAS WITH(NOLOCK) WHERE CODMONEDA = @DESTINO);
     
     SELECT 
         @VALOR = CASE     
-            WHEN @ORIGEN=@DESTINO THEN @IMPORTE --CUANDO EL ORIGEN Y DESTINO SON IGUALES NO SE CONVIERTE
-            WHEN @ORIGEN<>@DESTINO AND @MULTIPLICO='F' THEN @IMPORTE*@FACTOR_REAL*dbo.F_GET_COTIZACION(@FECHA, @DESTINO) --CUANDO SON DIFERENTES DEBO LLEVAR A LA MONEDA PPAL Y LUEGO A LA MONEDA DESTINO
-            ELSE @IMPORTE*@FACTOR_REAL/dbo.F_GET_COTIZACION(@FECHA, @DESTINO) --CUANDO SON DIFERENTES DEBO LLEVAR A LA MONEDA PPAL Y LUEGO A LA MONEDA DESTINO
-        END
+            WHEN @ORIGEN = @DESTINO THEN @IMPORTE
+            WHEN @ORIGEN <> @DESTINO AND @MULTIPLICO = 'F' THEN @IMPORTE * @FACTOR_REAL * dbo.F_GET_COTIZACION(@FECHA, @DESTINO)
+            ELSE @IMPORTE * @FACTOR_REAL / dbo.F_GET_COTIZACION(@FECHA, @DESTINO)
+        END;
 
-    RETURN(@VALOR)
+    RETURN(@VALOR);
 END
 GO
 PRINT 'Función [rip].[F_GET_COTIZACION_RIP] creada/actualizada.';
@@ -317,8 +332,13 @@ GO
 
 -- 4. CREACIÓN DE VISTAS
 
--- Vista de Clientes
-CREATE OR ALTER VIEW RIP.VW_APP_CLIENTES AS
+IF OBJECT_ID('RIP.VW_APP_CLIENTES', 'V') IS NOT NULL
+BEGIN
+    DROP VIEW RIP.VW_APP_CLIENTES;
+END
+GO
+
+CREATE VIEW RIP.VW_APP_CLIENTES AS
 SELECT
     CODCLIENTE AS id, NOMBRECLIENTE AS name, NIF20 AS rfc,
     DIRECCION1 AS address, TELEFONO1 AS phone, E_MAIL AS email,
@@ -327,8 +347,13 @@ FROM
     dbo.CLIENTES;
 GO
 
--- Vista de Productos
-CREATE OR ALTER VIEW RIP.VW_APP_PRODUCTOS AS
+IF OBJECT_ID('RIP.VW_APP_PRODUCTOS', 'V') IS NOT NULL
+BEGIN
+    DROP VIEW RIP.VW_APP_PRODUCTOS;
+END
+GO
+
+CREATE VIEW RIP.VW_APP_PRODUCTOS AS
 WITH ULTIMOS_PRECIOS AS (
     SELECT
         L.CODARTICULO, L.PRECIO,
@@ -354,8 +379,13 @@ FROM dbo.ARTICULOS A
 LEFT JOIN ULTIMOS_PRECIOS P ON A.CODARTICULO = P.CODARTICULO AND P.RN = 1;
 GO
 
--- Vista base de Pedidos
-CREATE OR ALTER VIEW RIP.VW_APP_PEDIDOS AS
+IF OBJECT_ID('RIP.VW_APP_PEDIDOS', 'V') IS NOT NULL
+BEGIN
+    DROP VIEW RIP.VW_APP_PEDIDOS;
+END
+GO
+
+CREATE VIEW RIP.VW_APP_PEDIDOS AS
 SELECT
     p.id,
     p.order_number,
@@ -382,9 +412,13 @@ LEFT JOIN
     RIP.APP_USUARIOS u ON p.created_by = u.id;
 GO
 
--- Vista de Despachos
-CREATE OR ALTER VIEW RIP.VW_APP_DESPACHOS
-AS
+IF OBJECT_ID('RIP.VW_APP_DESPACHOS', 'V') IS NOT NULL
+BEGIN
+    DROP VIEW RIP.VW_APP_DESPACHOS;
+END
+GO
+
+CREATE VIEW RIP.VW_APP_DESPACHOS AS
 SELECT
     d.id,
     d.order_id,
@@ -405,9 +439,13 @@ FROM
     RIP.APP_DESPACHOS d;
 GO
 
--- Vista de Pedidos con Transporte Autorizado
-CREATE OR ALTER VIEW RIP.VW_APP_PEDIDOS_CON_TRANSPORTE
-AS
+IF OBJECT_ID('RIP.VW_APP_PEDIDOS_CON_TRANSPORTE', 'V') IS NOT NULL
+BEGIN
+    DROP VIEW RIP.VW_APP_PEDIDOS_CON_TRANSPORTE;
+END
+GO
+
+CREATE VIEW RIP.VW_APP_PEDIDOS_CON_TRANSPORTE AS
 SELECT
     p.id,
     p.order_number,
@@ -437,15 +475,19 @@ JOIN
     dbo.CLIENTES c ON p.customer_id = c.CODCLIENTE;
 GO
 
--- Vista de Facturas disponibles para asociar a Pedidos
-CREATE OR ALTER VIEW RIP.VW_APP_FACTURAS_DISPONIBLES AS
+IF OBJECT_ID('RIP.VW_APP_FACTURAS_DISPONIBLES', 'V') IS NOT NULL
+BEGIN
+    DROP VIEW RIP.VW_APP_FACTURAS_DISPONIBLES;
+END
+GO
+
+CREATE VIEW RIP.VW_APP_FACTURAS_DISPONIBLES AS
 SELECT
     FV.NUMSERIE AS invoice_series,
     FV.NUMFACTURA AS invoice_number,
     FV.N AS invoice_n,
     C.NOMBRECLIENTE AS customer_name,
     FV.FECHA AS invoice_date,
-    -- Usamos la función oficial para mostrar el total de la factura en USD
     ROUND(RIP.F_GET_COTIZACION_RIP(FV.TOTALNETO, FV.FECHA, FV.FACTORMONEDA, FV.CODMONEDA, 2), 2) AS total_usd
 FROM
     dbo.FACTURASVENTA FV
@@ -453,12 +495,16 @@ INNER JOIN
     dbo.CLIENTES C ON FV.CODCLIENTE = C.CODCLIENTE
 LEFT JOIN
     RIP.APP_PEDIDOS P ON FV.NUMSERIE = P.invoice_series
-                      AND FV.NUMFACTURA = P.invoice_number
-                      AND FV.N = P.invoice_n
+                    AND FV.NUMFACTURA = P.invoice_number
+                    AND FV.N = P.invoice_n
 WHERE
-    P.id IS NULL; -- La condición clave: solo trae facturas SIN una orden asociada
-GO
-PRINT 'Vistas creadas/actualizadas.';
+    P.id IS NULL;
 GO
 
-PRINT '¡Despliegue completado! El esquema, las tablas, funciones y vistas han sido creados/actualizados.';
+PRINT 'Todas las vistas han sido creadas/actualizadas.';
+GO
+
+PRINT '====================================================================================';
+PRINT '¡Despliegue completado! El esquema, tablas, funciones y vistas han sido creados/actualizados.';
+PRINT '====================================================================================';
+GO

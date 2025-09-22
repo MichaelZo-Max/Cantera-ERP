@@ -99,10 +99,9 @@ export async function POST(req: Request) {
       { name: "customer_id", type: TYPES.Int, value: customer_id },
       { name: "destination_id", type: TYPES.Int, value: destination_id },
       { name: "created_by", type: TYPES.Int, value: user.id },
-      // --- 👇 CORRECCIÓN: Pasar los parámetros correctos de la factura ---
       { name: "invoice_series", type: TYPES.NVarChar, value: invoice_series },
       { name: "invoice_number", type: TYPES.Int, value: invoice_number },
-      { name: "invoice_n", type: TYPES.Int, value: invoice_n },
+      { name: "invoice_n", type: TYPES.NVarChar, value: invoice_n },
     ]);
 
     if (!headerResult || headerResult.length === 0 || !headerResult[0].id) {
