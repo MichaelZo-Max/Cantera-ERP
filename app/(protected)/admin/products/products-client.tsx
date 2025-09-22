@@ -1,7 +1,7 @@
-// app/(protected)/admin/products/products-client.tsx
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useEffect } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -9,32 +9,58 @@ import { AnimatedCard } from "@/components/ui/animated-card";
 import type { Product } from "@/lib/types";
 import { Package, Search } from "lucide-react";
 import { EmptyState } from "@/components/ui/empty-state";
+import { useDebounce } from "@/hooks/use-debounce";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
 
-// Componente simplificado a solo lectura
 export function ProductsClientUI({
-  initialProducts,
+  data,
+  pageCount,
 }: {
-  initialProducts: Product[];
+  data: Product[];
+  pageCount: number;
 }) {
-  const [products] = useState<Product[]>(initialProducts);
-  const [searchTerm, setSearchTerm] = useState("");
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
 
-  const filteredProducts = useMemo(
-    () =>
-      products.filter(
-        (product) =>
-          product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          (product.description &&
-            product.description
-              .toLowerCase()
-              .includes(searchTerm.toLowerCase()))
-      ),
-    [products, searchTerm]
-  );
+  const currentPage = Number(searchParams.get("page")) || 1;
+  const currentQuery = searchParams.get("q") || "";
+
+  const [searchTerm, setSearchTerm] = useState(currentQuery);
+  const debouncedSearchTerm = useDebounce(searchTerm, 500);
+
+  // Efecto corregido para actualizar la URL solo cuando la búsqueda cambia
+  useEffect(() => {
+    const params = new URLSearchParams(searchParams.toString());
+    
+    // Solo actualizamos la URL si el término de búsqueda debounced es diferente
+    // al que ya está en la URL, para evitar bucles de renderizado.
+    if (debouncedSearchTerm !== currentQuery) {
+      if (debouncedSearchTerm) {
+        params.set("q", debouncedSearchTerm);
+      } else {
+        params.delete("q");
+      }
+      // Volver a la página 1 solo cuando se realiza una nueva búsqueda
+      params.set("page", "1");
+      router.replace(`${pathname}?${params.toString()}`);
+    }
+  }, [debouncedSearchTerm, currentQuery, pathname, router, searchParams]);
+
+  const handlePageChange = (newPage: number) => {
+    const params = new URLSearchParams(searchParams);
+    params.set("page", String(newPage));
+    router.push(`${pathname}?${params.toString()}`);
+  };
 
   return (
     <div className="space-y-8 animate-fade-in">
-      {/* Header simplificado, sin botón de "Nuevo Producto" */}
       <div className="flex justify-between items-center">
         <div className="space-y-2">
           <div className="flex items-center space-x-3">
@@ -53,13 +79,12 @@ export function ProductsClientUI({
         </div>
       </div>
 
-      {/* Search Bar (se mantiene) */}
       <AnimatedCard hoverEffect="lift" className="glass">
         <CardContent className="pt-6">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-5 w-5" />
             <Input
-              placeholder="Buscar por name o descripción..."
+              placeholder="Buscar por nombre o descripción..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-12 h-12 text-lg focus-ring"
@@ -68,22 +93,21 @@ export function ProductsClientUI({
         </CardContent>
       </AnimatedCard>
 
-      {/* Grilla de Productos (solo lectura) */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filteredProducts.length === 0 ? (
+        {data.length === 0 ? (
           <div className="col-span-full">
             <Card className="glass">
               <CardContent className="pt-6">
                 <EmptyState
                   icon={<Package className="h-12 w-12" />}
-                  title="No hay productos para mostrar"
-                  description="El catálogo de productos está vacío o no se pudo cargar."
+                  title="No se encontraron productos"
+                  description="Intenta con otra búsqueda o revisa el catálogo más tarde."
                 />
               </CardContent>
             </Card>
           </div>
         ) : (
-          filteredProducts.map((product, index) => (
+          data.map((product, index) => (
             <AnimatedCard
               key={product.id}
               hoverEffect="lift"
@@ -104,7 +128,9 @@ export function ProductsClientUI({
                   </div>
                   <Badge
                     variant={product.is_active ? "default" : "secondary"}
-                    className={product.is_active ? "bg-gradient-primary" : ""}
+                    className={
+                      product.is_active ? "bg-gradient-primary" : ""
+                    }
                   >
                     {product.is_active ? "Activo" : "Inactivo"}
                   </Badge>
@@ -121,6 +147,45 @@ export function ProductsClientUI({
           ))
         )}
       </div>
+
+      {pageCount > 1 && (
+        <Pagination>
+          <PaginationContent>
+            <PaginationItem>
+              <PaginationPrevious
+                href="#"
+                onClick={(e) => {
+                  e.preventDefault();
+                  if (currentPage > 1) handlePageChange(currentPage - 1);
+                }}
+                className={
+                  currentPage === 1
+                    ? "pointer-events-none opacity-50"
+                    : undefined
+                }
+              />
+            </PaginationItem>
+            <span className="text-sm text-muted-foreground px-4">
+              Página {currentPage} de {pageCount}
+            </span>
+            <PaginationItem>
+              <PaginationNext
+                href="#"
+                onClick={(e) => {
+                  e.preventDefault();
+                  if (currentPage < pageCount)
+                    handlePageChange(currentPage + 1);
+                }}
+                className={
+                  currentPage === pageCount
+                    ? "pointer-events-none opacity-50"
+                    : undefined
+                }
+              />
+            </PaginationItem>
+          </PaginationContent>
+        </Pagination>
+      )}
     </div>
   );
 }

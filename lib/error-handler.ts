@@ -1,51 +1,31 @@
-import { toast } from "@/hooks/use-toast"
+import { NextResponse } from 'next/server';
 
-export class AppError extends Error {
-  constructor(
-    message: string,
-    public code?: string,
-    public statusCode?: number,
-  ) {
-    super(message)
-    this.name = "AppError"
-  }
-}
+/**
+ * A centralized error handler for API routes.
+ * Logs the error to the console and returns a standardized JSON response.
+ * @param error - The error object, preferably an instance of Error.
+ * @returns A NextResponse object with a 500 status code and JSON error message.
+ */
+export function errorHandler(error: unknown) {
+  // Log the full error to the server console for debugging
+  console.error("API Route Error:", error);
 
-export function handleError(error: unknown, context?: string) {
-  console.error(`[${context || "App"}] Error:`, error)
+  const message = error instanceof Error 
+    ? error.message 
+    : 'An unexpected internal server error occurred.';
 
-  if (error instanceof AppError) {
-    toast({
-      title: "Error",
-      description: error.message,
-      variant: "destructive",
-    })
-    return
-  }
-
-  if (error instanceof Error) {
-    toast({
-      title: "Error inesperado",
-      description: error.message,
-      variant: "destructive",
-    })
-    return
-  }
-
-  toast({
-    title: "Error",
-    description: "Ha ocurrido un error inesperado",
-    variant: "destructive",
-  })
-}
-
-export function createAsyncHandler<T extends any[], R>(fn: (...args: T) => Promise<R>, context?: string) {
-  return async (...args: T): Promise<R | undefined> => {
-    try {
-      return await fn(...args)
-    } catch (error) {
-      handleError(error, context)
-      return undefined
+  return new NextResponse(
+    JSON.stringify({
+      error: {
+        message: message,
+      },
+    }),
+    { 
+      status: 500,
+      headers: {
+        'Content-Type': 'application/json',
+      },
     }
-  }
+  );
 }
+

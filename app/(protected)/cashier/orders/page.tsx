@@ -24,7 +24,7 @@ async function getOrderCatalogs(): Promise<{
       fetch(`${baseUrl}/api/destinations`, { next: { revalidate: 60, tags: ["destinations"] } }),
       fetch(`${baseUrl}/api/trucks`, { next: { revalidate: 60, tags: ["trucks"] } }),
       fetch(`${baseUrl}/api/drivers`, { next: { revalidate: 60, tags: ["drivers"] } }),
-      fetch(`${baseUrl}/api/invoices`, { next: { revalidate: 0 } }), // <-- No cachear facturas
+      fetch(`${baseUrl}/api/invoices`, { cache: 'no-store' }),
     ]);
 
     if (!cRes.ok) throw new Error("Error al cargar clientes");

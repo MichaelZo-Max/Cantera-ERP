@@ -1,4 +1,3 @@
-// lib/db.ts
 import { Connection, Request, TYPES, ConnectionError } from "tedious";
 
 // Definición de tipos para mayor claridad
@@ -22,6 +21,7 @@ const config = {
     database: process.env.DB_DATABASE || 'CANTERA',
     trustServerCertificate: true,
     encrypt: false,
+    requestTimeout: 30000, // Aumentado el timeout a 30 segundos
     // El pool se configura aquí y Tedious lo gestiona automáticamente
     pool: {
       min: 0,
