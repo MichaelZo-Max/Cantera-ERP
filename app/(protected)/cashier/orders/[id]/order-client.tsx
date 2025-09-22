@@ -69,9 +69,13 @@ export function OrderClient({ isEditing, initialOrderData, catalogs }: OrderClie
         pricePerUnit: Number(item.price_per_unit),
         subtotal: Number(item.quantity) * Number(item.price_per_unit),
       })) ?? []);
-      if (initialOrderData.invoice_series && initialOrderData.invoice_number && initialOrderData.invoice_n) {
-          const invoiceValue = `${initialOrderData.invoice_series}|${initialOrderData.invoice_number}|${initialOrderData.invoice_n}`;
-          setSelectedInvoice(invoiceValue);
+      if (
+        initialOrderData.invoice_series &&
+        initialOrderData.invoice_number !== null && 
+        typeof initialOrderData.invoice_number !== 'undefined'
+      ) {
+        const invoiceValue = `${initialOrderData.invoice_series}|${initialOrderData.invoice_number}|${initialOrderData.invoice_n}`;
+        setSelectedInvoice(invoiceValue);
       }
     }
   }, [isEditing, initialOrderData]);
@@ -171,7 +175,7 @@ export function OrderClient({ isEditing, initialOrderData, catalogs }: OrderClie
     } finally {
       setIsSubmitting(false);
     }
-  }, [isEditing, initialOrderData, selectedcustomer_id, selectedDestinationId, orderItems, total, selectedTruckIds, selectedDriverIds, router]);
+  }, [isEditing, initialOrderData, selectedcustomer_id, selectedDestinationId, orderItems, total, selectedTruckIds, selectedDriverIds, router, selectedInvoice ]);
   
   const canSubmit = useMemo(() => (
     !!selectedcustomer_id && orderItems.length > 0 && selectedTruckIds.length > 0 && selectedDriverIds.length > 0

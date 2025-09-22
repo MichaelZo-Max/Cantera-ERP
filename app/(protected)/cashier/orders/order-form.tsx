@@ -82,7 +82,6 @@ export function OrderForm({
   onSubmit,
   isSubmitting,
 }: OrderFormProps) {
-  // 1. Inicializa los estados como vacíos o con valores por defecto.
   const [selectedcustomer_id, setSelectedcustomer_id] = useState<string>("");
   const [selectedDestinationId, setSelectedDestinationId] = useState<string | undefined>(undefined);
   const [selectedTruckIds, setSelectedTruckIds] = useState<string[]>([]);
@@ -93,17 +92,12 @@ export function OrderForm({
   const [selectedInvoice, setSelectedInvoice] = useState<string | undefined>(undefined);
 
   useEffect(() => {
-    // Verifica que estemos en modo edición y que los datos iniciales existan.
     if (isEditing && initialOrderData) {
-      // Establece el cliente y el destino
       setSelectedcustomer_id(String(initialOrderData.customer_id ?? ""));
       setSelectedDestinationId(initialOrderData.destination_id?.toString() ?? undefined);
-      
-      // Establece los camiones y choferes seleccionados
       setSelectedTruckIds(initialOrderData.trucks?.map((t: TruckType) => t.id.toString()) ?? []);
       setSelectedDriverIds(initialOrderData.drivers?.map((d: Driver) => d.id.toString()) ?? []);
       
-      // Establece los items (productos) del pedido
       if (initialOrderData.items) {
         const items = initialOrderData.items.map((item) => ({
           id: crypto.randomUUID(),
@@ -113,6 +107,15 @@ export function OrderForm({
           subtotal: Number(item.quantity) * Number(item.price_per_unit),
         }));
         setOrderItems(items);
+      }
+
+      if (
+        initialOrderData.invoice_series &&
+        initialOrderData.invoice_number !== null && 
+        typeof initialOrderData.invoice_number !== 'undefined'
+      ) {
+        const invoiceValue = `${initialOrderData.invoice_series}|${initialOrderData.invoice_number}|${initialOrderData.invoice_n}`;
+        setSelectedInvoice(invoiceValue);
       }
     }
   }, [isEditing, initialOrderData]);
@@ -200,6 +203,8 @@ export function OrderForm({
       total: total,
       truck_ids: selectedTruckIds.map((id) => parseInt(id, 10)),
       driver_ids: selectedDriverIds.map((id) => parseInt(id, 10)),
+      // ✅ CORRECCIÓN 2: Combinar los datos de la factura con el resto de la orden
+      ...invoiceData, 
     };
     onSubmit(orderData);
   };
@@ -214,6 +219,7 @@ export function OrderForm({
   );
 
   return (
+    // ... El resto del JSX no necesita cambios, ya está bien estructurado ...
     <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 items-start p-2">
       <div className="lg:col-span-3 space-y-6">
         <Card>
@@ -224,7 +230,6 @@ export function OrderForm({
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {/* --- 👇 MODIFICADO PARA INCLUIR EL CAMPO DE FACTURA --- */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Cliente *</Label>
@@ -233,7 +238,7 @@ export function OrderForm({
                   onChange={(value) => {
                     setSelectedcustomer_id(value);
                     setSelectedDestinationId(undefined);
-                    setSelectedInvoice(undefined); // Limpia la factura si cambia el cliente
+                    setSelectedInvoice(undefined);
                   }}
                   placeholder="Selecciona un cliente..."
                   options={initialClients.map((client) => ({ value: client.id.toString(), label: client.name }))}
@@ -250,7 +255,6 @@ export function OrderForm({
                 />
               </div>
             </div>
-            {/* --- 👇 NUEVO CAMPO PARA VINCULAR FACTURA --- */}
             <div className="mt-4 space-y-2">
               <Label className="flex items-center gap-2"><FileText size={16}/> Vincular Factura (Opcional)</Label>
               <SearchableSelect
@@ -259,10 +263,8 @@ export function OrderForm({
                 placeholder="Selecciona una factura disponible..."
                 disabled={!selectedcustomer_id}
                 options={initialInvoices
-                  // Filtra facturas para que coincidan con el cliente seleccionado
                   .filter(inv => inv.customer_name === initialClients.find(c => c.id.toString() === selectedcustomer_id)?.name)
                   .map(inv => ({
-                    // Usamos un separador para crear un valor único
                     value: `${inv.invoice_series}|${inv.invoice_number}|${inv.invoice_n}`,
                     label: `Factura ${inv.invoice_series}-${inv.invoice_number} ($${inv.total_usd.toFixed(2)})`,
                   }))}
