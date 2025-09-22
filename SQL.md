@@ -1,164 +1,7 @@
----
-
-## **Contrato de Datos: Backend (SQL Server) ↔ Frontend (Versión Final)**
-
-### **La Regla de Oro**
-
-- **VISTAS (`RIP.VW_...`) son para LEER 👓:** Se usan para buscar y obtener datos maestros (clientes, productos). Son de **solo lectura (`SELECT`)**.
-- **TABLAS (`RIP.APP_...`) son para TRABAJAR ✍️:** Se usan para crear, modificar y gestionar los registros del nuevo flujo (pedidos, despachos, etc.). Soportan operaciones de escritura (`INSERT`, `UPDATE`).
-
----
-
-### **1. Vistas (Solo Lectura)**
-
-#### **`RIP.VW_APP_CLIENTES`**
-
-- **Propósito:** Para buscar y obtener la información de los clientes existentes en el sistema principal.
-- **Columnas:** `id`, `name`, `rfc`, `address`, `phone`, `email`, `is_active`.
-- **Ejemplo de Uso:**
-  - **Buscar un cliente por name:**
-    ```sql
-    SELECT id, name, rfc FROM RIP.VW_APP_CLIENTES WHERE name LIKE '%[texto_busqueda]%';
-    ```
-
-\<br\>
-
-#### **`RIP.VW_APP_PRODUCTOS`**
-
-- **Propósito:** Para buscar productos, obtener su precio oficial y entender su formato de venta.
-- **Columnas:**
-  - `id` (INT): Identificador único del producto.
-  - `codigo` (NVARCHAR): Código o referencia del producto.
-  - `name` (NVARCHAR): Nombre del producto.
-  - `-- MODIFICADO: Nueva columna para la lógica de la UI.`
-  - `sell_format` (NVARCHAR): Indica cómo se vende el producto ('GRANEL', 'PAQUETE', 'UNIDAD', 'SERVICIO').
-  - `price_per_unit` (DECIMAL): **Precio de venta real** por unidad.
-  - `unit` (NVARCHAR): Unidad de medida base (ej. 'm3', 'Ton', 'SACO').
-  - `is_active` (BIT): `1` si está activo, `0` si no.
-- **Ejemplo de Uso:**
-  - **Listar todos los productos activos:**
-    ```sql
-    SELECT id, name, price_per_unit, unit, sell_format FROM RIP.VW_APP_PRODUCTOS WHERE is_active = 1;
-    ```
-
----
-
-### **2. Tablas (Lectura y Escritura)**
-
-#### **`RIP.APP_USUARIOS`**, **`RIP.APP_CAMIONES`**, **`RIP.APP_CHOFERES`**, **`RIP.APP_DESTINOS`**
-
-- _(Sin cambios en su estructura o propósito principal.)_
-
-\<br\>
-
-#### **`RIP.APP_PEDIDOS` (Encabezado)**
-
-- **Propósito:** Almacena el "contrato" o la orden de venta completa con el cliente.
-- **Columnas:**
-  - `id` (autonumérico)
-  - `order_number`
-  - `customer_id`
-  - `truck_id`
-  - `destination_id`
-  - `-- MODIFICADO: El campo status ahora tiene un flujo más detallado.`
-  - `status` (NVARCHAR): 'AWAITING_PAYMENT', 'PAID', 'PARTIALLY_DISPATCHED', 'DISPATCHED_COMPLETE', 'CANCELLED'.
-  - `notes`
-  - `created_by`, etc.
-
-\<br\>
-
-#### **`RIP.APP_PEDIDOS_ITEMS` (Líneas)**
-
-- **Propósito:** Almacena los productos específicos del "contrato" de venta.
-- **Columnas:**
-  - `id` (autonumérico)
-  - `order_id` (vincula con `APP_PEDIDOS`)
-  - `product_id`
-  - `quantity` (DECIMAL)
-  - `price_per_unit` (DECIMAL): El precio se "congela" aquí.
-  - `-- MODIFICADO: Nueva columna para congelar la unidad de venta.`
-  - `unit` (NVARCHAR): La unidad de medida se "congela" aquí (ej. 'm3', 'SACO').
-
-\<br\>
-
-#### **`RIP.APP_DESPACHOS`**
-
-- **Propósito:** `-- MODIFICADO: Ahora registra un viaje o un evento de retiro físico individual.` Un pedido puede tener múltiples despachos.
-- **Columnas:**
-  - `id` (autonumérico)
-  - `order_id` (vincula con el contrato de venta en `APP_PEDIDOS`)
-  - `-- MODIFICADO: El detalle de la carga ahora está en APP_DESPACHOS_ITEMS.`
-  - `loaded_quantity` (DECIMAL): Aún puede ser útil como un total de control del viaje.
-  - `loaded_by`, `load_photo_url`, `exited_by`, `exit_photo_url`, `status`, etc.
-
-\<br\>
-
-#### **`RIP.APP_DESPACHOS_ITEMS`** `-- NUEVA TABLA`
-
-- **Propósito:** Detalla qué productos y qué cantidad específica se cargó en un único viaje (despacho). Es el vínculo entre el despacho y los ítems del pedido.
-- **Columnas:**
-  - `id` (autonumérico)
-  - `despacho_id` (vincula con `APP_DESPACHOS`)
-  - `pedido_item_id` (vincula con la línea del pedido original `APP_PEDIDOS_ITEMS`)
-  - `dispatched_quantity` (DECIMAL): Cantidad cargada en este viaje específico.
-
-\<br\>
-
-#### **`RIP.APP_GUIAS_DESPACHO`** `-- NUEVA TABLA`
-
-- **Propósito:** Almacena la información del documento legal (Guía de Despacho) que se genera para cada viaje.
-- **Columnas:**
-  - `id` (autonumérico)
-  - `despacho_id` (vincula con el viaje en `APP_DESPACHOS`)
-  - `numero_guia` (NVARCHAR)
-  - `fecha_emision` (DATETIME)
-  - y otros campos requeridos por ley.
-
----
-
-### **Flujo de Ejemplo: Venta con Entrega Parcial** `-- FLUJO COMPLETAMENTE MODIFICADO`
-
-**Escenario:** Un cliente paga por 30 m³ de arena, que retirará en 3 viajes de 10 m³.
-
-1.  **Cajero crea el Pedido (Contrato):**
-
-    - Se crea un registro en `RIP.APP_PEDIDOS` con `status = 'PAID'`. Se obtiene el `order_id` (ej. 152).
-    - Se crea un registro en `RIP.APP_PEDIDOS_ITEMS`:
-      ```sql
-      INSERT INTO RIP.APP_PEDIDOS_ITEMS (order_id, product_id, quantity, price_per_unit, unit)
-      VALUES (152, 1001, 30.00, 26.50, 'm3');
-      -- Se obtiene el pedido_item_id (ej. 450)
-      ```
-
-2.  **Llega un camión para el primer viaje:**
-
-    - **Paso 2a: Operador de Patio crea el Despacho (el viaje).**
-      ```sql
-      INSERT INTO RIP.APP_DESPACHOS (order_id, loaded_by, status) VALUES (152, 2, 'LOADING');
-      -- Se obtiene el despacho_id (ej. 801)
-      ```
-    - **Paso 2b: Operador de Patio registra la carga específica de este viaje.**
-      ```sql
-      INSERT INTO RIP.APP_DESPACHOS_ITEMS (despacho_id, pedido_item_id, dispatched_quantity)
-      VALUES (801, 450, 10.00); -- Carga 10m³ del item #450 en el viaje #801
-      ```
-    - **Paso 2c: Se genera la Guía de Despacho para este viaje.**
-      ```sql
-      INSERT INTO RIP.APP_GUIAS_DESPACHO (despacho_id, numero_guia, ...) VALUES (801, 'GUIA-001234', ...);
-      ```
-    - **Paso 2d: El sistema actualiza el estado del pedido general.**
-      ```sql
-      UPDATE RIP.APP_PEDIDOS SET status = 'PARTIALLY_DISPATCHED' WHERE id = 152;
-      ```
-
-3.  **Siguientes Viajes:**
-
-    - El proceso del paso 2 se repite para los viajes 2 y 3.
-    - Después del último viaje, el estado del pedido general se actualiza a `DISPATCHED_COMPLETE`.
-
 -- =================================================================
--- SCRIPT DE DESPLIEGUE A PRODUCCIÓN (Versión Final Corregida)
--- Propósito: Crea y ajusta el esquema, tablas y vistas para el aplicativo.
+-- SCRIPT DE DESPLIEGUE A PRODUCCIÓN (Versión Final Integrada)
+-- Propósito: Crea y ajusta el esquema, tablas, funciones y vistas para el aplicativo.
+-- Este script es idempotente y puede ejecutarse múltiples veces.
 -- =================================================================
 
 -- 1. CREACIÓN DEL ESQUEMA
@@ -170,7 +13,7 @@ END
 GO
 
 -- 2. CREACIÓN DE TABLAS
--- Se crean las tablas en orden de dependencia.
+-- Se crean o actualizan las tablas en orden de dependencia.
 
 -- Tabla de Usuarios
 IF OBJECT_ID('RIP.APP_USUARIOS', 'U') IS NULL
@@ -256,21 +99,59 @@ BEGIN
         created_by INT NOT NULL,
         created_at DATETIME NOT NULL DEFAULT GETDATE(),
         updated_at DATETIME NOT NULL DEFAULT GETDATE(),
+        -- Campos para enlazar a factura existente
+        invoice_series NVARCHAR(10) COLLATE Latin1_General_CS_AI NULL,
+        invoice_number INT NULL,
+        invoice_n INT NULL,
+        -- Foreign Keys
         FOREIGN KEY (customer_id) REFERENCES dbo.CLIENTES(CODCLIENTE),
         FOREIGN KEY (created_by) REFERENCES RIP.APP_USUARIOS(id),
         FOREIGN KEY (destination_id) REFERENCES RIP.APP_DESTINOS(id),
-        CONSTRAINT CK_APP_PEDIDOS_status CHECK (status IN ('AWAITING_PAYMENT', 'PAID', 'PARTIALLY_DISPATCHED', 'DISPATCHED_COMPLETE', 'CANCELLED'))
+        -- Check Constraint
+        CONSTRAINT CK_APP_PEDIDOS_status CHECK (status IN ('AWAITING_PAYMENT', 'PAID', 'PARTIALLY_DISPATCHED', 'DISPATCHED_COMPLETE', 'CANCELLED')),
+        -- Foreign Key a FacturasVenta
+        CONSTRAINT FK_APP_PEDIDOS_FACTURASVENTA FOREIGN KEY (invoice_series, invoice_number, invoice_n) REFERENCES dbo.FACTURASVENTA(NUMSERIE, NUMFACTURA, N)
     );
     PRINT 'Tabla RIP.APP_PEDIDOS creada.';
 END
 ELSE
 BEGIN
-    -- CORRECCIÓN: Lógica mejorada para eliminar y recrear la restricción de forma segura.
+    PRINT 'Tabla RIP.APP_PEDIDOS ya existe. Verificando y aplicando actualizaciones...';
+    -- Actualizar la restricción de STATUS
     IF EXISTS (SELECT 1 FROM sys.check_constraints WHERE name = 'CK_APP_PEDIDOS_status')
     BEGIN
         ALTER TABLE RIP.APP_PEDIDOS DROP CONSTRAINT CK_APP_PEDIDOS_status;
     END
     ALTER TABLE RIP.APP_PEDIDOS ADD CONSTRAINT CK_APP_PEDIDOS_status CHECK (status IN ('AWAITING_PAYMENT', 'PAID', 'PARTIALLY_DISPATCHED', 'DISPATCHED_COMPLETE', 'CANCELLED'));
+    PRINT ' -> Restricción CK_APP_PEDIDOS_status actualizada.';
+
+    -- Añadir columnas de factura si no existen
+    IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE Name = N'invoice_series' AND Object_ID = Object_ID(N'RIP.APP_PEDIDOS'))
+    BEGIN
+        ALTER TABLE RIP.APP_PEDIDOS ADD invoice_series NVARCHAR(10) COLLATE Latin1_General_CS_AI NULL;
+        PRINT ' -> Columna "invoice_series" añadida.';
+    END
+    IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE Name = N'invoice_number' AND Object_ID = Object_ID(N'RIP.APP_PEDIDOS'))
+    BEGIN
+        ALTER TABLE RIP.APP_PEDIDOS ADD invoice_number INT NULL;
+        PRINT ' -> Columna "invoice_number" añadida.';
+    END
+    IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE Name = N'invoice_n' AND Object_ID = Object_ID(N'RIP.APP_PEDIDOS'))
+    BEGIN
+        ALTER TABLE RIP.APP_PEDIDOS ADD invoice_n INT NULL;
+        PRINT ' -> Columna "invoice_n" añadida.';
+    END
+
+    -- Añadir la clave foránea si no existe
+    IF NOT EXISTS (SELECT * FROM sys.foreign_keys WHERE object_id = OBJECT_ID(N'[RIP].[FK_APP_PEDIDOS_FACTURASVENTA]') AND parent_object_id = OBJECT_ID(N'[RIP].[APP_PEDIDOS]'))
+    BEGIN
+        -- Es posible que la intercalación de la columna existente no coincida. Se ajusta primero.
+        ALTER TABLE RIP.APP_PEDIDOS ALTER COLUMN invoice_series NVARCHAR(10) COLLATE Latin1_General_CS_AI NULL;
+        ALTER TABLE RIP.APP_PEDIDOS ADD CONSTRAINT FK_APP_PEDIDOS_FACTURASVENTA
+        FOREIGN KEY (invoice_series, invoice_number, invoice_n)
+        REFERENCES dbo.FACTURASVENTA(NUMSERIE, NUMFACTURA, N);
+        PRINT ' -> Restricción FK_APP_PEDIDOS_FACTURASVENTA creada.';
+    END
     PRINT 'Tabla RIP.APP_PEDIDOS actualizada.';
 END
 GO
@@ -407,7 +288,34 @@ BEGIN
 END
 GO
 
--- 3. CREACIÓN DE VISTAS
+-- 3. CREACIÓN DE FUNCIONES
+CREATE OR ALTER FUNCTION [rip].[F_GET_COTIZACION_RIP](
+    @IMPORTE FLOAT
+    , @FECHA DATE
+    , @FACTOR_REAL FLOAT
+    , @ORIGEN INT
+    , @DESTINO INT
+)
+RETURNS FLOAT
+AS
+BEGIN
+    DECLARE @VALOR FLOAT
+    DECLARE @MULTIPLICO AS NCHAR(1)=(SELECT NUMERADOR FROM MONEDAS WITH(NOLOCK) WHERE CODMONEDA=@DESTINO )
+    
+    SELECT 
+        @VALOR = CASE     
+            WHEN @ORIGEN=@DESTINO THEN @IMPORTE --CUANDO EL ORIGEN Y DESTINO SON IGUALES NO SE CONVIERTE
+            WHEN @ORIGEN<>@DESTINO AND @MULTIPLICO='F' THEN @IMPORTE*@FACTOR_REAL*dbo.F_GET_COTIZACION(@FECHA, @DESTINO) --CUANDO SON DIFERENTES DEBO LLEVAR A LA MONEDA PPAL Y LUEGO A LA MONEDA DESTINO
+            ELSE @IMPORTE*@FACTOR_REAL/dbo.F_GET_COTIZACION(@FECHA, @DESTINO) --CUANDO SON DIFERENTES DEBO LLEVAR A LA MONEDA PPAL Y LUEGO A LA MONEDA DESTINO
+        END
+
+    RETURN(@VALOR)
+END
+GO
+PRINT 'Función [rip].[F_GET_COTIZACION_RIP] creada/actualizada.';
+GO
+
+-- 4. CREACIÓN DE VISTAS
 
 -- Vista de Clientes
 CREATE OR ALTER VIEW RIP.VW_APP_CLIENTES AS
@@ -446,7 +354,7 @@ FROM dbo.ARTICULOS A
 LEFT JOIN ULTIMOS_PRECIOS P ON A.CODARTICULO = P.CODARTICULO AND P.RN = 1;
 GO
 
--- CORRECCIÓN: Se añade la vista base de Pedidos que faltaba.
+-- Vista base de Pedidos
 CREATE OR ALTER VIEW RIP.VW_APP_PEDIDOS AS
 SELECT
     p.id,
@@ -460,7 +368,10 @@ SELECT
     p.created_by,
     u.name AS created_by_name,
     p.created_at,
-    p.updated_at
+    p.updated_at,
+    p.invoice_series,
+    p.invoice_number,
+    p.invoice_n
 FROM
     RIP.APP_PEDIDOS p
 JOIN
@@ -471,7 +382,7 @@ LEFT JOIN
     RIP.APP_USUARIOS u ON p.created_by = u.id;
 GO
 
--- Vista de Despachos (Ahora funcionará al encontrar la vista VW_APP_PEDIDOS)
+-- Vista de Despachos
 CREATE OR ALTER VIEW RIP.VW_APP_DESPACHOS
 AS
 SELECT
@@ -526,59 +437,7 @@ JOIN
     dbo.CLIENTES c ON p.customer_id = c.CODCLIENTE;
 GO
 
-PRINT '¡Despliegue completado! El esquema, las tablas y las vistas han sido creados/actualizados.';
-
--- PASO 1: Modificar la intercalación de la columna existente.
-ALTER TABLE RIP.APP_PEDIDOS
-ALTER COLUMN invoice_series NVARCHAR(10) COLLATE Latin1_General_CS_AI NULL; -- <-- Usa la intercalación que averiguaste.
-GO
-
--- PASO 2: Ahora sí, crear la restricción de clave foránea.
--- Si la restricción ya existía, puede que este paso dé error, pero el paso anterior es el importante.
-BEGIN TRY
-    ALTER TABLE RIP.APP_PEDIDOS
-    ADD CONSTRAINT FK_APP_PEDIDOS_FACTURASVENTA
-    FOREIGN KEY (invoice_series, invoice_number, invoice_n)
-    REFERENCES dbo.FACTURASVENTA(NUMSERIE, NUMFACTURA, N);
-
-    PRINT '¡SOLUCIONADO! La columna fue modificada y la relación creada exitosamente.';
-END TRY
-BEGIN CATCH
-    PRINT 'La columna fue modificada. La restricción ya existía o hubo otro problema al crearla.';
-END CATCH
-GO
-
-USE [CANTERA]
-GO
-/****** Object:  UserDefinedFunction [rip].[F_GET_COTIZACION_RIP]    Script Date: 22/09/2025 9:35:38 ******/
-SET ANSI_NULLS ON
-GO
-SET QUOTED_IDENTIFIER ON
-GO
-CREATE FUNCTION [rip].[F_GET_COTIZACION_RIP](
-   	@IMPORTE FLOAT
-		, @FECHA DATE
-		, @FACTOR_REAL FLOAT
-		, @ORIGEN INT
-		, @DESTINO INt
-)
-RETURNS FLOAT
-AS
-BEGIN
-	DECLARE @VALOR FLOAT
-	DECLARE @MULTIPLICO AS NCHAR(1)=(SELECT NUMERADOR FROM MONEDAS WITH(NOLOCK) WHERE CODMONEDA=@DESTINO )
-		--DECLARE @PPAL AS INT=(SELECT CODMONEDA FROM MONEDAS WITH(NOLOCK) WHERE PRINCIPAL='T' )
-	SELECT 
-		@VALOR= CASE	
-			WHEN @ORIGEN=@DESTINO THEN @IMPORTE --CUANDO EL ORIGEN Y DESTINO SON IGUALES NO SE CONVIERTE
-			--WHEN @ORIGEN<>@DESTINO AND @DESTINO=@PPAL THEN @IMPORTE*@FACTOR_REAL --CUANDO EL DESTINO ES LA PPAL
-			WHEN @ORIGEN<>@DESTINO AND @MULTIPLICO='F' THEN @IMPORTE*@FACTOR_REAL*dbo.F_GET_COTIZACION(@FECHA, @DESTINO) --CUANDO SON DIFERENTES DEBO LLEVAR A LA MONEDA PPAL Y LUEGO A LA MONEDA DESTINO
-			ELSE @IMPORTE*@FACTOR_REAL/dbo.F_GET_COTIZACION(@FECHA, @DESTINO) END --CUANDO SON DIFERENTES DEBO LLEVAR A LA MONEDA PPAL Y LUEGO A LA MONEDA DESTINO
-
-
-  RETURN(@VALOR)
-END
-
+-- Vista de Facturas disponibles para asociar a Pedidos
 CREATE OR ALTER VIEW RIP.VW_APP_FACTURAS_DISPONIBLES AS
 SELECT
     FV.NUMSERIE AS invoice_series,
@@ -599,12 +458,7 @@ LEFT JOIN
 WHERE
     P.id IS NULL; -- La condición clave: solo trae facturas SIN una orden asociada
 GO
+PRINT 'Vistas creadas/actualizadas.';
+GO
 
-PRINT 'Vista RIP.VW_APP_FACTURAS_DISPONIBLES creada/actualizada.';
-
-3. Flujo de Uso Sugerido
-En tu frontend, al momento de crear o editar una orden, debes hacer una consulta a la nueva vista RIP.VW_APP_FACTURAS_DISPONIBLES para poblar un buscador o una lista desplegable.
-
-El usuario selecciona la factura deseada de esa lista.
-
-Al guardar la orden en RIP.APP_PEDIDOS, simplemente incluyes los valores de invoice_series, invoice_number y invoice_n que seleccionó el usuario.
+PRINT '¡Despliegue completado! El esquema, las tablas, funciones y vistas han sido creados/actualizados.';
