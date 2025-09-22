@@ -229,33 +229,6 @@ export function OrderClient({ isEditing, initialOrderData, catalogs }: OrderClie
           </CardContent>
         </Card>
         <Card>
-          <CardHeader><CardTitle>Datos Generales</CardTitle></CardHeader>
-          <CardContent className="grid md:grid-cols-2 gap-4">
-             <div className="space-y-2">
-                <Label>Cliente *</Label>
-                <SearchableSelect
-                  value={selectedcustomer_id}
-                  onChange={(value) => {
-                    setSelectedcustomer_id(value);
-                    setSelectedDestinationId(undefined);
-                  }}
-                  placeholder="Selecciona un cliente..."
-                  options={catalogs.clients.map(client => ({ value: client.id.toString(), label: client.name }))}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Destino (Opcional)</Label>
-                <SearchableSelect
-                  value={selectedDestinationId}
-                  onChange={setSelectedDestinationId}
-                  placeholder="Selecciona un destino..."
-                  disabled={!selectedcustomer_id || filteredDestinations.length === 0}
-                  options={filteredDestinations.map(dest => ({ value: dest.id.toString(), label: dest.name }))}
-                />
-              </div>
-          </CardContent>
-        </Card>
-        <Card>
           <CardHeader><CardTitle>Transporte</CardTitle></CardHeader>
           <CardContent className="grid md:grid-cols-2 gap-4">
              <div className="space-y-2">
