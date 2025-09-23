@@ -1,4 +1,3 @@
-// app/(protected)/cashier/deliveries/deliveries-client.tsx
 "use client";
 
 import { useMemo, useState } from "react";
@@ -13,11 +12,11 @@ import {
   Clock,
   CheckCircle,
   Package,
-  FileText, // <-- Importa el ícono de factura
+  FileText,
   Eye,
   ChevronDown,
 } from "lucide-react";
-import type { Delivery } from "@/lib/types";
+import type { Delivery, Invoice } from "@/lib/types"; // Make sure to import Invoice type
 import { AnimatedCard } from "@/components/ui/animated-card";
 import { EmptyState } from "@/components/ui/empty-state";
 import {
@@ -26,7 +25,7 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 
-/* ----------------------------- Config de estado ----------------------------- */
+/* ----------------------------- Config de estado (sin cambios) ----------------------------- */
 const STATUS_CONFIG = {
   PENDING: {
     label: "Pendiente",
@@ -76,25 +75,27 @@ export function CashierDeliveriesClientUI({
     return initialDeliveries.filter((delivery) => {
       const placa = delivery.truck?.placa?.toLowerCase() ?? "";
       const cliente = delivery.orderDetails.client?.name?.toLowerCase() ?? "";
-      const orderNumber = delivery.orderDetails.order_number?.toLowerCase() ?? "";
-      // --- INICIO: CÓDIGO A AGREGAR ---
-      const invoiceNumber = delivery.orderDetails.invoice_full_number?.toLowerCase() ?? "";
-      // --- FIN: CÓDIGO A AGREGAR ---
-      const id = String(delivery.delivery_id).toLowerCase();
-      
+      const orderNumber =
+        delivery.orderDetails.order_number?.toLowerCase() ?? "";
+      const id = String(delivery.id).toLowerCase();
+
+      // --- 👇 CAMBIO: Lógica de búsqueda para múltiples facturas ---
+      const hasMatchingInvoice =
+        delivery.orderDetails.invoices?.some((invoice) =>
+          invoice.invoice_full_number?.toLowerCase().includes(q)
+        ) ?? false;
+
       return (
         placa.includes(q) ||
         cliente.includes(q) ||
         id.includes(q) ||
         orderNumber.includes(q) ||
-        // --- INICIO: CÓDIGO A AGREGAR ---
-        invoiceNumber.includes(q)
-        // --- FIN: CÓDIGO A AGREGAR ---
+        hasMatchingInvoice // Usamos el resultado de la búsqueda en el array
       );
     });
   }, [initialDeliveries, searchTerm]);
 
-  /* Agrupar por orden */
+  /* Agrupar por orden (sin cambios) */
   const deliveriesByOrder = useMemo(() => {
     const grouped = new Map<string, Delivery[]>();
     for (const d of filteredDeliveries) {
@@ -104,12 +105,12 @@ export function CashierDeliveriesClientUI({
     }
     // Ordenar cada grupo por ID de viaje
     for (const [, arr] of grouped) {
-      arr.sort((a, b) => a.delivery_id - b.delivery_id);
+      arr.sort((a, b) => a.id - b.id);
     }
     return grouped;
   }, [filteredDeliveries]);
 
-  /* Contadores (según lo filtrado para coherencia visual) */
+  /* Contadores (sin cambios) */
   const completedDeliveriesCount = useMemo(
     () => filteredDeliveries.filter((d) => d.estado === "EXITED").length,
     [filteredDeliveries]
@@ -165,9 +166,7 @@ export function CashierDeliveriesClientUI({
             />
             <Input
               id="search-deliveries"
-              // --- INICIO: TEXTO ACTUALIZADO ---
               placeholder="Buscar por placa, cliente, orden, factura o ID de viaje…"
-              // --- FIN: TEXTO ACTUALIZADO ---
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="h-12 pl-12 text-base sm:text-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
@@ -184,12 +183,13 @@ export function CashierDeliveriesClientUI({
           Array.from(deliveriesByOrder.entries()).map(
             ([order_id, orderDeliveries], orderIndex) => {
               const firstDelivery = orderDeliveries[0];
-              const completedTrips = orderDeliveries.filter(
-                (d) => d.estado === "EXITED"
-              ).length;
-              const orderNumber = firstDelivery.orderDetails.order_number || order_id;
-              const clientName = firstDelivery.orderDetails.client?.name || "N/A";
-              const invoiceFullNumber = firstDelivery.orderDetails.invoice_full_number;
+              const orderNumber =
+                firstDelivery.orderDetails.order_number || order_id;
+              const clientName =
+                firstDelivery.orderDetails.client?.name || "N/A";
+
+              // --- 👇 CAMBIO: Obtenemos el array de facturas ---
+              const invoices = firstDelivery.orderDetails.invoices;
 
               return (
                 <Collapsible key={order_id} defaultOpen>
@@ -212,14 +212,21 @@ export function CashierDeliveriesClientUI({
                             <p className="mt-1 line-clamp-1 text-sm text-muted-foreground">
                               {clientName}
                             </p>
-                            {/* --- INICIO: CÓDIGO A AGREGAR --- */}
-                            {invoiceFullNumber && (
-                              <div className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">
-                                <FileText className="h-3 w-3" />
-                                <span>{invoiceFullNumber}</span>
+
+                            {/* --- 👇 CAMBIO: Mapeamos y mostramos las facturas --- */}
+                            {invoices && invoices.length > 0 && (
+                              <div className="mt-2 space-y-1">
+                                {invoices.map((invoice) => (
+                                  <div
+                                    key={invoice.invoice_full_number}
+                                    className="flex items-center gap-1.5 text-xs text-muted-foreground"
+                                  >
+                                    <FileText className="h-3 w-3" />
+                                    <span>{invoice.invoice_full_number}</span>
+                                  </div>
+                                ))}
                               </div>
                             )}
-                            {/* --- FIN: CÓDIGO A AGREGAR --- */}
                           </div>
                         </div>
                       </CardHeader>
@@ -227,22 +234,14 @@ export function CashierDeliveriesClientUI({
 
                     <CollapsibleContent>
                       <CardContent className="p-4">
-                        <div
-                          className="
-                            grid gap-4
-                            grid-cols-1
-                            sm:grid-cols-2
-                            lg:grid-cols-3
-                            xl:grid-cols-4
-                          "
-                        >
+                        <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                           {orderDeliveries.map((delivery) => {
                             const hasItemsLoaded =
                               (delivery.dispatchItems?.length ?? 0) > 0;
 
                             return (
                               <Card
-                                key={delivery.delivery_id}
+                                key={delivery.id}
                                 className="flex h-full flex-col border-2"
                               >
                                 <CardHeader className="pb-2">
@@ -250,7 +249,7 @@ export function CashierDeliveriesClientUI({
                                     <div className="flex items-center gap-2">
                                       <Truck className="h-4 w-4 text-primary" />
                                       <span className="text-sm font-semibold">
-                                        Viaje #{delivery.delivery_id}
+                                        Viaje #{delivery.id}
                                       </span>
                                     </div>
                                     <StatusBadge estado={delivery.estado} />
@@ -268,7 +267,7 @@ export function CashierDeliveriesClientUI({
                                         {delivery.dispatchItems!.map(
                                           (item, idx) => (
                                             <li
-                                              key={`${delivery.delivery_id}-${idx}`}
+                                              key={`${delivery.id}-${idx}`}
                                               className="flex items-center justify-between text-xs"
                                             >
                                               <span className="truncate pr-2 text-muted-foreground">

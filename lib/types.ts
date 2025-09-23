@@ -65,14 +65,16 @@ export interface Product {
   updatedAt?: Date;
 }
 
-export type Invoice = {
+export interface Invoice {
   invoice_series: string;
   invoice_number: number;
-  invoice_n: number;
-  customer_name: string;
-  invoice_date: string; // La fecha viene como string desde la API
+  invoice_n: string;
+  invoice_full_number?: string;
+  customer_id: number;
+  customer_name?: string;
+  invoice_date?: Date;
   total_usd: number;
-};
+}
 
 export interface Driver {
   id: number;
@@ -128,14 +130,11 @@ export interface Order {
   deliveries?: Delivery[];
   trucks?: Truck[];
   drivers?: Driver[];
-  invoice_series?: string | null;
-  invoice_number?: number | null;
-  invoice_n?: number | null;
-  invoice_full_number?: string;
+  invoices: Invoice[];
 }
 
 export interface Delivery {
-  delivery_id: number;
+  id: number;
   estado: DeliveryStatus;
   orderDetails: Order;
   truck: Truck;

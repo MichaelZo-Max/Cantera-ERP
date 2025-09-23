@@ -21,7 +21,6 @@ import {
   ShoppingCart,
   Truck,
   Package,
-  ListOrdered,
   FileText,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -93,28 +92,31 @@ export function OrderForm({
   const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [currentQuantity, setCurrentQuantity] = useState<number>(0);
-  const [selectedInvoice, setSelectedInvoice] = useState<string | undefined>();
+  const [selectedInvoices, setSelectedInvoices] = useState<string[]>([]);
 
   // --- Estados para Clientes Paginados ---
   const [clients, setClients] = useState<Client[]>(initialClients);
   const [clientSearch, setClientSearch] = useState("");
   const debouncedClientSearch = useDebounce(clientSearch, 500);
   const [clientPage, setClientPage] = useState(1);
-  const [clientTotalPages, setClientTotalPages] = useState(10); // Asumimos que hay más páginas
+  const [clientTotalPages, setClientTotalPages] = useState(10);
   const [isClientsLoading, setIsClientsLoading] = useState(false);
+  const selectedClient = useMemo(
+    () => clients.find((c) => c.id.toString() === selectedcustomer_id),
+    [clients, selectedcustomer_id]
+  );
 
   // --- Estados para Productos Paginados ---
   const [products, setProducts] = useState<Product[]>(initialProducts);
   const [productSearch, setProductSearch] = useState("");
   const debouncedProductSearch = useDebounce(productSearch, 500);
   const [productPage, setProductPage] = useState(1);
-  const [productTotalPages, setProductTotalPages] = useState(10); // Asumimos que hay más páginas
+  const [productTotalPages, setProductTotalPages] = useState(10);
   const [isProductsLoading, setIsProductsLoading] = useState(false);
 
   // --- Efecto para inicializar el formulario en modo edición ---
   useEffect(() => {
     if (isEditing && initialOrderData) {
-      // Seteamos los IDs
       setSelectedcustomer_id(initialOrderData.customer_id?.toString());
       setSelectedDestinationId(initialOrderData.destination_id?.toString());
       setSelectedTruckIds(
@@ -124,7 +126,6 @@ export function OrderForm({
         initialOrderData.drivers?.map((d: Driver) => d.id.toString()) ?? []
       );
 
-      // Mapeamos los items
       if (initialOrderData.items) {
         const items = initialOrderData.items.map((item) => ({
           id: crypto.randomUUID(),
@@ -136,19 +137,18 @@ export function OrderForm({
         setOrderItems(items);
       }
 
-      // Construimos el valor de la factura si existe
-      if (
-        initialOrderData.invoice_series &&
-        initialOrderData.invoice_number !== null &&
-        initialOrderData.invoice_n !== null
-      ) {
-        const invoiceValue = `${initialOrderData.invoice_series}|${initialOrderData.invoice_number}|${initialOrderData.invoice_n}`;
-        setSelectedInvoice(invoiceValue);
+      // --- 👇 CAMBIO: Inicializar el estado de facturas múltiples ---
+      if (initialOrderData.invoices && initialOrderData.invoices.length > 0) {
+        const invoiceValues = initialOrderData.invoices.map(
+          (inv) =>
+            `${inv.invoice_series}|${inv.invoice_number}|${inv.invoice_n}`
+        );
+        setSelectedInvoices(invoiceValues);
       }
     }
   }, [isEditing, initialOrderData]);
 
-  // --- Lógica para buscar y paginar Clientes ---
+  // --- Lógica de Búsqueda y Paginación (sin cambios) ---
   useEffect(() => {
     const fetchClients = async () => {
       setIsClientsLoading(true);
@@ -177,7 +177,6 @@ export function OrderForm({
     fetchClients();
   }, [clientPage, debouncedClientSearch]);
 
-  // --- Lógica para buscar y paginar Productos ---
   useEffect(() => {
     const fetchProducts = async () => {
       setIsProductsLoading(true);
@@ -206,13 +205,8 @@ export function OrderForm({
     fetchProducts();
   }, [productPage, debouncedProductSearch]);
 
-  // Reiniciar paginación al cambiar la búsqueda
-  useEffect(() => {
-    setClientPage(1);
-  }, [debouncedClientSearch]);
-  useEffect(() => {
-    setProductPage(1);
-  }, [debouncedProductSearch]);
+  useEffect(() => setClientPage(1), [debouncedClientSearch]);
+  useEffect(() => setProductPage(1), [debouncedProductSearch]);
 
   const filteredDestinations = useMemo(() => {
     if (!selectedcustomer_id) return [];
@@ -261,27 +255,31 @@ export function OrderForm({
     [products]
   );
 
+  // --- 👇 CAMBIO: Lógica de envío actualizada ---
   const handleFormSubmit = () => {
     if (
       !selectedcustomer_id ||
       orderItems.length === 0 ||
       selectedTruckIds.length === 0 ||
-      selectedDriverIds.length === 0
+      selectedDriverIds.length === 0 ||
+      selectedInvoices.length === 0 // Ahora es obligatorio
     ) {
       toast.error(
-        "Completa todos los campos: Cliente, al menos un producto, un camión y un chofer."
+        "Completa todos los campos requeridos: Cliente, al menos un producto, una factura, un camión y un chofer."
       );
       return;
     }
-    let invoiceData = {};
-    if (selectedInvoice) {
-      const [series, number, n] = selectedInvoice.split("|");
-      invoiceData = {
+
+    // Construimos el array de facturas que espera la API
+    const invoicesData = selectedInvoices.map((invoiceString) => {
+      const [series, number, n] = invoiceString.split("|");
+      return {
         invoice_series: series,
         invoice_number: parseInt(number, 10),
         invoice_n: n,
       };
-    }
+    });
+
     const orderData = {
       customer_id: parseInt(selectedcustomer_id, 10),
       destination_id: selectedDestinationId
@@ -296,7 +294,7 @@ export function OrderForm({
       total: total,
       truck_ids: selectedTruckIds.map((id) => parseInt(id, 10)),
       driver_ids: selectedDriverIds.map((id) => parseInt(id, 10)),
-      ...invoiceData,
+      invoices: invoicesData, // Enviamos el array de facturas
     };
     onSubmit(orderData);
   };
@@ -306,8 +304,15 @@ export function OrderForm({
       !!selectedcustomer_id &&
       orderItems.length > 0 &&
       selectedTruckIds.length > 0 &&
-      selectedDriverIds.length > 0,
-    [selectedcustomer_id, orderItems, selectedTruckIds, selectedDriverIds]
+      selectedDriverIds.length > 0 &&
+      selectedInvoices.length > 0, // Chequeamos que haya al menos una factura
+    [
+      selectedcustomer_id,
+      orderItems,
+      selectedTruckIds,
+      selectedDriverIds,
+      selectedInvoices,
+    ]
   );
 
   return (
@@ -329,7 +334,7 @@ export function OrderForm({
                   onChange={(value) => {
                     setSelectedcustomer_id(value);
                     setSelectedDestinationId(undefined);
-                    setSelectedInvoice(undefined);
+                    setSelectedInvoices([]); // Limpiamos las facturas al cambiar de cliente
                   }}
                   placeholder="Selecciona un cliente..."
                   options={clients.map((client) => ({
@@ -363,31 +368,34 @@ export function OrderForm({
             </div>
             <div className="mt-4 space-y-2">
               <Label className="flex items-center gap-2">
-                <FileText size={16} /> Vincular Factura (Opcional)
+                <FileText size={16} /> Vincular Factura(s) *
               </Label>
               <SearchableSelect
-                value={selectedInvoice}
-                onChange={setSelectedInvoice}
-                placeholder="Selecciona una factura disponible..."
+                isMulti
+                value={selectedInvoices}
+                onChange={setSelectedInvoices}
+                placeholder="Selecciona una o más facturas..."
                 disabled={!selectedcustomer_id}
                 options={initialInvoices
-                  .filter(
-                    (inv) =>
-                      inv.customer_name ===
-                      clients.find(
-                        (c) => c.id.toString() === selectedcustomer_id
-                      )?.name
-                  )
+                  .filter((inv) => {
+                    // Si no hay un cliente seleccionado, no mostramos ninguna factura
+                    if (!selectedClient) {
+                      return false;
+                    }
+                    // Comparamos el nombre del cliente de la factura con el nombre del cliente seleccionado
+                    return inv && inv.customer_name === selectedClient.name;
+                  })
                   .map((inv) => ({
                     value: `${inv.invoice_series}|${inv.invoice_number}|${inv.invoice_n}`,
-                    label: `${inv.invoice_series}-${
-                      inv.invoice_number
-                    } ($${inv.total_usd.toFixed(2)})`,
+                    label: `${inv.invoice_series}-${inv.invoice_number} ($${(
+                      inv.total_usd ?? 0
+                    ).toFixed(2)})`,
                   }))}
               />
             </div>
           </CardContent>
         </Card>
+        {/* --- El resto del JSX (Transporte, Items, Resumen) no necesita cambios --- */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">

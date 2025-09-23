@@ -16,16 +16,18 @@ export async function GET(
       return new NextResponse("ID de pedido inválido", { status: 400 });
     }
 
+    // --- 👇 CAMBIO: Usar la vista VW_APP_PEDIDOS que ya tiene las facturas en JSON ---
     const orderQuery = `
       SELECT
           p.id, p.order_number, p.status, p.created_at, p.notes,
           p.customer_id, p.destination_id,
-          p.invoice_series, p.invoice_number, p.invoice_n,
           c.name AS client_name, c.rfc,
-          d.name AS destino_name
+          d.name AS destino_name,
+          vp.invoices -- Obtenemos el string JSON de facturas desde la vista
       FROM RIP.APP_PEDIDOS p
       JOIN RIP.VW_APP_CLIENTES c ON c.id = p.customer_id
       LEFT JOIN RIP.APP_DESTINOS d ON d.id = p.destination_id
+      LEFT JOIN RIP.VW_APP_PEDIDOS vp ON vp.id = p.id -- Unimos con la vista para obtener las facturas
       WHERE p.id = @id;
     `;
     const orderResult = await executeQuery(orderQuery, [
@@ -35,8 +37,11 @@ export async function GET(
     if (orderResult.length === 0) {
       return new NextResponse("Pedido no encontrado", { status: 404 });
     }
-    // El objeto 'order' ya tiene la estructura plana que necesitamos
+
     const order = orderResult[0];
+    // Parseamos el string JSON de facturas para convertirlo en un array
+    order.invoices =
+      typeof order.invoices === "string" ? JSON.parse(order.invoices) : [];
 
     // 2. Obtener los items (sin cambios)
     const itemsQuery = `
@@ -67,8 +72,9 @@ export async function GET(
     const driversResult = await executeQuery(driversQuery, [
       { name: "id", type: TYPES.Int, value: id },
     ]);
+
     const finalResponse = {
-      ...order, // <-- El objeto base ya tiene invoice_series, etc.
+      ...order,
       items: itemsResult.map((item: any) => ({
         id: item.id,
         quantity: Number(item.quantity),
@@ -84,7 +90,7 @@ export async function GET(
       drivers: driversResult,
     };
 
-    return NextResponse.json(finalResponse); // <-- Se devuelve el objeto con estructura plana
+    return NextResponse.json(finalResponse);
   } catch (error) {
     console.error(`[API_ORDERS_ID_GET]`, error);
     return new NextResponse("Error interno del servidor", { status: 500 });
@@ -93,7 +99,7 @@ export async function GET(
 
 /**
  * @route   PUT /api/orders/[id]
- * @desc    Actualizar un pedido completo (datos, items, camiones y choferes)
+ * @desc    Actualizar un pedido completo (datos, items, facturas, camiones y choferes)
  */
 export async function PUT(
   request: Request,
@@ -111,18 +117,16 @@ export async function PUT(
       return NextResponse.json(validation.error.errors, { status: 400 });
     }
 
-    const { items, truck_ids, driver_ids, ...orderData } = validation.data;
+    const { items, truck_ids, driver_ids, invoices, ...orderData } =
+      validation.data;
 
     const updateOrderQuery = `
       UPDATE RIP.APP_PEDIDOS
       SET customer_id = @customer_id, 
-          destination_id = @destination_id, 
-          invoice_series = @invoice_series,
-          invoice_number = @invoice_number,
-          invoice_n = @invoice_n,
+          destination_id = @destination_id,
           updated_at = GETDATE()
       WHERE id = @id;
-`;
+    `;
     await executeQuery(updateOrderQuery, [
       { name: "id", type: TYPES.Int, value: id },
       { name: "customer_id", type: TYPES.Int, value: orderData.customer_id },
@@ -131,29 +135,22 @@ export async function PUT(
         type: TYPES.Int,
         value: orderData.destination_id,
       },
-      {
-        name: "invoice_series",
-        type: TYPES.NVarChar,
-        value: orderData.invoice_series,
-      },
-      {
-        name: "invoice_number",
-        type: TYPES.Int,
-        value: orderData.invoice_number,
-      },
-      { name: "invoice_n", type: TYPES.NVarChar, value: orderData.invoice_n },
     ]);
 
+    // 1. Actualizar Items (sin cambios, método "borrar e insertar")
     await executeQuery(
       `DELETE FROM RIP.APP_PEDIDOS_ITEMS WHERE order_id = @id`,
       [{ name: "id", type: TYPES.Int, value: id }]
     );
-
     for (const item of items) {
       const insertItemQuery = `
-            INSERT INTO RIP.APP_PEDIDOS_ITEMS (order_id, product_id, quantity, price_per_unit, unit)
-            VALUES (@order_id, @product_id, @quantity, @price_per_unit, @unit);
-        `;
+
+      INSERT INTO RIP.APP_PEDIDOS_ITEMS (order_id, product_id, quantity, price_per_unit, unit)
+
+      VALUES (@order_id, @product_id, @quantity, @price_per_unit, @unit);
+
+    `;
+
       await executeQuery(insertItemQuery, [
         { name: "order_id", type: TYPES.Int, value: id },
         { name: "product_id", type: TYPES.Int, value: item.product_id },
@@ -167,7 +164,33 @@ export async function PUT(
       ]);
     }
 
-    // 3. Actualizar Camiones
+    await executeQuery(
+      `DELETE FROM RIP.APP_PEDIDOS_FACTURAS WHERE pedido_id = @id`,
+      [{ name: "id", type: TYPES.Int, value: id }]
+    );
+    // 3. Insertar las nuevas asociaciones de facturas
+    for (const invoice of invoices) {
+      const insertInvoiceQuery = `
+            INSERT INTO RIP.APP_PEDIDOS_FACTURAS (pedido_id, invoice_series, invoice_number, invoice_n)
+            VALUES (@pedido_id, @invoice_series, @invoice_number, @invoice_n);
+        `;
+      await executeQuery(insertInvoiceQuery, [
+        { name: "pedido_id", type: TYPES.Int, value: id },
+        {
+          name: "invoice_series",
+          type: TYPES.NVarChar,
+          value: invoice.invoice_series,
+        },
+        {
+          name: "invoice_number",
+          type: TYPES.Int,
+          value: invoice.invoice_number,
+        },
+        { name: "invoice_n", type: TYPES.NVarChar, value: invoice.invoice_n },
+      ]);
+    }
+
+    // 4. Actualizar Camiones (sin cambios)
     await executeQuery(
       `DELETE FROM RIP.APP_PEDIDOS_CAMIONES WHERE pedido_id = @id`,
       [{ name: "id", type: TYPES.Int, value: id }]
@@ -180,7 +203,7 @@ export async function PUT(
       ]);
     }
 
-    // 4. Actualizar Choferes
+    // 5. Actualizar Choferes (sin cambios)
     await executeQuery(
       `DELETE FROM RIP.APP_PEDIDOS_CHOFERES WHERE pedido_id = @id`,
       [{ name: "id", type: TYPES.Int, value: id }]

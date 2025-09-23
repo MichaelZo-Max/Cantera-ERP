@@ -59,8 +59,10 @@ const LoadedDeliveryCard = React.memo(
         <div className="flex justify-between items-start mb-3">
           <div>
             <p className="font-bold text-lg">{delivery.truck?.placa}</p>
-            {/* CORREGIDO: usa delivery_id */}
-            <p className="text-sm text-muted-foreground">Despacho ID: {delivery.delivery_id}</p>
+            {/* CORREGIDO: usa id */}
+            <p className="text-sm text-muted-foreground">
+              Despacho ID: {delivery.id}
+            </p>
           </div>
           <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300">
             Listo para Salir
@@ -70,14 +72,20 @@ const LoadedDeliveryCard = React.memo(
           <div className="flex items-center gap-2">
             <User className="h-4 w-4 text-muted-foreground" />
             {/* CORREGIDO: usa orderDetails */}
-            <span className="truncate">{delivery.orderDetails?.client?.name}</span>
+            <span className="truncate">
+              {delivery.orderDetails?.client?.name}
+            </span>
           </div>
           <div className="flex items-center gap-2">
             <Package className="h-4 w-4 text-muted-foreground" />
-             {/* CORREGIDO: usa dispatchItems y orderDetails */}
+            {/* CORREGIDO: usa dispatchItems y orderDetails */}
             <span>
               {delivery.dispatchItems && delivery.dispatchItems.length > 0
-                ? `${delivery.orderDetails.items.find(i => i.id === delivery.dispatchItems![0].pedido_item_id)?.product.name} ${
+                ? `${
+                    delivery.orderDetails.items.find(
+                      (i) => i.id === delivery.dispatchItems![0].pedido_item_id
+                    )?.product.name
+                  } ${
                     delivery.dispatchItems.length > 1
                       ? `y ${delivery.dispatchItems.length - 1} más...`
                       : ""
@@ -104,34 +112,35 @@ const LoadedDeliveryCard = React.memo(
 );
 LoadedDeliveryCard.displayName = "LoadedDeliveryCard";
 
-const ExitedDeliveryCard = React.memo(({ delivery }: { delivery: Delivery }) => (
-  <Card className="bg-blue-50 border-blue-200 dark:bg-blue-900/20 dark:border-blue-800">
-    <CardContent className="pt-4">
-      <div className="flex justify-between items-start mb-3">
-        <div>
-          <p className="font-semibold">{delivery.truck?.placa}</p>
-          <p className="text-sm text-muted-foreground">
-            {/* CORREGIDO: usa orderDetails */}
-            {delivery.orderDetails?.client?.name}
-          </p>
-        </div>
-        <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300">
-          Salió
-        </Badge>
-      </div>
-      <div className="text-sm space-y-1">
-        {delivery.exitedAt && (
-          <div className="flex justify-between">
-            <span className="text-muted-foreground">Salida:</span>
-            <span>{new Date(delivery.exitedAt).toLocaleTimeString()}</span>
+const ExitedDeliveryCard = React.memo(
+  ({ delivery }: { delivery: Delivery }) => (
+    <Card className="bg-blue-50 border-blue-200 dark:bg-blue-900/20 dark:border-blue-800">
+      <CardContent className="pt-4">
+        <div className="flex justify-between items-start mb-3">
+          <div>
+            <p className="font-semibold">{delivery.truck?.placa}</p>
+            <p className="text-sm text-muted-foreground">
+              {/* CORREGIDO: usa orderDetails */}
+              {delivery.orderDetails?.client?.name}
+            </p>
           </div>
-        )}
-      </div>
-    </CardContent>
-  </Card>
-));
+          <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300">
+            Salió
+          </Badge>
+        </div>
+        <div className="text-sm space-y-1">
+          {delivery.exitedAt && (
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Salida:</span>
+              <span>{new Date(delivery.exitedAt).toLocaleTimeString()}</span>
+            </div>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  )
+);
 ExitedDeliveryCard.displayName = "ExitedDeliveryCard";
-
 
 // --- COMPONENTE PRINCIPAL ---
 
@@ -172,12 +181,14 @@ export function SecurityExitsClientUI({
     const query = searchQuery.toLowerCase().trim();
     if (!query) return loadedDeliveries;
     return loadedDeliveries.filter((delivery) => {
-      // CORREGIDO: usa delivery_id y orderDetails
-      const deliveryId = String(delivery.delivery_id);
+      // CORREGIDO: usa id y orderDetails
+      const deliveryId = String(delivery.id);
       return (
         (delivery.truck?.placa || "").toLowerCase().includes(query) ||
         deliveryId.toLowerCase().includes(query) ||
-        (delivery.orderDetails?.client?.name || "").toLowerCase().includes(query)
+        (delivery.orderDetails?.client?.name || "")
+          .toLowerCase()
+          .includes(query)
       );
     });
   }, [searchQuery, loadedDeliveries]);
@@ -194,7 +205,7 @@ export function SecurityExitsClientUI({
     setExitNotes("");
     setShowExitModal(true);
   }, []);
-  
+
   // Cierra cualquier modal y resetea estados
   const handleCloseModals = useCallback(() => {
     setShowExitModal(false);
@@ -215,17 +226,17 @@ export function SecurityExitsClientUI({
 
     try {
       const formData = new FormData();
-      formData.append("status", "EXITED"); 
+      formData.append("status", "EXITED");
       formData.append("notes", exitNotes);
       if (user?.id) formData.append("userId", user.id.toString());
       formData.append("photoFile", exitPhoto);
 
-      // CORREGIDO: usa delivery_id
-      const res = await fetch(`/api/deliveries/${selectedDelivery.delivery_id}`, {
+      // CORREGIDO: usa id
+      const res = await fetch(`/api/deliveries/${selectedDelivery.id}`, {
         method: "PATCH",
         body: formData,
       });
-      
+
       const responseBody = await res.text();
       if (!res.ok) {
         try {
@@ -240,16 +251,13 @@ export function SecurityExitsClientUI({
 
       // Actualizar el estado local para reflejar el cambio inmediatamente
       setAllDeliveries((prev) =>
-        prev.map((d) =>
-          d.delivery_id === updatedDelivery.delivery_id ? updatedDelivery : d
-        )
+        prev.map((d) => (d.id === updatedDelivery.id ? updatedDelivery : d))
       );
-      
+
       toast.success("Salida Autorizada Correctamente", {
         description: `Se generó la guía para la placa ${selectedDelivery.truck?.placa}.`,
       });
       handleCloseModals();
-
     } catch (error: any) {
       console.error("Error al autorizar la salida:", error);
       toast.error("No se pudo autorizar la salida.", {
@@ -260,7 +268,6 @@ export function SecurityExitsClientUI({
     }
   }, [selectedDelivery, exitPhoto, exitNotes, user?.id, handleCloseModals]);
 
-
   const openImagePreview = useCallback((imageUrl: string) => {
     setPreviewImageUrl(imageUrl);
     setShowImagePreview(true);
@@ -268,7 +275,7 @@ export function SecurityExitsClientUI({
 
   return (
     <div className="space-y-6">
-       {/* UI (Sin cambios lógicos) */}
+      {/* UI (Sin cambios lógicos) */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between">
         <div>
           <h2 className="text-2xl font-bold text-foreground">
@@ -279,7 +286,7 @@ export function SecurityExitsClientUI({
           </p>
         </div>
       </div>
-      
+
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -320,20 +327,24 @@ export function SecurityExitsClientUI({
         </CardHeader>
         <CardContent>
           {loadedDeliveries.length === 0 ? (
-             <div className="text-center py-8">
-               <Truck className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-               <p className="text-muted-foreground">No hay viajes listos para salir en este momento.</p>
-             </div>
+            <div className="text-center py-8">
+              <Truck className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+              <p className="text-muted-foreground">
+                No hay viajes listos para salir en este momento.
+              </p>
+            </div>
           ) : filteredDeliveries.length === 0 ? (
-             <div className="text-center py-8">
-               <Search className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-               <p className="text-muted-foreground">No se encontraron viajes con la búsqueda actual.</p>
-             </div>
+            <div className="text-center py-8">
+              <Search className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+              <p className="text-muted-foreground">
+                No se encontraron viajes con la búsqueda actual.
+              </p>
+            </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
               {filteredDeliveries.map((delivery) => (
                 <LoadedDeliveryCard
-                  key={delivery.delivery_id}
+                  key={delivery.id}
                   delivery={delivery}
                   onSelect={handleSelectDelivery}
                 />
@@ -355,7 +366,7 @@ export function SecurityExitsClientUI({
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
               {exitedDeliveries.map((delivery) => (
-                <ExitedDeliveryCard key={delivery.delivery_id} delivery={delivery} /> // CORREGIDO: usa delivery_id
+                <ExitedDeliveryCard key={delivery.id} delivery={delivery} /> // CORREGIDO: usa id
               ))}
             </div>
           </CardContent>
@@ -371,7 +382,8 @@ export function SecurityExitsClientUI({
               Autorizar Salida - {selectedDelivery?.truck?.placa}
             </DialogTitle>
             <DialogDescription>
-              Verifica los detalles, toma una foto clara de la placa y genera la guía de despacho.
+              Verifica los detalles, toma una foto clara de la placa y genera la
+              guía de despacho.
             </DialogDescription>
           </DialogHeader>
           {selectedDelivery && (
@@ -387,9 +399,12 @@ export function SecurityExitsClientUI({
                       (oi) => oi.id === item.pedido_item_id
                     );
                     return (
-                      <div key={item.id} className="flex justify-between items-center text-sm">
+                      <div
+                        key={item.id}
+                        className="flex justify-between items-center text-sm"
+                      >
                         <span className="text-muted-foreground">
-                          {orderItem?.product?.name || 'Producto no encontrado'}
+                          {orderItem?.product?.name || "Producto no encontrado"}
                         </span>
                         <span className="font-medium bg-gray-200 dark:bg-gray-700 px-2 py-1 rounded">
                           {item.dispatched_quantity} {orderItem?.product?.unit}
@@ -397,8 +412,11 @@ export function SecurityExitsClientUI({
                       </div>
                     );
                   })}
-                  {(!selectedDelivery.dispatchItems || selectedDelivery.dispatchItems.length === 0) && (
-                     <p className="text-sm text-center text-muted-foreground py-2">No se registraron items para este despacho.</p>
+                  {(!selectedDelivery.dispatchItems ||
+                    selectedDelivery.dispatchItems.length === 0) && (
+                    <p className="text-sm text-center text-muted-foreground py-2">
+                      No se registraron items para este despacho.
+                    </p>
                   )}
                 </div>
               </div>
@@ -423,7 +441,7 @@ export function SecurityExitsClientUI({
                         size="icon"
                         className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity"
                         onClick={() =>
-                           // CORREGIDO: usa loadPhoto
+                          // CORREGIDO: usa loadPhoto
                           openImagePreview(selectedDelivery.loadPhoto!)
                         }
                       >
@@ -432,8 +450,10 @@ export function SecurityExitsClientUI({
                     </div>
                   ) : (
                     <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg h-48 flex flex-col items-center justify-center">
-                       <Camera className="h-8 w-8 text-muted-foreground mb-2" />
-                       <p className="text-sm text-muted-foreground">Sin foto de patio</p>
+                      <Camera className="h-8 w-8 text-muted-foreground mb-2" />
+                      <p className="text-sm text-muted-foreground">
+                        Sin foto de patio
+                      </p>
                     </div>
                   )}
                 </div>
@@ -444,23 +464,25 @@ export function SecurityExitsClientUI({
                     label="Foto de salida (obligatoria)"
                     capture={true}
                   />
-                   <p className="text-xs text-muted-foreground mt-2">
-                     Asegúrate que la placa sea claramente visible.
-                   </p>
+                  <p className="text-xs text-muted-foreground mt-2">
+                    Asegúrate que la placa sea claramente visible.
+                  </p>
                 </div>
               </div>
-               {selectedDelivery.notes && (
-                 <div className="p-3 bg-yellow-50 border border-yellow-200 dark:bg-yellow-900/20 dark:border-yellow-800 rounded-lg">
-                   <p className="text-sm font-medium text-yellow-800 dark:text-yellow-300">
-                     Notas del Patio:
-                   </p>
-                   <p className="text-sm text-yellow-700 dark:text-yellow-400 whitespace-pre-wrap">
-                     {selectedDelivery.notes}
-                   </p>
-                 </div>
-               )}
+              {selectedDelivery.notes && (
+                <div className="p-3 bg-yellow-50 border border-yellow-200 dark:bg-yellow-900/20 dark:border-yellow-800 rounded-lg">
+                  <p className="text-sm font-medium text-yellow-800 dark:text-yellow-300">
+                    Notas del Patio:
+                  </p>
+                  <p className="text-sm text-yellow-700 dark:text-yellow-400 whitespace-pre-wrap">
+                    {selectedDelivery.notes}
+                  </p>
+                </div>
+              )}
               <div className="space-y-2">
-                <Label htmlFor="security-notes">Observaciones de Seguridad (Opcional)</Label>
+                <Label htmlFor="security-notes">
+                  Observaciones de Seguridad (Opcional)
+                </Label>
                 <Textarea
                   id="security-notes"
                   value={exitNotes}
@@ -492,19 +514,19 @@ export function SecurityExitsClientUI({
           )}
         </DialogContent>
       </Dialog>
-      
+
       <Dialog open={showImagePreview} onOpenChange={setShowImagePreview}>
-         <DialogContent className="max-w-3xl p-0">
-           {previewImageUrl && (
-             <Image
-               src={previewImageUrl}
-               alt="Vista previa de la imagen"
-               width={1200}
-               height={900}
-               className="w-full h-auto max-h-[90vh] object-contain"
-             />
-           )}
-         </DialogContent>
+        <DialogContent className="max-w-3xl p-0">
+          {previewImageUrl && (
+            <Image
+              src={previewImageUrl}
+              alt="Vista previa de la imagen"
+              width={1200}
+              height={900}
+              className="w-full h-auto max-h-[90vh] object-contain"
+            />
+          )}
+        </DialogContent>
       </Dialog>
     </div>
   );

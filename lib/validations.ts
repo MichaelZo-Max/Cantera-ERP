@@ -28,7 +28,7 @@ export const createOrderItemSchema = z.object({
 
 /**
  * @description Esquema para la CREACIÓN de un nuevo pedido.
- * Sincronizado con los campos que la API route realmente utiliza.
+ * Sincronizado para aceptar múltiples facturas.
  */
 export const createOrderSchema = z.object({
   customer_id: z.number().int().positive("El cliente es requerido."),
@@ -50,10 +50,20 @@ export const createOrderSchema = z.object({
   driver_ids: z
     .array(z.number().int().positive())
     .min(1, "Debes seleccionar al menos un chofer."),
-  
-  invoice_series: z.string().optional().nullable(),
-  invoice_number: z.coerce.number().optional().nullable(),
-  invoice_n: z.string().optional().nullable(),
+
+  // --- 👇 CAMBIO: Reemplazamos los campos individuales por un array de objetos de factura ---
+  invoices: z
+    .array(
+      z.object({
+        invoice_series: z.string(),
+        invoice_number: z.number(),
+        invoice_n: z.string(),
+      }),
+      {
+        required_error: "Se requiere al menos una factura.",
+      }
+    )
+    .min(1, "El pedido debe estar asociado a al menos una factura."),
 });
 
 /**

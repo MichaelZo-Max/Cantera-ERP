@@ -13,6 +13,7 @@ import type {
   Order,
   Truck as TruckType,
   Driver,
+  Invoice, // <-- AÑADIDO: Importar el tipo Invoice
 } from "@/lib/types";
 
 // --- UI Components ---
@@ -107,10 +108,23 @@ interface YardClientProps {
 
 // --- Reusable RHF Controlled Component ---
 const RHFSearchableSelect = ({
-  control, name, label, options, placeholder, disabled, className, loading
+  control,
+  name,
+  label,
+  options,
+  placeholder,
+  disabled,
+  className,
+  loading,
 }: {
-  control: any; name: string; label: string; options: SearchableSelectOption[];
-  placeholder: string; disabled?: boolean; className?: string; loading?: boolean;
+  control: any;
+  name: string;
+  label: string;
+  options: SearchableSelectOption[];
+  placeholder: string;
+  disabled?: boolean;
+  className?: string;
+  loading?: boolean;
 }) => (
   <FormField
     control={control}
@@ -127,7 +141,9 @@ const RHFSearchableSelect = ({
             disabled={disabled || loading}
             className="w-full"
           />
-          {loading && <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />}
+          {loading && (
+            <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />
+          )}
         </div>
         <FormMessage />
       </FormItem>
@@ -155,7 +171,7 @@ const DeliveryCard = React.memo(
               <TruckIcon className="h-5 w-5" /> {delivery.truck.placa}
             </p>
             <p className="text-sm text-muted-foreground">
-              Despacho ID: {delivery.delivery_id}
+              Despacho ID: {delivery.id}
             </p>
           </div>
           <Badge
@@ -171,13 +187,27 @@ const DeliveryCard = React.memo(
           <span className="font-medium">Conductor:</span>
           <span className="truncate">{delivery.driver.name}</span>
         </div>
-        {delivery.orderDetails.invoice_full_number && (
-          <div className="flex items-center gap-2">
-            <FileText className="h-4 w-4 text-muted-foreground" />
-            <span className="font-medium">Factura:</span>
-            <span className="truncate">{delivery.orderDetails.invoice_full_number}</span>
-          </div>
-        )}
+        {/* --- 👇 CAMBIO: Mapear y mostrar múltiples facturas --- */}
+        {delivery.orderDetails.invoices &&
+          delivery.orderDetails.invoices.length > 0 && (
+            <div className="flex items-start gap-2">
+              <FileText className="h-4 w-4 text-muted-foreground flex-shrink-0 mt-0.5" />
+              <div className="flex flex-col">
+                <span className="font-medium">Factura(s):</span>
+                <div className="flex flex-wrap gap-1 mt-1">
+                  {delivery.orderDetails.invoices.map((invoice: Invoice) => (
+                    <Badge
+                      key={invoice.invoice_full_number}
+                      variant="secondary"
+                      className="text-xs"
+                    >
+                      {invoice.invoice_full_number}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
         <div className="flex items-center gap-2">
           <User className="h-4 w-4 text-muted-foreground" />
           <span className="font-medium">Cliente:</span>
@@ -210,7 +240,9 @@ export function YardDeliveriesClientUI({
   // --- State Management ---
   const [deliveries, setDeliveries] = useState<Delivery[]>(initialDeliveries);
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedDelivery, setSelectedDelivery] = useState<Delivery | null>(null);
+  const [selectedDelivery, setSelectedDelivery] = useState<Delivery | null>(
+    null
+  );
   const [showModal, setShowModal] = useState(false);
 
   const [authorizedTrucks, setAuthorizedTrucks] = useState<TruckType[]>([]);
@@ -227,8 +259,7 @@ export function YardDeliveriesClientUI({
     resolver: zodResolver(confirmLoadSchema),
     defaultValues: { notes: "", loadedItems: [] },
   });
-  
-  // CORRECCIÓN: useFieldArray necesita name y control
+
   const { fields: loadedItemsFields, replace: replaceLoadedItems } =
     useFieldArray({
       control: confirmLoadForm.control,
@@ -255,7 +286,8 @@ export function YardDeliveriesClientUI({
 
       try {
         const res = await fetch(`/api/orders/${orderId}`);
-        if (!res.ok) throw new Error("No se pudo cargar el transporte autorizado.");
+        if (!res.ok)
+          throw new Error("No se pudo cargar el transporte autorizado.");
         const data = await res.json();
         setAuthorizedTrucks(data.trucks || []);
         setAuthorizedDrivers(data.drivers || []);
@@ -272,7 +304,6 @@ export function YardDeliveriesClientUI({
   }, [selectedOrderId, createTripForm]);
 
   // --- Derived State (Memoized) ---
-  // CORRECCIÓN: Añadido 'return' en los useMemo
   const filteredDeliveries = useMemo(() => {
     const query = searchQuery.toLowerCase();
     if (!query) return deliveries;
@@ -281,8 +312,11 @@ export function YardDeliveriesClientUI({
         (d.truck.placa?.toLowerCase() ?? "").includes(query) ||
         (d.driver.name?.toLowerCase() ?? "").includes(query) ||
         (d.orderDetails.client.name?.toLowerCase() ?? "").includes(query) ||
-        (d.orderDetails.invoice_full_number?.toLowerCase() ?? "").includes(query) ||
-        (d.delivery_id.toString() ?? "").includes(query)
+        (d.id.toString() ?? "").includes(query) ||
+        // --- 👇 CAMBIO: Lógica de búsqueda para múltiples facturas ---
+        (d.orderDetails.invoices?.some((invoice) =>
+          invoice.invoice_full_number?.toLowerCase().includes(query)
+        ))
     );
   }, [searchQuery, deliveries]);
 
@@ -315,7 +349,7 @@ export function YardDeliveriesClientUI({
 
       const newDelivery = await res.json();
       toast.success(
-        `Nuevo viaje (Despacho #${newDelivery.delivery_id}) creado con éxito.`
+        `Nuevo viaje (Despacho #${newDelivery.id}) creado con éxito.`
       );
 
       setDeliveries((prev) => [newDelivery, ...prev]);
@@ -338,13 +372,10 @@ export function YardDeliveriesClientUI({
       formData.append("userId", user.id.toString());
       formData.append("photoFile", values.loadPhoto);
 
-      const res = await fetch(
-        `/api/deliveries/${selectedDelivery.delivery_id}`,
-        {
-          method: "PATCH",
-          body: formData,
-        }
-      );
+      const res = await fetch(`/api/deliveries/${selectedDelivery.id}`, {
+        method: "PATCH",
+        body: formData,
+      });
 
       if (!res.ok) {
         const errorData = await res.json();
@@ -355,9 +386,7 @@ export function YardDeliveriesClientUI({
       toast.success(`Carga confirmada para ${selectedDelivery.truck.placa}`);
 
       setDeliveries((prev) =>
-        prev.map((d) =>
-          d.delivery_id === updatedDelivery.delivery_id ? updatedDelivery : d
-        )
+        prev.map((d) => (d.id === updatedDelivery.id ? updatedDelivery : d))
       );
 
       setShowModal(false);
@@ -377,7 +406,7 @@ export function YardDeliveriesClientUI({
       }
 
       try {
-        const res = await fetch(`/api/deliveries/${delivery.delivery_id}`);
+        const res = await fetch(`/api/deliveries/${delivery.id}`);
         if (!res.ok) {
           throw new Error(
             "No se pudo obtener la información actualizada del despacho."
@@ -517,7 +546,7 @@ export function YardDeliveriesClientUI({
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {pendingDeliveries.map((d) => (
                   <DeliveryCard
-                    key={d.delivery_id}
+                    key={d.id}
                     delivery={d}
                     onSelect={handleSelectDelivery}
                   />
@@ -546,11 +575,11 @@ export function YardDeliveriesClientUI({
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {loadedDeliveries.map((d) => (
                   <DeliveryCard
-                    key={d.delivery_id}
+                    key={d.id}
                     delivery={d}
                     onSelect={() =>
                       toast.info(
-                        `El despacho #${d.delivery_id} ya está cargado y listo para salir.`
+                        `El despacho #${d.id} ya está cargado y listo para salir.`
                       )
                     }
                   />
@@ -567,7 +596,7 @@ export function YardDeliveriesClientUI({
         </AnimatedCard>
       </div>
 
-      {/* Modal de Confirmación de Carga (código existente sin cambios) */}
+      {/* Modal de Confirmación de Carga */}
       <Dialog open={showModal} onOpenChange={setShowModal}>
         <DialogContent className="sm:max-w-xl max-h-[90vh] overflow-y-auto">
           {selectedDelivery && (
@@ -584,11 +613,8 @@ export function YardDeliveriesClientUI({
               <Form {...confirmLoadForm}>
                 <form
                   onSubmit={confirmLoadForm.handleSubmit(handleConfirmLoad)}
-                  className="space-y-6 py-2" // Aumentado para mejor separación
+                  className="space-y-6 py-2"
                 >
-                  {/* --- INICIO DEL CÓDIGO MODIFICADO --- */}
-
-                  {/* El campo de la foto ahora está aquí */}
                   <FormField
                     control={confirmLoadForm.control}
                     name="loadPhoto"
@@ -608,7 +634,6 @@ export function YardDeliveriesClientUI({
                     )}
                   />
 
-                  {/* El resumen del despacho está a continuación */}
                   <div className="p-3 border rounded-lg text-sm space-y-2">
                     <p>
                       <strong>Cliente:</strong>{" "}
@@ -621,8 +646,6 @@ export function YardDeliveriesClientUI({
                       <strong>Camión:</strong> {selectedDelivery.truck.placa}
                     </p>
                   </div>
-
-                  {/* --- FIN DEL CÓDIGO MODIFICADO --- */}
 
                   <div className="space-y-2">
                     <Label>Items del Pedido</Label>

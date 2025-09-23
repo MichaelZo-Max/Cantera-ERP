@@ -1,4 +1,3 @@
-// app/(protected)/cashier/orders/list/orders-list-client.tsx
 "use client";
 
 import { useState, useMemo } from "react";
@@ -6,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import type { Order, OrderProgress, OrderItem, DeliveryItem } from "@/lib/types";
+import type { Order, OrderProgress, OrderItem, DeliveryItem, Invoice } from "@/lib/types";
 import { Search, FileText, Calendar, User, Truck, Package, Pencil } from "lucide-react";
 import Link from "next/link";
 import { PageHeader } from "@/components/page-header";
@@ -14,6 +13,7 @@ import { AnimatedCard } from "@/components/ui/animated-card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Progress } from "@/components/ui/progress";
 
+// --- (Función getStatusConfig sin cambios) ---
 const getStatusConfig = (status: string) => {
   switch (status) {
     case "AWAITING_PAYMENT":
@@ -87,7 +87,10 @@ export function OrdersListClientUI({ initialOrders }: { initialOrders: Order[] }
     return initialOrders.filter(order =>
       (order.order_number?.toLowerCase() ?? "").includes(q) ||
       (order.client?.name?.toLowerCase() ?? "").includes(q) ||
-      (order.invoice_full_number?.toLowerCase() ?? "").includes(q) // Esta es la línea corregida
+      // --- 👇 CAMBIO: Lógica de búsqueda para múltiples facturas ---
+      (order.invoices?.some(invoice => 
+        invoice.invoice_full_number?.toLowerCase().includes(q)
+      ))
     );
   }, [initialOrders, searchTerm]);
 
@@ -98,7 +101,6 @@ export function OrdersListClientUI({ initialOrders }: { initialOrders: Order[] }
         description="Consulta y gestiona los pedidos"
         actions={
           <Button asChild>
-            {/* El enlace para "Nuevo Pedido" ahora apunta a /orders/new */}
             <Link href="/cashier/orders/new">
               <FileText className="h-4 w-4 mr-2" />
               <span>Nuevo Pedido</span>
@@ -144,13 +146,23 @@ export function OrdersListClientUI({ initialOrders }: { initialOrders: Order[] }
                 </CardHeader>
                 <CardContent className="space-y-3 flex-grow">
                   <div className="flex items-center space-x-2"><User className="h-4 w-4 text-muted-foreground" /> <span className="font-medium">{order.client?.name}</span></div>
-                  {order.invoice_full_number && (
+                  
+                  {/* --- 👇 CAMBIO: Mapear y mostrar todas las facturas como badges --- */}
+                  {order.invoices && order.invoices.length > 0 && (
                     <div className="flex items-center space-x-2 text-sm text-muted-foreground">
-                      <FileText className="h-4 w-4" /> 
-                      <span>{order.invoice_full_number}</span>
+                      <FileText className="h-4 w-4 flex-shrink-0" /> 
+                      <div className="flex flex-wrap gap-1">
+                        {order.invoices.map((invoice: Invoice) => (
+                          <Badge key={invoice.invoice_full_number} variant="secondary">
+                            {invoice.invoice_full_number}
+                          </Badge>
+                        ))}
+                      </div>
                     </div>
                   )}
+
                   <div className="flex items-center space-x-2 text-sm text-muted-foreground"><Calendar className="h-4 w-4" /> <span>{new Date(order.created_at).toLocaleDateString("es-VE")}</span></div>
+                  
                   {progress.totalTrips > 0 && (
                       <div className="space-y-2 pt-2">
                         <div className="flex items-center justify-between text-sm">
@@ -167,7 +179,6 @@ export function OrdersListClientUI({ initialOrders }: { initialOrders: Order[] }
                 </CardContent>
                 <CardFooter className="pt-4 border-t flex justify-between items-center">
                   <p className="text-xl font-bold">${Number(order.total ?? 0).toFixed(2)}</p>
-                  {/* El enlace para "Editar" ahora apunta a /orders/[id] */}
                   <Button asChild variant="outline" size="sm">
                     <Link href={`/cashier/orders/${order.id}`}>
                       <Pencil className="h-4 w-4 mr-2" />
