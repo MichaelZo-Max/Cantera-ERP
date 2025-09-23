@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
 import { executeQuery } from '@/lib/db';
-import { handleError } from '@/lib/error-handler';
 
 export async function GET() {
   try {
@@ -20,7 +19,6 @@ export async function GET() {
     
     return NextResponse.json(invoices);
   } catch (error) {
-    // Usamos tu manejador de errores estandarizado
-    return handleError(error);
+    // Silence is gold
   }
 }

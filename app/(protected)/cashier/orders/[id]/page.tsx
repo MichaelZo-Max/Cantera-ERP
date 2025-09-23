@@ -1,17 +1,16 @@
-// app/(protected)/cashier/orders/[id]/page.tsx
 export const dynamic = "force-dynamic";
 
 import { AppLayout } from "@/components/app-layout";
-import { OrderClient } from "./order-client"; 
-// Añadimos Invoice a la importación de tipos
+import { OrderClient } from "./order-client";
 import type { Client, Product, Destination, Truck, Driver, Order, Invoice } from "@/lib/types";
+import { getApiUrl } from "@/lib/utils";
+import { notFound } from "next/navigation";
 
-// Función para obtener los datos de una orden específica
 async function getOrderDetails(orderId: string): Promise<Order | null> {
-  if (orderId === "new") return null; 
+  if (!orderId) return null;
   try {
-    const baseUrl = process.env.NEXT_PUBLIC_API_URL;
-    const res = await fetch(`${baseUrl}/api/orders/${orderId}`, { cache: 'no-store' }); // Evitar cache para datos de edición
+    const res = await fetch(getApiUrl(`/api/orders/${orderId}`), { cache: 'no-store' });
+    if (res.status === 404) return null;
     if (!res.ok) throw new Error("Error al cargar la orden");
     return res.json();
   } catch (error) {
@@ -20,60 +19,73 @@ async function getOrderDetails(orderId: string): Promise<Order | null> {
   }
 }
 
-// Función para obtener todos los catálogos necesarios para el formulario
 async function getOrderCatalogs() {
   try {
-    const baseUrl = process.env.NEXT_PUBLIC_API_URL;
-    // Añadimos la llamada a la API de facturas
+    const baseUrl = getApiUrl(""); // Usamos una cadena vacía para obtener solo la base
     const [cRes, pRes, dRes, tRes, drRes, iRes] = await Promise.all([
-      fetch(`${baseUrl}/api/customers`, { next: { tags: ["customers"] } }),
-      fetch(`${baseUrl}/api/products`, { next: { tags: ["products"] } }),
-      fetch(`${baseUrl}/api/destinations`, { next: { tags: ["destinations"] } }),
-      fetch(`${baseUrl}/api/trucks`, { next: { tags: ["trucks"] } }),
-      fetch(`${baseUrl}/api/drivers`, { next: { tags: ["drivers"] } }),
-      fetch(`${baseUrl}/api/invoices`, { next: { revalidate: 0 } }), // No cachear facturas
+      fetch(`${baseUrl}api/customers?page=1&limit=20`),
+      fetch(`${baseUrl}api/products?page=1&limit=20`),
+      fetch(`${baseUrl}api/destinations`),
+      fetch(`${baseUrl}api/trucks`),
+      fetch(`${baseUrl}api/drivers`),
+      fetch(`${baseUrl}api/invoices`, { next: { revalidate: 0 } }),
     ]);
 
-    const clients = await cRes.json();
-    const products = await pRes.json();
-    const destinations = await dRes.json();
-    const trucks = await tRes.json();
-    const drivers = await drRes.json();
-    const invoices = await iRes.json(); // Obtenemos las facturas
-
-    return { clients, products, destinations, trucks, drivers, invoices };
+    const clientsData = await cRes.json();
+    const productsData = await pRes.json();
+    
+    return {
+      clients: clientsData.data || [],
+      products: productsData.data || [],
+      destinations: await dRes.json(),
+      trucks: await tRes.json(),
+      drivers: await drRes.json(),
+      invoices: await iRes.json(),
+    };
   } catch (error) {
     console.error("Error cargando catálogos:", error);
     return { clients: [], products: [], destinations: [], trucks: [], drivers: [], invoices: [] };
   }
 }
 
-// El componente de página que renderiza el formulario
-export default async function OrderPage({ params }: { params: { id: string } }) {
-  const isEditing = params.id !== "new";
+export default async function EditOrderPage({ params }: { params: { id: string } }) {
   const [order, catalogs] = await Promise.all([
     getOrderDetails(params.id),
     getOrderCatalogs(),
   ]);
 
-  // Si estamos editando pero la orden no se encontró (y no es el pedido que se acaba de crear)
-  if (isEditing && !order) {
-    return (
-      <AppLayout title="Error">
-        <p className="text-center">No se pudo encontrar la orden solicitada.</p>
-      </AppLayout>
-    );
+  if (!order) {
+    notFound();
   }
 
-  const pageTitle = isEditing ? `Editar Pedido #${order?.order_number}` : "Crear Nuevo Pedido";
+  // ✅ **CORRECCIÓN**:
+  // 1. Se cambió `order.customer` por `order.client` para que coincida con tu tipo `Order`.
+  // 2. Se añadieron los tipos explícitos `(c: Client)` y `(p: Product)` para solucionar los errores de 'any'.
+  if (order.client && !catalogs.clients.some((c: Client) => c.id === order.customer_id)) {
+    catalogs.clients.unshift(order.client);
+  }
+  order.items?.forEach(item => {
+    if (item.product && !catalogs.products.some((p: Product) => p.id === item.product_id)) {
+      catalogs.products.unshift(item.product);
+    }
+  });
 
   return (
-    <AppLayout title={pageTitle}>
-      <OrderClient
-        isEditing={isEditing}
-        initialOrderData={order}
-        catalogs={catalogs}
-      />
+    <AppLayout title={`Editar Pedido #${order.order_number}`}>
+      <div className="space-y-6">
+        <div className="text-left">
+          <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
+            Editar Pedido <span className="text-primary">#{order.order_number}</span>
+          </h1>
+          <p className="mt-2 text-muted-foreground">
+            Modifica los detalles del pedido.
+          </p>
+        </div>
+        <OrderClient
+          orderData={order}
+          catalogs={catalogs}
+        />
+      </div>
     </AppLayout>
   );
 }

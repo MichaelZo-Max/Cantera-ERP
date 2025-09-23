@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Check, ChevronsUpDown, X } from "lucide-react";
+import { Check, ChevronsUpDown, Loader2 } from "lucide-react"; // Importamos un ícono de carga
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
@@ -24,7 +24,6 @@ export interface SearchableSelectOption {
   label: React.ReactNode;
 }
 
-// 👇 1. Sobrecarga de tipos para manejar single y multi-select
 type SingleSelectProps = {
   isMulti?: false;
   value?: string;
@@ -37,6 +36,7 @@ type MultiSelectProps = {
   onChange: (value: string[]) => void;
 };
 
+// Se añaden nuevas props para la funcionalidad asíncrona
 type SearchableSelectProps = {
   options: SearchableSelectOption[];
   placeholder?: string;
@@ -44,6 +44,10 @@ type SearchableSelectProps = {
   emptyText?: string;
   disabled?: boolean;
   className?: string;
+  onSearch?: (query: string) => void;
+  onLoadMore?: () => void;
+  hasNextPage?: boolean;
+  isLoading?: boolean;
 } & (SingleSelectProps | MultiSelectProps);
 
 export function SearchableSelect(props: SearchableSelectProps) {
@@ -54,20 +58,21 @@ export function SearchableSelect(props: SearchableSelectProps) {
     emptyText = "No se encontraron resultados.",
     disabled = false,
     className,
+    onSearch,
+    onLoadMore,
+    hasNextPage,
+    isLoading,
   } = props;
 
   const [open, setOpen] = React.useState(false);
 
-  // === Lógica para Single Select ===
   const handleSingleSelect = (currentValue: string) => {
     if (!props.isMulti) {
-      const newValue = currentValue === props.value ? "" : currentValue;
-      props.onChange(newValue);
+      props.onChange(currentValue === props.value ? "" : currentValue);
       setOpen(false);
     }
   };
 
-  // === Lógica para Multi Select ===
   const handleMultiSelect = (currentValue: string) => {
     if (props.isMulti) {
       const currentValues = props.value || [];
@@ -79,7 +84,6 @@ export function SearchableSelect(props: SearchableSelectProps) {
     }
   };
 
-  // Determina qué opción está seleccionada (para single-select)
   const selectedOption = React.useMemo(() => {
     if (!props.isMulti) {
       return options.find((option) => option.value === props.value);
@@ -87,18 +91,24 @@ export function SearchableSelect(props: SearchableSelectProps) {
     return null;
   }, [options, props]);
 
-  // Determina las opciones seleccionadas (para multi-select)
   const selectedOptionsMulti = React.useMemo(() => {
     if (props.isMulti) {
       return options.filter((option) => props.value?.includes(option.value));
     }
     return [];
   }, [options, props]);
-
-  // Función de filtrado mejorada
-  const commandFilter = (itemValue: string, search: string): number => {
-    // ... (la función de filtrado no necesita cambios)
-    return 1;
+  
+  // Cuando onSearch es provisto, asumimos que el filtrado se hace externamente.
+  const commandFilter = (value: string, search: string): number => {
+    if (onSearch) {
+      return 1; 
+    }
+    // Si no, se realiza un filtrado básico por etiqueta
+    const option = options.find(o => o.value === value);
+    if (option && typeof option.label === 'string') {
+        return option.label.toLowerCase().includes(search.toLowerCase()) ? 1 : 0;
+    }
+    return 0;
   };
 
   return (
@@ -109,15 +119,14 @@ export function SearchableSelect(props: SearchableSelectProps) {
           role="combobox"
           aria-expanded={open}
           className={cn(
-            "w-full justify-between font-normal text-sm h-auto", // h-auto para multi-select
-            !props.value && "text-muted-foreground",
+            "w-full justify-between font-normal text-sm h-auto",
+            (!props.value || (props.isMulti && props.value?.length === 0)) && "text-muted-foreground",
             className
           )}
           disabled={disabled}
         >
           <div className="flex-1 text-left">
             {props.isMulti ? (
-              // Vista para Multi-select
               selectedOptionsMulti.length > 0 ? (
                 <div className="flex gap-1 flex-wrap">
                   {selectedOptionsMulti.map((option) => (
@@ -133,8 +142,7 @@ export function SearchableSelect(props: SearchableSelectProps) {
               ) : (
                 <span>{placeholder}</span>
               )
-            ) : // Vista para Single-select
-            selectedOption ? (
+            ) : selectedOption ? (
               <span className="truncate">{selectedOption.label}</span>
             ) : (
               <span>{placeholder}</span>
@@ -150,12 +158,15 @@ export function SearchableSelect(props: SearchableSelectProps) {
         onOpenAutoFocus={(e) => e.preventDefault()}
       >
         <Command filter={commandFilter}>
-          <CommandInput placeholder={searchPlaceholder} />
+          <CommandInput
+            placeholder={searchPlaceholder}
+            onValueChange={onSearch}
+            disabled={disabled || isLoading}
+          />
           <CommandList>
-            <CommandEmpty>{emptyText}</CommandEmpty>
+            <CommandEmpty>{isLoading ? "Buscando..." : emptyText}</CommandEmpty>
             <CommandGroup>
               {options.map((option) => {
-                // Determina si la opción está seleccionada
                 const isSelected = props.isMulti
                   ? props.value?.includes(option.value)
                   : props.value === option.value;
@@ -183,6 +194,22 @@ export function SearchableSelect(props: SearchableSelectProps) {
                 );
               })}
             </CommandGroup>
+            {/* Se añade el indicador de carga y el botón para cargar más */}
+            {isLoading && (
+              <CommandItem disabled className="flex justify-center items-center">
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                <span>Cargando...</span>
+              </CommandItem>
+            )}
+            {hasNextPage && !isLoading && (
+              <CommandItem
+                key="load-more"
+                onSelect={onLoadMore}
+                className="flex justify-center items-center cursor-pointer opacity-75"
+              >
+                <span>Cargar más resultados</span>
+              </CommandItem>
+            )}
           </CommandList>
         </Command>
       </PopoverContent>

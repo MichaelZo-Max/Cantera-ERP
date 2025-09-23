@@ -7,6 +7,17 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
+export function getApiUrl(path: string): string {
+  // Asegúrate de que tu variable de entorno se llame NEXT_PUBLIC_API_URL en tu archivo .env.local
+  const baseUrl = process.env.NEXT_PUBLIC_API_URL || ''; 
+  
+  // Lógica para evitar barras duplicadas (ej: http://localhost:3000//api/orders)
+  const normalizedPath = path.startsWith('/') ? path.substring(1) : path;
+  const normalizedBaseUrl = baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`;
+
+  return `${normalizedBaseUrl}${normalizedPath}`;
+}
+
 export function formatCurrency(amount: number): string {
   return new Intl.NumberFormat("es-MX", {
     style: "currency",

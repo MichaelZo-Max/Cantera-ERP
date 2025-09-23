@@ -1,57 +1,51 @@
-// app/(protected)/cashier/orders/page.tsx
 export const dynamic = "force-dynamic";
 
 import { AppLayout } from "@/components/app-layout";
 import { OrderFormClient } from "./order-form-client";
-// Asegúrate de que tu archivo de tipos exporte 'Invoice'
 import type { Client, Product, Destination, Truck, Driver, Invoice } from "@/lib/types";
+import { getApiUrl } from "@/lib/utils";
 
-// La función para obtener los catálogos ahora también busca las facturas
+// La función ahora pide solo la primera página de clientes y productos
 async function getOrderCatalogs(): Promise<{
   clients: Client[];
   products: Product[];
   destinations: Destination[];
   trucks: Truck[];
   drivers: Driver[];
-  invoices: Invoice[]; // <-- Añadido
+  invoices: Invoice[];
 }> {
   try {
     const baseUrl = process.env.NEXT_PUBLIC_API_URL;
     // Añadimos la nueva llamada a la API de facturas
     const [cRes, pRes, dRes, tRes, drRes, iRes] = await Promise.all([
-      fetch(`${baseUrl}/api/customers`, { next: { revalidate: 60, tags: ["customers"] } }),
-      fetch(`${baseUrl}/api/products`, { next: { revalidate: 60, tags: ["products"] } }),
-      fetch(`${baseUrl}/api/destinations`, { next: { revalidate: 60, tags: ["destinations"] } }),
-      fetch(`${baseUrl}/api/trucks`, { next: { revalidate: 60, tags: ["trucks"] } }),
-      fetch(`${baseUrl}/api/drivers`, { next: { revalidate: 60, tags: ["drivers"] } }),
-      fetch(`${baseUrl}/api/invoices`, { cache: 'no-store' }),
+      fetch(`${baseUrl}/api/customers?page=1&limit=20`, { next: { tags: ["customers"] } }),
+      fetch(`${baseUrl}/api/products?page=1&limit=20`, { next: { tags: ["products"] } }),
+      fetch(`${baseUrl}/api/destinations`, { next: { tags: ["destinations"] } }),
+      fetch(`${baseUrl}/api/trucks`, { next: { tags: ["trucks"] } }),
+      fetch(`${baseUrl}/api/drivers`, { next: { tags: ["drivers"] } }),
+      fetch(`${baseUrl}/api/invoices`, { next: { revalidate: 0 } }),
     ]);
 
-    if (!cRes.ok) throw new Error("Error al cargar clientes");
-    if (!pRes.ok) throw new Error("Error al cargar productos");
-    if (!dRes.ok) throw new Error("Error al cargar destinos");
-    if (!tRes.ok) throw new Error("Error al cargar camiones");
-    if (!drRes.ok) throw new Error("Error al cargar choferes");
-    if (!iRes.ok) throw new Error("Error al cargar facturas"); // <-- Verificación
-
-    const clients = await cRes.json();
-    const products = await pRes.json();
+    // Procesamos todas las respuestas
+    const clientsData = await cRes.json();
+    const productsData = await pRes.json();
     const destinations = await dRes.json();
     const trucks = await tRes.json();
     const drivers = await drRes.json();
-    const invoices = await iRes.json(); // <-- Obtenemos las facturas
+    const invoices = await iRes.json();
+    
+    // Extraemos el array 'data' de las respuestas paginadas
+    const clients = clientsData.data || [];
+    const products = productsData.data || [];
 
     return { clients, products, destinations, trucks, drivers, invoices };
   } catch (error) {
     console.error("Error cargando catálogos en el servidor:", error);
-    // Devolvemos el array vacío para facturas también
     return { clients: [], products: [], destinations: [], trucks: [], drivers: [], invoices: [] };
   }
 }
 
-// El componente de la página ahora usa el OrderFormClient
 export default async function CashierOrderPage() {
-  // Desestructuramos las facturas
   const { clients, products, destinations, trucks, drivers, invoices } = await getOrderCatalogs();
 
   return (
@@ -65,7 +59,6 @@ export default async function CashierOrderPage() {
             Completa los siguientes campos para registrar un nuevo pedido para un cliente.
           </p>
         </div>
-        
         <div>
           <OrderFormClient
             clients={clients}
@@ -73,7 +66,7 @@ export default async function CashierOrderPage() {
             destinations={destinations}
             trucks={trucks}
             drivers={drivers}
-            invoices={invoices} // <-- Pasamos las facturas al componente cliente
+            invoices={invoices}
           />
         </div>
       </div>
