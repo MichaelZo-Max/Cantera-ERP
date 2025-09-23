@@ -5,32 +5,19 @@ import { executeQuery, TYPES } from "@/lib/db";
 import { revalidateTag } from "next/cache";
 import { createOrderSchema } from "@/lib/validations";
 
-// ... (La función GET no necesita cambios)
 export async function GET() {
   try {
-    // --- 👇 CORRECCIÓN: Se ha modificado la consulta SQL ---
+    // 1. Usamos la vista para una consulta más limpia
     const sql = `
       SELECT
-          p.id,
-          p.order_number,
-          p.status,
-          p.created_at,
-          c.name AS client_name,
-          f.NUMSERIE AS invoice_serie,    -- Se usa la columna correcta de FACTURASVENTA
-          f.NUMFACTURA AS invoice_folio,  -- Se usa la columna correcta de FACTURASVENTA
+          p.*, -- Seleccionamos todas las columnas de la vista
           (SELECT SUM(pi.quantity * pi.price_per_unit)
            FROM RIP.APP_PEDIDOS_ITEMS pi
            WHERE pi.order_id = p.id) AS total,
           (SELECT COUNT(*) FROM RIP.APP_DESPACHOS d WHERE d.order_id = p.id) AS total_deliveries,
           (SELECT COUNT(*) FROM RIP.APP_DESPACHOS d WHERE d.order_id = p.id AND d.status = 'EXITED') AS completed_deliveries
       FROM
-          RIP.APP_PEDIDOS AS p
-      JOIN
-          RIP.VW_APP_CLIENTES AS c ON p.customer_id = c.id
-      LEFT JOIN 
-          dbo.FACTURASVENTA AS f ON p.invoice_series = f.NUMSERIE 
-                                 AND p.invoice_number = f.NUMFACTURA 
-                                 AND p.invoice_n = f.N -- El JOIN ahora usa la clave compuesta correcta
+          RIP.VW_APP_PEDIDOS AS p
       ORDER BY
           p.created_at DESC;
     `;
@@ -41,11 +28,12 @@ export async function GET() {
       ...order,
       client: {
         id: order.customer_id,
-        name: order.client_name,
+        name: order.customer_name,
       },
     }));
 
     return NextResponse.json(orders);
+
   } catch (error) {
     console.error("[API_ORDERS_GET]", error);
     return new NextResponse("Error interno al obtener los pedidos", {

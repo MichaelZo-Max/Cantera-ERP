@@ -86,7 +86,8 @@ export function OrdersListClientUI({ initialOrders }: { initialOrders: Order[] }
     const q = searchTerm.toLowerCase();
     return initialOrders.filter(order =>
       (order.order_number?.toLowerCase() ?? "").includes(q) ||
-      (order.client?.name?.toLowerCase() ?? "").includes(q)
+      (order.client?.name?.toLowerCase() ?? "").includes(q) ||
+      (order.invoice_full_number?.toLowerCase() ?? "").includes(q) // Esta es la línea corregida
     );
   }, [initialOrders, searchTerm]);
 
@@ -111,7 +112,7 @@ export function OrdersListClientUI({ initialOrders }: { initialOrders: Order[] }
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground h-4 w-4" />
             <Input
-              placeholder="Buscar por número de pedido o cliente…"
+              placeholder="Buscar por orden, cliente o factura…"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-10 h-11"
@@ -143,6 +144,12 @@ export function OrdersListClientUI({ initialOrders }: { initialOrders: Order[] }
                 </CardHeader>
                 <CardContent className="space-y-3 flex-grow">
                   <div className="flex items-center space-x-2"><User className="h-4 w-4 text-muted-foreground" /> <span className="font-medium">{order.client?.name}</span></div>
+                  {order.invoice_full_number && (
+                    <div className="flex items-center space-x-2 text-sm text-muted-foreground">
+                      <FileText className="h-4 w-4" /> 
+                      <span>{order.invoice_full_number}</span>
+                    </div>
+                  )}
                   <div className="flex items-center space-x-2 text-sm text-muted-foreground"><Calendar className="h-4 w-4" /> <span>{new Date(order.created_at).toLocaleDateString("es-VE")}</span></div>
                   {progress.totalTrips > 0 && (
                       <div className="space-y-2 pt-2">

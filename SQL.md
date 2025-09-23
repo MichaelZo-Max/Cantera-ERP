@@ -401,7 +401,8 @@ SELECT
     p.updated_at,
     p.invoice_series,
     p.invoice_number,
-    p.invoice_n
+    p.invoice_n,
+    ISNULL(p.invoice_series + '-' + CAST(p.invoice_number AS VARCHAR) + p.invoice_n COLLATE DATABASE_DEFAULT, '') AS invoice_full_number
 FROM
     RIP.APP_PEDIDOS p
 JOIN
@@ -422,6 +423,10 @@ CREATE VIEW RIP.VW_APP_DESPACHOS AS
 SELECT
     d.id,
     d.order_id,
+    p.invoice_series,
+    p.invoice_number,
+    p.invoice_n,
+    ISNULL(p.invoice_series + '-' + CAST(p.invoice_number AS VARCHAR) + p.invoice_n COLLATE DATABASE_DEFAULT, '') AS invoice_full_number,
     d.truck_id,
     d.driver_id,
     d.status AS estado,
@@ -432,11 +437,13 @@ SELECT
     d.load_photo_url AS loadPhoto,
     d.exited_at AS exitedAt,
     d.exit_photo_url AS exitPhoto,
-    (SELECT * FROM RIP.VW_APP_PEDIDOS p WHERE p.id = d.order_id FOR JSON PATH, WITHOUT_ARRAY_WRAPPER) AS orderDetails,
+    (SELECT * FROM RIP.VW_APP_PEDIDOS vp WHERE vp.id = d.order_id FOR JSON PATH, WITHOUT_ARRAY_WRAPPER) AS orderDetails,
     (SELECT t.id, t.placa, t.brand, t.model, t.capacity FROM RIP.APP_CAMIONES t WHERE t.id = d.truck_id FOR JSON PATH, WITHOUT_ARRAY_WRAPPER) AS truck,
     (SELECT dr.id, dr.name, dr.docId FROM RIP.APP_CHOFERES dr WHERE dr.id = d.driver_id FOR JSON PATH, WITHOUT_ARRAY_WRAPPER) AS driver
 FROM
-    RIP.APP_DESPACHOS d;
+    RIP.APP_DESPACHOS d
+JOIN
+    RIP.APP_PEDIDOS p ON d.order_id = p.id;
 GO
 
 IF OBJECT_ID('RIP.VW_APP_PEDIDOS_CON_TRANSPORTE', 'V') IS NOT NULL
@@ -453,6 +460,7 @@ SELECT
     p.customer_id,
     c.NOMBRECLIENTE as customer_name,
     p.created_at,
+    ISNULL(p.invoice_series + '-' + CAST(p.invoice_number AS VARCHAR) + p.invoice_n COLLATE DATABASE_DEFAULT, '') AS invoice_full_number,
     (
         SELECT
             cam.id, cam.placa, cam.brand, cam.model

@@ -380,7 +380,7 @@ export function OrderForm({
                   )
                   .map((inv) => ({
                     value: `${inv.invoice_series}|${inv.invoice_number}|${inv.invoice_n}`,
-                    label: `Factura ${inv.invoice_series}-${
+                    label: `${inv.invoice_series}-${
                       inv.invoice_number
                     } ($${inv.total_usd.toFixed(2)})`,
                   }))}

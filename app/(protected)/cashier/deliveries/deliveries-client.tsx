@@ -1,3 +1,4 @@
+// app/(protected)/cashier/deliveries/deliveries-client.tsx
 "use client";
 
 import { useMemo, useState } from "react";
@@ -12,6 +13,7 @@ import {
   Clock,
   CheckCircle,
   Package,
+  FileText, // <-- Importa el ícono de factura
   Eye,
   ChevronDown,
 } from "lucide-react";
@@ -67,21 +69,27 @@ export function CashierDeliveriesClientUI({
 }) {
   const [searchTerm, setSearchTerm] = useState("");
 
-  /* Filtrado por búsqueda (placa, cliente, nro orden, id viaje) */
+  /* Filtrado por búsqueda (placa, cliente, nro orden, factura, id viaje) */
   const filteredDeliveries = useMemo(() => {
     const q = searchTerm.trim().toLowerCase();
     if (!q) return initialDeliveries;
     return initialDeliveries.filter((delivery) => {
       const placa = delivery.truck?.placa?.toLowerCase() ?? "";
       const cliente = delivery.orderDetails.client?.name?.toLowerCase() ?? "";
-      const orderNumber =
-        delivery.orderDetails.order_number?.toLowerCase() ?? "";
+      const orderNumber = delivery.orderDetails.order_number?.toLowerCase() ?? "";
+      // --- INICIO: CÓDIGO A AGREGAR ---
+      const invoiceNumber = delivery.orderDetails.invoice_full_number?.toLowerCase() ?? "";
+      // --- FIN: CÓDIGO A AGREGAR ---
       const id = String(delivery.delivery_id).toLowerCase();
+      
       return (
         placa.includes(q) ||
         cliente.includes(q) ||
         id.includes(q) ||
-        orderNumber.includes(q)
+        orderNumber.includes(q) ||
+        // --- INICIO: CÓDIGO A AGREGAR ---
+        invoiceNumber.includes(q)
+        // --- FIN: CÓDIGO A AGREGAR ---
       );
     });
   }, [initialDeliveries, searchTerm]);
@@ -157,7 +165,9 @@ export function CashierDeliveriesClientUI({
             />
             <Input
               id="search-deliveries"
-              placeholder="Buscar por placa, cliente, orden o ID de viaje…"
+              // --- INICIO: TEXTO ACTUALIZADO ---
+              placeholder="Buscar por placa, cliente, orden, factura o ID de viaje…"
+              // --- FIN: TEXTO ACTUALIZADO ---
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="h-12 pl-12 text-base sm:text-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
@@ -177,10 +187,9 @@ export function CashierDeliveriesClientUI({
               const completedTrips = orderDeliveries.filter(
                 (d) => d.estado === "EXITED"
               ).length;
-              const orderNumber =
-                firstDelivery.orderDetails.order_number || order_id;
-              const clientName =
-                firstDelivery.orderDetails.client?.name || "N/A";
+              const orderNumber = firstDelivery.orderDetails.order_number || order_id;
+              const clientName = firstDelivery.orderDetails.client?.name || "N/A";
+              const invoiceFullNumber = firstDelivery.orderDetails.invoice_full_number;
 
               return (
                 <Collapsible key={order_id} defaultOpen>
@@ -203,20 +212,14 @@ export function CashierDeliveriesClientUI({
                             <p className="mt-1 line-clamp-1 text-sm text-muted-foreground">
                               {clientName}
                             </p>
-                          </div>
-                          <div className="flex items-center gap-3 sm:gap-4">
-                            <Badge
-                              variant="outline"
-                              className="whitespace-nowrap"
-                            >
-                              {completedTrips}/{orderDeliveries.length} Viajes
-                              Completados
-                            </Badge>
-                            <ChevronDown
-                              aria-hidden="true"
-                              className="h-5 w-5 transition-transform duration-300 data-[state=open]:rotate-180"
-                              /* El estado lo inyecta shadcn al trigger; usamos un span "espejo" para heredar el data-state */
-                            />
+                            {/* --- INICIO: CÓDIGO A AGREGAR --- */}
+                            {invoiceFullNumber && (
+                              <div className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">
+                                <FileText className="h-3 w-3" />
+                                <span>{invoiceFullNumber}</span>
+                              </div>
+                            )}
+                            {/* --- FIN: CÓDIGO A AGREGAR --- */}
                           </div>
                         </div>
                       </CardHeader>

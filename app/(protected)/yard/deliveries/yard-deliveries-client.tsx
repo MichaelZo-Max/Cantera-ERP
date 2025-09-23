@@ -53,6 +53,7 @@ import {
   CheckCircle,
   Clock,
   User,
+  FileText,
   Truck as TruckIcon,
   Search,
   Package,
@@ -170,6 +171,13 @@ const DeliveryCard = React.memo(
           <span className="font-medium">Conductor:</span>
           <span className="truncate">{delivery.driver.name}</span>
         </div>
+        {delivery.orderDetails.invoice_full_number && (
+          <div className="flex items-center gap-2">
+            <FileText className="h-4 w-4 text-muted-foreground" />
+            <span className="font-medium">Factura:</span>
+            <span className="truncate">{delivery.orderDetails.invoice_full_number}</span>
+          </div>
+        )}
         <div className="flex items-center gap-2">
           <User className="h-4 w-4 text-muted-foreground" />
           <span className="font-medium">Cliente:</span>
@@ -273,6 +281,7 @@ export function YardDeliveriesClientUI({
         (d.truck.placa?.toLowerCase() ?? "").includes(query) ||
         (d.driver.name?.toLowerCase() ?? "").includes(query) ||
         (d.orderDetails.client.name?.toLowerCase() ?? "").includes(query) ||
+        (d.orderDetails.invoice_full_number?.toLowerCase() ?? "").includes(query) ||
         (d.delivery_id.toString() ?? "").includes(query)
     );
   }, [searchQuery, deliveries]);
@@ -484,7 +493,7 @@ export function YardDeliveriesClientUI({
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Buscar despacho..."
+                placeholder="Buscar por placa, cliente, factura..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-9"

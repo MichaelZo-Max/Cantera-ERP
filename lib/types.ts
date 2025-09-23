@@ -131,6 +131,7 @@ export interface Order {
   invoice_series?: string | null;
   invoice_number?: number | null;
   invoice_n?: number | null;
+  invoice_full_number?: string;
 }
 
 export interface Delivery {
