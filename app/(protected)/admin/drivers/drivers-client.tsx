@@ -1,7 +1,6 @@
 "use client";
 
-import React, { useState, useCallback, useMemo } from "react";
-// (El resto de tus importaciones de componentes de UI se mantienen igual)
+import React, { useState, useCallback, useMemo, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -46,7 +45,8 @@ import {
   Phone,
   ChevronsUpDown,
   Check,
-  AlertCircle, // ✨ 1. Importar icono para errores
+  AlertCircle,
+  Loader2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useConfirmation } from "@/hooks/use-confirmation";
@@ -55,9 +55,22 @@ import { AnimatedCard } from "@/components/ui/animated-card";
 import { PageHeader } from "@/components/page-header";
 import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
 import { cn } from "@/lib/utils";
-import { driverSchema } from "@/lib/validations"; // ✨ 2. Importar el esquema de Zod
+import { driverSchema } from "@/lib/validations";
 
-// ✨ 3. Definir un tipo para los errores del formulario
+// ✨ HOOK DEBOUNCE: Para optimizar la búsqueda y no llamar a la API en cada tecleo
+function useDebounce<T>(value: T, delay: number): T {
+  const [debouncedValue, setDebouncedValue] = useState<T>(value);
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedValue(value);
+    }, delay);
+    return () => {
+      clearTimeout(handler);
+    };
+  }, [value, delay]);
+  return debouncedValue;
+}
+
 type FormErrors = {
   name?: string[];
   docId?: string[];
@@ -65,115 +78,166 @@ type FormErrors = {
   customer_ids?: string[];
 };
 
-// ... (El componente MultiSelectCustomers se mantiene igual)
-
 export function DriversClientUI({
   initialDrivers,
   initialCustomers,
+  totalPages, // Recibimos el total de páginas desde el servidor
 }: {
   initialDrivers: Driver[];
   initialCustomers: Client[];
+  totalPages: number;
 }) {
-  // ... (El componente MultiSelectCustomers se puede definir aquí como lo tenías)
+  // =================================================================
+  // ✨ COMPONENTE MULTI-SELECT DE CLIENTES CON PAGINACIÓN
+  // =================================================================
   const MultiSelectCustomers = React.forwardRef<
     HTMLButtonElement,
     {
-      allCustomers: Client[];
+      initialCustomers: Client[];
       selectedIds: number[];
       onChange: (ids: number[]) => void;
-      error?: boolean; // Prop opcional para marcar error
+      onLoadMore: (searchTerm: string, page: number) => Promise<Client[]>;
+      totalPages: number;
+      error?: boolean;
     }
-  >(({ allCustomers, selectedIds, onChange, error }, ref) => {
-    const [open, setOpen] = useState(false);
+  >(
+    (
+      { initialCustomers, selectedIds, onChange, onLoadMore, totalPages, error },
+      ref
+    ) => {
+      const [open, setOpen] = useState(false);
+      const [customers, setCustomers] = useState<Client[]>(initialCustomers);
+      const [page, setPage] = useState(1);
+      const [searchTerm, setSearchTerm] = useState("");
+      const [isLoading, setIsLoading] = useState(false);
+      const debouncedSearchTerm = useDebounce(searchTerm, 300);
 
-    const handleSelect = (customerId: number) => {
-      const newSelectedIds = selectedIds.includes(customerId)
-        ? selectedIds.filter((id) => id !== customerId)
-        : [...selectedIds, customerId];
-      onChange(newSelectedIds);
-    };
+      // Cargar más clientes al hacer scroll
+      const loadMoreCustomers = useCallback(async () => {
+        if (page >= totalPages || isLoading) return;
+        setIsLoading(true);
+        const nextPage = page + 1;
+        const newCustomers = await onLoadMore(debouncedSearchTerm, nextPage);
+        setCustomers((prev) => [...prev, ...newCustomers]);
+        setPage(nextPage);
+        setIsLoading(false);
+      }, [page, totalPages, isLoading, onLoadMore, debouncedSearchTerm]);
 
-    const selectedCustomers = useMemo(
-      () => allCustomers.filter((c) => selectedIds.includes(c.id)),
-      [allCustomers, selectedIds]
-    );
+      // Efecto para buscar clientes cuando el término de búsqueda cambia
+      useEffect(() => {
+        const searchCustomers = async () => {
+          setIsLoading(true);
+          setPage(1); // Reiniciar la página en una nueva búsqueda
+          const newCustomers = await onLoadMore(debouncedSearchTerm, 1);
+          setCustomers(newCustomers);
+          setIsLoading(false);
+        };
+        searchCustomers();
+      }, [debouncedSearchTerm, onLoadMore]);
 
-    return (
-      <Popover open={open} onOpenChange={setOpen}>
-        <PopoverTrigger asChild>
-          <Button
-            ref={ref}
-            variant="outline"
-            role="combobox"
-            aria-expanded={open}
-            className={cn(
-              "w-full justify-between h-auto",
-              error && "border-red-500" // Estilo de error
-            )}
+      // Manejador del scroll para carga infinita
+      const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+        const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
+        // Si el scroll está a 20px del final, carga más
+        if (scrollHeight - scrollTop - clientHeight < 20) {
+          loadMoreCustomers();
+        }
+      };
+
+      const handleSelect = (customerId: number) => {
+        const newSelectedIds = selectedIds.includes(customerId)
+          ? selectedIds.filter((id) => id !== customerId)
+          : [...selectedIds, customerId];
+        onChange(newSelectedIds);
+      };
+
+      // Encuentra los clientes seleccionados entre los clientes ya cargados y los iniciales
+      const selectedCustomers = useMemo(() => {
+        const allAvailableCustomers = [...initialCustomers, ...customers];
+        const uniqueCustomers = Array.from(new Map(allAvailableCustomers.map(c => [c.id, c])).values());
+        return uniqueCustomers.filter((c) => selectedIds.includes(c.id));
+      }, [selectedIds, customers, initialCustomers]);
+
+      return (
+        <Popover open={open} onOpenChange={setOpen}>
+          <PopoverTrigger asChild>
+            <Button
+              ref={ref}
+              variant="outline"
+              role="combobox"
+              aria-expanded={open}
+              className={cn("w-full justify-between h-auto", error && "border-red-500")}
+            >
+              <div className="flex flex-wrap gap-1">
+                {selectedCustomers.length > 0 ? (
+                  selectedCustomers.map((customer) => (
+                    <Badge key={customer.id} variant="secondary" className="rounded-sm">
+                      {customer.name}
+                    </Badge>
+                  ))
+                ) : (
+                  <span className="text-muted-foreground font-normal">
+                    Seleccionar clientes...
+                  </span>
+                )}
+              </div>
+              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent
+            className="w-[--radix-popover-trigger-width] p-0 z-[99]"
+            onOpenAutoFocus={(e) => e.preventDefault()}
           >
-            <div className="flex flex-wrap gap-1">
-              {selectedCustomers.length > 0 ? (
-                selectedCustomers.map((customer) => (
-                  <Badge
-                    key={customer.id}
-                    variant="secondary"
-                    className="rounded-sm"
-                  >
-                    {customer.name}
-                  </Badge>
-                ))
-              ) : (
-                <span className="text-muted-foreground font-normal">
-                  Seleccionar clientes...
-                </span>
-              )}
-            </div>
-            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-          </Button>
-        </PopoverTrigger>
-        <PopoverContent
-          className="w-[--radix-popover-trigger-width] p-0 z-[99]"
-          onOpenAutoFocus={(e) => e.preventDefault()}
-        >
-          <Command>
-            <CommandInput placeholder="Buscar cliente..." />
-            <CommandList>
-              <CommandEmpty>No se encontraron clientes.</CommandEmpty>
-              <CommandGroup>
-                {allCustomers.map((customer) => (
-                  <CommandItem
-                    key={customer.id}
-                    value={customer.name}
-                    onSelect={() => handleSelect(customer.id)}
-                  >
-                    <Check
-                      className={cn(
-                        "mr-2 h-4 w-4",
-                        selectedIds.includes(customer.id)
-                          ? "opacity-100"
-                          : "opacity-0"
-                      )}
-                    />
-                    {customer.name}
-                  </CommandItem>
-                ))}
-              </CommandGroup>
-            </CommandList>
-          </Command>
-        </PopoverContent>
-      </Popover>
-    );
-  });
+            <Command>
+              <CommandInput
+                placeholder="Buscar cliente..."
+                value={searchTerm}
+                onValueChange={setSearchTerm}
+              />
+              <CommandList onScroll={handleScroll}>
+                <CommandEmpty>No se encontraron clientes.</CommandEmpty>
+                <CommandGroup>
+                  {customers.map((customer) => (
+                    <CommandItem
+                      key={customer.id}
+                      value={customer.name}
+                      onSelect={() => handleSelect(customer.id)}
+                    >
+                      <Check
+                        className={cn(
+                          "mr-2 h-4 w-4",
+                          selectedIds.includes(customer.id) ? "opacity-100" : "opacity-0"
+                        )}
+                      />
+                      {customer.name}
+                    </CommandItem>
+                  ))}
+                </CommandGroup>
+                {isLoading && (
+                   <div className="flex items-center justify-center p-2 text-sm text-muted-foreground">
+                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                     Cargando...
+                   </div>
+                )}
+              </CommandList>
+            </Command>
+          </PopoverContent>
+        </Popover>
+      );
+    }
+  );
   MultiSelectCustomers.displayName = "MultiSelectCustomers";
 
+  // =================================================================
+  // ✨ ESTADOS Y LÓGICA PRINCIPAL DEL COMPONENTE
+  // =================================================================
+
   const [drivers, setDrivers] = useState<Driver[]>(initialDrivers);
-  const [customers, setCustomers] = useState<Client[]>(initialCustomers);
   const [apiError, setApiError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [showDialog, setShowDialog] = useState(false);
   const [editingDriver, setEditingDriver] = useState<Driver | null>(null);
 
-  // ✨ 4. Renombrar `client_ids` a `customer_ids` para consistencia con el backend
   const [formData, setFormData] = useState({
     name: "",
     docId: "",
@@ -181,19 +245,16 @@ export function DriversClientUI({
     customer_ids: [] as number[],
   });
 
-  const [formErrors, setFormErrors] = useState<FormErrors>({}); // ✨ 5. Estado para errores
+  const [formErrors, setFormErrors] = useState<FormErrors>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const { isOpen, options, confirm, handleConfirm, handleCancel } =
-    useConfirmation();
+  const { isOpen, options, confirm, handleConfirm, handleCancel } = useConfirmation();
 
-  // (filteredDrivers se mantiene igual)
   const filteredDrivers = useMemo(
     () =>
       drivers.filter(
         (driver) =>
           driver.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          (driver.docId &&
-            driver.docId.toLowerCase().includes(searchTerm.toLowerCase()))
+          (driver.docId && driver.docId.toLowerCase().includes(searchTerm.toLowerCase()))
       ),
     [drivers, searchTerm]
   );
@@ -201,7 +262,7 @@ export function DriversClientUI({
   const handleNewDriver = useCallback(() => {
     setEditingDriver(null);
     setFormData({ name: "", docId: "", phone: "", customer_ids: [] });
-    setFormErrors({}); // Limpiar errores
+    setFormErrors({});
     setApiError(null);
     setShowDialog(true);
   }, []);
@@ -214,19 +275,39 @@ export function DriversClientUI({
       phone: driver.phone || "",
       customer_ids: driver.clients?.map((c) => c.id) || [],
     });
-    setFormErrors({}); // Limpiar errores
+    setFormErrors({});
     setApiError(null);
     setShowDialog(true);
   }, []);
+
+  // Función para cargar más clientes (pasada como prop a MultiSelectCustomers)
+  const fetchMoreCustomers = async (
+    searchTerm: string,
+    page: number
+  ): Promise<Client[]> => {
+    try {
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL;
+      // La API debe soportar los parámetros 'page', 'limit' y 'search'
+      const res = await fetch(
+        `${baseUrl}/api/customers?page=${page}&limit=20&search=${searchTerm}`
+      );
+      if (!res.ok) throw new Error("Failed to fetch more clients");
+      const data = await res.json();
+      return data.data; // Asumiendo que la API devuelve { data: [], totalPages: X }
+    } catch (error) {
+      console.error("Error cargando más clientes:", error);
+      toast.error("No se pudieron cargar más clientes.");
+      return [];
+    }
+  };
 
   const handleSubmit = useCallback(
     async (e: React.FormEvent) => {
       e.preventDefault();
       setIsSubmitting(true);
       setApiError(null);
-      setFormErrors({}); // Limpiar errores antes de una nueva validación
+      setFormErrors({});
 
-      // ✨ 6. Validación con Zod en el frontend
       const validation = driverSchema.safeParse(formData);
 
       if (!validation.success) {
@@ -236,15 +317,12 @@ export function DriversClientUI({
         toast.error("Error de validación", {
           description: "Por favor, corrige los campos marcados en rojo.",
         });
-        return; // Detiene el envío si hay errores
+        return;
       }
 
-      // ✨ 7. Usar `validation.data` que contiene los datos limpios y validados
       const body = validation.data;
       const method = editingDriver ? "PATCH" : "POST";
-      const url = editingDriver
-        ? `/api/drivers/${editingDriver.id}`
-        : "/api/drivers";
+      const url = editingDriver ? `/api/drivers/${editingDriver.id}` : "/api/drivers";
 
       try {
         const res = await fetch(url, {
@@ -254,28 +332,20 @@ export function DriversClientUI({
         });
 
         if (!res.ok) {
-          // Intenta parsear el error de Zod del backend si existe
           try {
             const errorData = await res.json();
-            // Aquí podrías mapear los errores del backend al estado `formErrors`
-            throw new Error(
-              errorData.message || "Error al guardar. Verifica los datos."
-            );
+            throw new Error(errorData.message || "Error al guardar. Verifica los datos.");
           } catch {
-            // Si el error no es JSON, usa el texto
             const errorText = await res.text();
             throw new Error(errorText || "Ocurrió un error en el servidor.");
           }
         }
 
-        // Refrescar la lista de choferes (tu lógica actual es buena)
         const fetchResponse = await fetch("/api/drivers");
         const updatedDrivers = await fetchResponse.json();
         setDrivers(updatedDrivers);
 
-        toast.success(
-          `Chofer ${editingDriver ? "actualizado" : "creado"} exitosamente.`
-        );
+        toast.success(`Chofer ${editingDriver ? "actualizado" : "creado"} exitosamente.`);
         setShowDialog(false);
       } catch (err: any) {
         setApiError(err.message);
@@ -287,7 +357,6 @@ export function DriversClientUI({
     [editingDriver, formData]
   );
 
-  // (handleToggleStatus se mantiene igual)
   const handleToggleStatus = useCallback(
     (driver: Driver) => {
       confirm(
@@ -325,6 +394,10 @@ export function DriversClientUI({
     [confirm]
   );
 
+  // =================================================================
+  // ✨ RENDERIZADO DEL COMPONENTE
+  // =================================================================
+
   return (
     <div className="space-y-8 animate-fade-in">
       <PageHeader
@@ -359,9 +432,7 @@ export function DriversClientUI({
             >
               <CardHeader className="pb-3">
                 <div className="flex justify-between items-start">
-                  <CardTitle className="text-lg font-bold">
-                    {driver.name}
-                  </CardTitle>
+                  <CardTitle className="text-lg font-bold">{driver.name}</CardTitle>
                   <Badge variant={driver.is_active ? "default" : "destructive"}>
                     {driver.is_active ? "Activo" : "Inactivo"}
                   </Badge>
@@ -382,7 +453,6 @@ export function DriversClientUI({
                     </div>
                   )}
                 </div>
-
                 <div className="space-y-2 pt-2 border-t">
                   <Label className="font-semibold text-xs text-foreground">
                     Clientes Asociados:
@@ -390,11 +460,7 @@ export function DriversClientUI({
                   <div className="flex flex-wrap gap-1">
                     {driver.clients && driver.clients.length > 0 ? (
                       driver.clients.map((client) => (
-                        <Badge
-                          key={client.id}
-                          variant="secondary"
-                          className="font-normal"
-                        >
+                        <Badge key={client.id} variant="secondary" className="font-normal">
                           {client.name}
                         </Badge>
                       ))
@@ -448,13 +514,10 @@ export function DriversClientUI({
         />
       )}
 
-      {/* ✨ 8. DIALOG CON MEJORAS DE VALIDACIÓN */}
       <Dialog open={showDialog} onOpenChange={setShowDialog}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>
-              {editingDriver ? "Editar Chofer" : "Crear Nuevo Chofer"}
-            </DialogTitle>
+            <DialogTitle>{editingDriver ? "Editar Chofer" : "Crear Nuevo Chofer"}</DialogTitle>
             <DialogDescription>
               {editingDriver
                 ? "Actualiza los datos del chofer."
@@ -463,83 +526,80 @@ export function DriversClientUI({
           </DialogHeader>
 
           <form onSubmit={handleSubmit} className="space-y-6 pt-4">
-            {/* --- CAMPO NOMBRE --- */}
-            <div className="space-y-2">
-              <Label htmlFor="name" className="font-semibold">
-                Nombre Completo <span className="text-red-500">*</span>
-              </Label>
-              <Input
-                id="name"
-                value={formData.name}
-                onChange={(e) =>
-                  setFormData({ ...formData, name: e.target.value })
-                }
-                className={cn(formErrors.name && "border-red-500")}
-              />
-              {formErrors.name && (
-                <p className="text-xs text-red-500 flex items-center gap-1 mt-1">
-                  <AlertCircle className="h-3 w-3" /> {formErrors.name[0]}
-                </p>
-              )}
-            </div>
+            {/* ... Campos de Nombre, Documento y Teléfono (se mantienen igual) ... */}
+             <div className="space-y-2">
+               <Label htmlFor="name" className="font-semibold">
+                 Nombre Completo <span className="text-red-500">*</span>
+               </Label>
+               <Input
+                 id="name"
+                 value={formData.name}
+                 onChange={(e) =>
+                   setFormData({ ...formData, name: e.target.value })
+                 }
+                 className={cn(formErrors.name && "border-red-500")}
+               />
+               {formErrors.name && (
+                 <p className="text-xs text-red-500 flex items-center gap-1 mt-1">
+                   <AlertCircle className="h-3 w-3" /> {formErrors.name[0]}
+                 </p>
+               )}
+             </div>
 
-            {/* --- CAMPO DOCUMENTO --- */}
-            <div className="space-y-2">
-              <Label htmlFor="docId" className="font-semibold">
-                Documento de Identidad
-              </Label>
-              <Input
-                id="docId"
-                value={formData.docId}
-                onChange={(e) =>
-                  setFormData({ ...formData, docId: e.target.value })
-                }
-                className={cn(formErrors.docId && "border-red-500")}
-              />
-              {formErrors.docId && (
-                <p className="text-xs text-red-500 flex items-center gap-1 mt-1">
-                  <AlertCircle className="h-3 w-3" /> {formErrors.docId[0]}
-                </p>
-              )}
-            </div>
+             <div className="space-y-2">
+               <Label htmlFor="docId" className="font-semibold">
+                 Documento de Identidad
+               </Label>
+               <Input
+                 id="docId"
+                 value={formData.docId}
+                 onChange={(e) =>
+                   setFormData({ ...formData, docId: e.target.value })
+                 }
+                 className={cn(formErrors.docId && "border-red-500")}
+               />
+               {formErrors.docId && (
+                 <p className="text-xs text-red-500 flex items-center gap-1 mt-1">
+                   <AlertCircle className="h-3 w-3" /> {formErrors.docId[0]}
+                 </p>
+               )}
+             </div>
 
-            {/* --- CAMPO TELÉFONO --- */}
-            <div className="space-y-2">
-              <Label htmlFor="phone" className="font-semibold">
-                Teléfono
-              </Label>
-              <Input
-                id="phone"
-                value={formData.phone}
-                onChange={(e) =>
-                  setFormData({ ...formData, phone: e.target.value })
-                }
-                className={cn(formErrors.phone && "border-red-500")}
-              />
-              {formErrors.phone && (
-                <p className="text-xs text-red-500 flex items-center gap-1 mt-1">
-                  <AlertCircle className="h-3 w-3" /> {formErrors.phone[0]}
-                </p>
-              )}
-            </div>
+             <div className="space-y-2">
+               <Label htmlFor="phone" className="font-semibold">
+                 Teléfono
+               </Label>
+               <Input
+                 id="phone"
+                 value={formData.phone}
+                 onChange={(e) =>
+                   setFormData({ ...formData, phone: e.target.value })
+                 }
+                 className={cn(formErrors.phone && "border-red-500")}
+               />
+               {formErrors.phone && (
+                 <p className="text-xs text-red-500 flex items-center gap-1 mt-1">
+                   <AlertCircle className="h-3 w-3" /> {formErrors.phone[0]}
+                 </p>
+               )}
+             </div>
 
-            {/* --- CAMPO CLIENTES --- */}
+            {/* --- ✨ CAMPO CLIENTES CON PAGINACIÓN --- */}
             <div className="space-y-2">
               <Label htmlFor="customers" className="font-semibold">
                 Clientes Asociados
               </Label>
               <MultiSelectCustomers
-                allCustomers={customers}
+                initialCustomers={initialCustomers}
                 selectedIds={formData.customer_ids}
-                onChange={(ids) =>
-                  setFormData({ ...formData, customer_ids: ids })
-                }
+                onChange={(ids) => setFormData({ ...formData, customer_ids: ids })}
+                onLoadMore={fetchMoreCustomers}
+                totalPages={totalPages}
                 error={!!formErrors.customer_ids}
               />
               {formErrors.customer_ids && (
                 <p className="text-xs text-red-500 flex items-center gap-1 mt-1">
-                  <AlertCircle className="h-3 w-3" />{" "}
-                  {formErrors.customer_ids[0]}
+                  <AlertCircle className="h-3 w-3" /> {formErrors.customer_ids[0]}
                 </p>
               )}
             </div>
@@ -557,7 +617,10 @@ export function DriversClientUI({
               </Button>
               <Button type="submit" disabled={isSubmitting}>
                 {isSubmitting ? (
-                  "Guardando..."
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Guardando...
+                  </>
                 ) : (
                   <>
                     <Save className="mr-2 h-4 w-4" />

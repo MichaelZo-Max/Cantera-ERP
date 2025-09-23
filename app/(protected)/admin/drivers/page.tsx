@@ -3,11 +3,11 @@
 export const dynamic = "force-dynamic";
 
 import { AppLayout } from "@/components/app-layout";
-// Asegúrate de importar ambos tipos
-import type { Driver, Client } from "@/lib/types"; 
+// Asegúrate de importar los tipos necesarios
+import type { Driver, Client, PaginatedResponse } from "@/lib/types";
 import { DriversClientUI } from "./drivers-client";
 
-// Función para obtener los choferes
+// La función getDrivers se mantiene igual
 async function getDrivers(): Promise<Driver[]> {
   try {
     const baseUrl = process.env.NEXT_PUBLIC_API_URL;
@@ -18,38 +18,47 @@ async function getDrivers(): Promise<Driver[]> {
     return res.json();
   } catch (error) {
     console.error("Error cargando choferes:", error);
-    return []; // Devuelve un array vacío en caso de error
+    return [];
   }
 }
 
-// NUEVA FUNCIÓN: para obtener los clientes
-async function getClients(): Promise<Client[]> {
+// MODIFICACIÓN: Actualizar getClients para obtener datos paginados
+async function getClients(): Promise<PaginatedResponse<Client>> {
   try {
     const baseUrl = process.env.NEXT_PUBLIC_API_URL;
-    // La API de clientes se llama 'customers' según la estructura del proyecto
-    const res = await fetch(`${baseUrl}/api/customers`, {
+    // Hacemos la petición a la primera página por defecto
+    const res = await fetch(`${baseUrl}/api/customers?page=1&limit=20`, {
       next: { tags: ["customers"] },
     });
     if (!res.ok) throw new Error("Failed to fetch clients");
     return res.json();
   } catch (error) {
     console.error("Error cargando clientes:", error);
-    return [];
+    // ✨ CORRECCIÓN: Se añaden las propiedades que faltan para cumplir con el tipo
+    return {
+      data: [],
+      totalPages: 0,
+      total: 0,
+      page: 1,
+      limit: 20,
+    };
   }
 }
 
 export default async function DriversPage() {
-  // Llamamos a ambas funciones para obtener los datos en paralelo
-  const [drivers, clients] = await Promise.all([
+  // Obtenemos los datos en paralelo
+  const [drivers, clientsResponse] = await Promise.all([
     getDrivers(),
     getClients(),
   ]);
 
   return (
     <AppLayout title="Gestión de Choferes">
-      <DriversClientUI 
-        initialDrivers={drivers} 
-        initialCustomers={clients} // Pasamos la nueva prop con los clientes
+      <DriversClientUI
+        initialDrivers={drivers}
+        // Pasamos los datos iniciales de clientes y la paginación
+        initialCustomers={clientsResponse.data}
+        totalPages={clientsResponse.totalPages}
       />
     </AppLayout>
   );
