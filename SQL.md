@@ -486,19 +486,14 @@ SELECT
     FV.NUMSERIE AS invoice_series,
     FV.NUMFACTURA AS invoice_number,
     FV.N AS invoice_n,
+    C.CODCLIENTE AS customer_id,
     C.NOMBRECLIENTE AS customer_name,
     FV.FECHA AS invoice_date,
     ROUND(RIP.F_GET_COTIZACION_RIP(FV.TOTALNETO, FV.FECHA, FV.FACTORMONEDA, FV.CODMONEDA, 2), 2) AS total_usd
 FROM
     dbo.FACTURASVENTA FV
 INNER JOIN
-    dbo.CLIENTES C ON FV.CODCLIENTE = C.CODCLIENTE
-LEFT JOIN
-    RIP.APP_PEDIDOS P ON FV.NUMSERIE = P.invoice_series
-                    AND FV.NUMFACTURA = P.invoice_number
-                    AND FV.N = P.invoice_n
-WHERE
-    P.id IS NULL;
+    dbo.CLIENTES C ON FV.CODCLIENTE = C.CODCLIENTE;
 GO
 
 PRINT 'Todas las vistas han sido creadas/actualizadas.';
