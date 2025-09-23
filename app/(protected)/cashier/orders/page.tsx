@@ -1,52 +1,55 @@
+// app/(protected)/cashier/orders/page.tsx
+
 export const dynamic = "force-dynamic";
 
 import { AppLayout } from "@/components/app-layout";
 import { OrderFormClient } from "./order-form-client";
-import type { Client, Product, Destination, Truck, Driver, Invoice } from "@/lib/types";
+import type { Client, Product, Destination, Truck, Driver } from "@/lib/types"; // Quitamos Invoice de aquí
 import { getApiUrl } from "@/lib/utils";
 
-// La función ahora pide solo la primera página de clientes y productos
 async function getOrderCatalogs(): Promise<{
   clients: Client[];
   products: Product[];
   destinations: Destination[];
   trucks: Truck[];
   drivers: Driver[];
-  invoices: Invoice[];
+  // invoices: Invoice[]; // <-- ELIMINAMOS ESTA LÍNEA
 }> {
   try {
     const baseUrl = process.env.NEXT_PUBLIC_API_URL;
-    // Añadimos la nueva llamada a la API de facturas
-    const [cRes, pRes, dRes, tRes, drRes, iRes] = await Promise.all([
+    // Quitamos la llamada a la API de facturas
+    const [cRes, pRes, dRes, tRes, drRes] = await Promise.all([
       fetch(`${baseUrl}/api/customers?page=1&limit=20`, { next: { tags: ["customers"] } }),
       fetch(`${baseUrl}/api/products?page=1&limit=20`, { next: { tags: ["products"] } }),
       fetch(`${baseUrl}/api/destinations`, { next: { tags: ["destinations"] } }),
       fetch(`${baseUrl}/api/trucks`, { next: { tags: ["trucks"] } }),
       fetch(`${baseUrl}/api/drivers`, { next: { tags: ["drivers"] } }),
-      fetch(`${baseUrl}/api/invoices`, { next: { revalidate: 0 } }),
+      // fetch(`${baseUrl}/api/invoices`, { next: { revalidate: 0 } }), // <-- ELIMINAMOS ESTA LÍNEA
     ]);
 
-    // Procesamos todas las respuestas
+    // Procesamos las respuestas
     const clientsData = await cRes.json();
     const productsData = await pRes.json();
     const destinations = await dRes.json();
     const trucks = await tRes.json();
     const drivers = await drRes.json();
-    const invoices = await iRes.json();
+    // const invoices = await iRes.json(); // <-- ELIMINAMOS ESTA LÍNEA
     
-    // Extraemos el array 'data' de las respuestas paginadas
     const clients = clientsData.data || [];
     const products = productsData.data || [];
 
-    return { clients, products, destinations, trucks, drivers, invoices };
+    // Devolvemos los catálogos sin las facturas
+    return { clients, products, destinations, trucks, drivers };
   } catch (error) {
     console.error("Error cargando catálogos en el servidor:", error);
-    return { clients: [], products: [], destinations: [], trucks: [], drivers: [], invoices: [] };
+    // Ajustamos el valor de retorno
+    return { clients: [], products: [], destinations: [], trucks: [], drivers: [] };
   }
 }
 
 export default async function CashierOrderPage() {
-  const { clients, products, destinations, trucks, drivers, invoices } = await getOrderCatalogs();
+  // Obtenemos los datos sin las facturas
+  const { clients, products, destinations, trucks, drivers } = await getOrderCatalogs();
 
   return (
     <AppLayout title="Crear Pedido">
@@ -66,7 +69,7 @@ export default async function CashierOrderPage() {
             destinations={destinations}
             trucks={trucks}
             drivers={drivers}
-            invoices={invoices}
+            invoices={[]}
           />
         </div>
       </div>

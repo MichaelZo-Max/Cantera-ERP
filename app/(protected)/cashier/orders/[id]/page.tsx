@@ -2,7 +2,8 @@ export const dynamic = "force-dynamic";
 
 import { AppLayout } from "@/components/app-layout";
 import { OrderClient } from "./order-client";
-import type { Client, Product, Destination, Truck, Driver, Order, Invoice } from "@/lib/types";
+// Quitamos 'Invoice' de aquí, ya no se carga en esta página
+import type { Client, Product, Destination, Truck, Driver, Order } from "@/lib/types";
 import { getApiUrl } from "@/lib/utils";
 import { notFound } from "next/navigation";
 
@@ -19,32 +20,34 @@ async function getOrderDetails(orderId: string): Promise<Order | null> {
   }
 }
 
+// La función ahora solo obtiene los catálogos esenciales, sin las facturas.
 async function getOrderCatalogs() {
   try {
-    const baseUrl = getApiUrl(""); // Usamos una cadena vacía para obtener solo la base
-    const [cRes, pRes, dRes, tRes, drRes, iRes] = await Promise.all([
+    const baseUrl = getApiUrl("");
+    // Eliminamos iRes (la llamada a /api/invoices) de Promise.all
+    const [cRes, pRes, dRes, tRes, drRes] = await Promise.all([
       fetch(`${baseUrl}api/customers?page=1&limit=20`),
       fetch(`${baseUrl}api/products?page=1&limit=20`),
       fetch(`${baseUrl}api/destinations`),
       fetch(`${baseUrl}api/trucks`),
       fetch(`${baseUrl}api/drivers`),
-      fetch(`${baseUrl}api/invoices`, { next: { revalidate: 0 } }),
     ]);
 
     const clientsData = await cRes.json();
     const productsData = await pRes.json();
     
+    // El objeto retornado ya no incluye la propiedad 'invoices'
     return {
       clients: clientsData.data || [],
       products: productsData.data || [],
       destinations: await dRes.json(),
       trucks: await tRes.json(),
       drivers: await drRes.json(),
-      invoices: await iRes.json(),
     };
   } catch (error) {
     console.error("Error cargando catálogos:", error);
-    return { clients: [], products: [], destinations: [], trucks: [], drivers: [], invoices: [] };
+    // Ajustamos el objeto de retorno en caso de error
+    return { clients: [], products: [], destinations: [], trucks: [], drivers: [] };
   }
 }
 
@@ -58,9 +61,6 @@ export default async function EditOrderPage({ params }: { params: { id: string }
     notFound();
   }
 
-  // ✅ **CORRECCIÓN**:
-  // 1. Se cambió `order.customer` por `order.client` para que coincida con tu tipo `Order`.
-  // 2. Se añadieron los tipos explícitos `(c: Client)` y `(p: Product)` para solucionar los errores de 'any'.
   if (order.client && !catalogs.clients.some((c: Client) => c.id === order.customer_id)) {
     catalogs.clients.unshift(order.client);
   }

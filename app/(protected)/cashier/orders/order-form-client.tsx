@@ -5,17 +5,15 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { OrderForm } from "./order-form";
-// Asegúrate de que tu archivo de tipos exporte 'Invoice'
 import type { Client, Product, Destination, Truck, Driver, Invoice } from "@/lib/types";
 
-// Define las props que recibirá este componente cliente
 interface OrderFormClientProps {
   clients: Client[];
   products: Product[];
   destinations: Destination[];
   trucks: Truck[];
   drivers: Driver[];
-  invoices: Invoice[]; // <-- Añadido
+  invoices: Invoice[]; // Se mantiene para consistencia, pero recibirá []
 }
 
 export function OrderFormClient({
@@ -24,7 +22,7 @@ export function OrderFormClient({
   destinations,
   trucks,
   drivers,
-  invoices, // <-- Recibimos las facturas
+  invoices, // Recibirá un array vacío
 }: OrderFormClientProps) {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -64,7 +62,7 @@ export function OrderFormClient({
       initialDestinations={destinations}
       initialTrucks={trucks}
       initialDrivers={drivers}
-      initialInvoices={invoices} // <-- Pasamos las facturas al formulario
+      initialInvoices={invoices} // Pasa el array vacío
       onSubmit={handleCreateOrder}
       isSubmitting={isSubmitting}
       isEditing={false}

@@ -38,9 +38,17 @@ import { SearchableSelect } from "@/components/ui/searchable-select";
 import { GradientButton } from "@/components/ui/gradient-button";
 import { useDebounce } from "@/hooks/use-debounce";
 
+// Interfaz para la respuesta de la API de clientes/productos
 interface PaginatedResponse<T> {
   data: T[];
   totalPages: number;
+}
+
+// Interfaz para la respuesta de la API de facturas
+interface InvoicesApiResponse {
+  invoices: Invoice[];
+  totalPages: number;
+  currentPage: number;
 }
 
 interface OrderItem {
@@ -114,6 +122,10 @@ export function OrderForm({
   const [productTotalPages, setProductTotalPages] = useState(10);
   const [isProductsLoading, setIsProductsLoading] = useState(false);
 
+  // --- Estados para Facturas Dinámicas ---
+  const [invoices, setInvoices] = useState<Invoice[]>(initialInvoices);
+  const [isInvoicesLoading, setIsInvoicesLoading] = useState(false);
+
   // --- Efecto para inicializar el formulario en modo edición ---
   useEffect(() => {
     if (isEditing && initialOrderData) {
@@ -137,7 +149,6 @@ export function OrderForm({
         setOrderItems(items);
       }
 
-      // --- 👇 CAMBIO: Inicializar el estado de facturas múltiples ---
       if (initialOrderData.invoices && initialOrderData.invoices.length > 0) {
         const invoiceValues = initialOrderData.invoices.map(
           (inv) =>
@@ -148,7 +159,39 @@ export function OrderForm({
     }
   }, [isEditing, initialOrderData]);
 
-  // --- Lógica de Búsqueda y Paginación (sin cambios) ---
+  // --- Efecto para cargar facturas al seleccionar un cliente ---
+  useEffect(() => {
+    const fetchInvoicesForClient = async () => {
+      if (!selectedClient) {
+        setInvoices([]);
+        return;
+      }
+
+      setIsInvoicesLoading(true);
+      try {
+        const params = new URLSearchParams({
+          customerName: selectedClient.name,
+          pageSize: "1000",
+        });
+
+        const res = await fetch(`/api/invoices?${params.toString()}`);
+        if (!res.ok) throw new Error("No se pudieron cargar las facturas");
+        
+        const result: InvoicesApiResponse = await res.json();
+        setInvoices(result.invoices || []);
+        
+      } catch (error) {
+        toast.error("Error al cargar las facturas del cliente.");
+        setInvoices([]);
+      } finally {
+        setIsInvoicesLoading(false);
+      }
+    };
+
+    fetchInvoicesForClient();
+  }, [selectedClient]);
+
+  // --- Lógica de Búsqueda y Paginación (Clientes y Productos) ---
   useEffect(() => {
     const fetchClients = async () => {
       setIsClientsLoading(true);
@@ -232,7 +275,7 @@ export function OrderForm({
       setOrderItems((prevItems) => [...prevItems, newItem]);
       setSelectedProduct(null);
       setCurrentQuantity(0);
-      setProductSearch(""); // Limpia la búsqueda para mostrar el placeholder de nuevo
+      setProductSearch("");
       toast.success(`${newItem.product.name} ha sido agregado al pedido.`);
     } else {
       toast.error("Por favor, selecciona un producto y una cantidad válida.");
@@ -255,14 +298,13 @@ export function OrderForm({
     [products]
   );
 
-  // --- 👇 CAMBIO: Lógica de envío actualizada ---
   const handleFormSubmit = () => {
     if (
       !selectedcustomer_id ||
       orderItems.length === 0 ||
       selectedTruckIds.length === 0 ||
       selectedDriverIds.length === 0 ||
-      selectedInvoices.length === 0 // Ahora es obligatorio
+      selectedInvoices.length === 0
     ) {
       toast.error(
         "Completa todos los campos requeridos: Cliente, al menos un producto, una factura, un camión y un chofer."
@@ -270,7 +312,6 @@ export function OrderForm({
       return;
     }
 
-    // Construimos el array de facturas que espera la API
     const invoicesData = selectedInvoices.map((invoiceString) => {
       const [series, number, n] = invoiceString.split("|");
       return {
@@ -294,7 +335,7 @@ export function OrderForm({
       total: total,
       truck_ids: selectedTruckIds.map((id) => parseInt(id, 10)),
       driver_ids: selectedDriverIds.map((id) => parseInt(id, 10)),
-      invoices: invoicesData, // Enviamos el array de facturas
+      invoices: invoicesData,
     };
     onSubmit(orderData);
   };
@@ -305,7 +346,7 @@ export function OrderForm({
       orderItems.length > 0 &&
       selectedTruckIds.length > 0 &&
       selectedDriverIds.length > 0 &&
-      selectedInvoices.length > 0, // Chequeamos que haya al menos una factura
+      selectedInvoices.length > 0,
     [
       selectedcustomer_id,
       orderItems,
@@ -334,7 +375,7 @@ export function OrderForm({
                   onChange={(value) => {
                     setSelectedcustomer_id(value);
                     setSelectedDestinationId(undefined);
-                    setSelectedInvoices([]); // Limpiamos las facturas al cambiar de cliente
+                    setSelectedInvoices([]);
                   }}
                   placeholder="Selecciona un cliente..."
                   options={clients.map((client) => ({
@@ -374,28 +415,23 @@ export function OrderForm({
                 isMulti
                 value={selectedInvoices}
                 onChange={setSelectedInvoices}
-                placeholder="Selecciona una o más facturas..."
-                disabled={!selectedcustomer_id}
-                options={initialInvoices
-                  .filter((inv) => {
-                    // Si no hay un cliente seleccionado, no mostramos ninguna factura
-                    if (!selectedClient) {
-                      return false;
-                    }
-                    // Comparamos el nombre del cliente de la factura con el nombre del cliente seleccionado
-                    return inv && inv.customer_name === selectedClient.name;
-                  })
-                  .map((inv) => ({
-                    value: `${inv.invoice_series}|${inv.invoice_number}|${inv.invoice_n}`,
-                    label: `${inv.invoice_series}-${inv.invoice_number} ($${(
-                      inv.total_usd ?? 0
-                    ).toFixed(2)})`,
-                  }))}
+                placeholder={
+                  selectedClient
+                    ? "Selecciona una o más facturas..."
+                    : "Primero selecciona un cliente"
+                }
+                disabled={!selectedcustomer_id || isInvoicesLoading}
+                isLoading={isInvoicesLoading}
+                options={invoices.map((inv) => ({
+                  value: `${inv.invoice_series}|${inv.invoice_number}|${inv.invoice_n}`,
+                  label: `${inv.invoice_series}-${inv.invoice_number} ($${(
+                    inv.total_usd ?? 0
+                  ).toFixed(2)})`,
+                }))}
               />
             </div>
           </CardContent>
         </Card>
-        {/* --- El resto del JSX (Transporte, Items, Resumen) no necesita cambios --- */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">

@@ -1,10 +1,11 @@
+// app/(protected)/cashier/orders/[id]/order-client.tsx
 "use client";
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { OrderForm } from "../order-form"; // Importamos el formulario principal
-import type { Client, Product, Destination, Truck as TruckType, Driver, Order, Invoice } from "@/lib/types";
+import { OrderForm } from "../order-form";
+import type { Client, Product, Destination, Truck as TruckType, Driver, Order } from "@/lib/types";
 
 interface Catalogs {
   clients: Client[];
@@ -12,7 +13,6 @@ interface Catalogs {
   destinations: Destination[];
   trucks: TruckType[];
   drivers: Driver[];
-  invoices: Invoice[];
 }
 
 interface OrderClientProps {
@@ -28,7 +28,7 @@ export function OrderClient({ orderData, catalogs }: OrderClientProps) {
     setIsSubmitting(true);
     try {
       const res = await fetch(`/api/orders/${orderData.id}`, {
-        method: 'PUT', // o 'PATCH'
+        method: 'PUT',
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
       });
@@ -57,7 +57,7 @@ export function OrderClient({ orderData, catalogs }: OrderClientProps) {
       initialDestinations={catalogs.destinations}
       initialTrucks={catalogs.trucks}
       initialDrivers={catalogs.drivers}
-      initialInvoices={catalogs.invoices}
+      initialInvoices={orderData.invoices || []}
       isEditing
       initialOrderData={orderData}
       onSubmit={handleUpdateOrder}
