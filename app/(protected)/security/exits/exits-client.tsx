@@ -15,7 +15,6 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   Dialog,
   DialogContent,
@@ -31,17 +30,17 @@ import {
   Package,
   User,
   CheckCircle,
-  AlertTriangle,
   LogOut,
   Camera,
-  FileText,
+  FileText, // <-- Icono de factura
   Eye,
   Box,
 } from "lucide-react";
 import { toast } from "sonner";
-import type { Delivery, DeliveryItem } from "@/lib/types"; // CORREGIDO: Importa DeliveryItem
+// ✅ Importamos el tipo Invoice si no está ya
+import type { Delivery, DeliveryItem, Invoice } from "@/lib/types";
 
-// --- SUB-COMPONENTES (Actualizados con las propiedades correctas) ---
+// --- SUB-COMPONENTES ---
 
 const LoadedDeliveryCard = React.memo(
   ({
@@ -59,7 +58,6 @@ const LoadedDeliveryCard = React.memo(
         <div className="flex justify-between items-start mb-3">
           <div>
             <p className="font-bold text-lg">{delivery.truck?.placa}</p>
-            {/* CORREGIDO: usa id */}
             <p className="text-sm text-muted-foreground">
               Despacho ID: {delivery.id}
             </p>
@@ -71,14 +69,32 @@ const LoadedDeliveryCard = React.memo(
         <div className="space-y-2 text-sm">
           <div className="flex items-center gap-2">
             <User className="h-4 w-4 text-muted-foreground" />
-            {/* CORREGIDO: usa orderDetails */}
             <span className="truncate">
               {delivery.orderDetails?.client?.name}
             </span>
           </div>
+
+          {/* --- ✅ CAMBIO: Mostrar las facturas en la tarjeta --- */}
+          {delivery.orderDetails.invoices &&
+            delivery.orderDetails.invoices.length > 0 && (
+              <div className="flex items-start gap-2">
+                <FileText className="h-4 w-4 text-muted-foreground flex-shrink-0 mt-0.5" />
+                <div className="flex flex-wrap gap-1">
+                  {delivery.orderDetails.invoices.map((invoice: Invoice) => (
+                    <Badge
+                      key={invoice.invoice_full_number}
+                      variant="secondary"
+                      className="text-xs"
+                    >
+                      {invoice.invoice_full_number}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            )}
+
           <div className="flex items-center gap-2">
             <Package className="h-4 w-4 text-muted-foreground" />
-            {/* CORREGIDO: usa dispatchItems y orderDetails */}
             <span>
               {delivery.dispatchItems && delivery.dispatchItems.length > 0
                 ? `${
@@ -93,6 +109,7 @@ const LoadedDeliveryCard = React.memo(
                 : "Sin items"}
             </span>
           </div>
+
           {delivery.loadedAt && (
             <div className="flex justify-between text-xs pt-1">
               <span className="text-muted-foreground">Cargado:</span>
@@ -120,7 +137,6 @@ const ExitedDeliveryCard = React.memo(
           <div>
             <p className="font-semibold">{delivery.truck?.placa}</p>
             <p className="text-sm text-muted-foreground">
-              {/* CORREGIDO: usa orderDetails */}
               {delivery.orderDetails?.client?.name}
             </p>
           </div>
@@ -143,7 +159,6 @@ const ExitedDeliveryCard = React.memo(
 ExitedDeliveryCard.displayName = "ExitedDeliveryCard";
 
 // --- COMPONENTE PRINCIPAL ---
-
 export function SecurityExitsClientUI({
   initialDeliveries,
 }: {
@@ -164,38 +179,35 @@ export function SecurityExitsClientUI({
   const [showImagePreview, setShowImagePreview] = useState(false);
   const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
 
-  // Filtrado de despachos por estado
   const loadedDeliveries = useMemo(
-    // CORREGIDO: usa estado
     () => allDeliveries.filter((d) => d.estado === "CARGADA"),
     [allDeliveries]
   );
   const exitedDeliveries = useMemo(
-    // CORREGIDO: usa estado
     () => allDeliveries.filter((d) => d.estado === "EXITED"),
     [allDeliveries]
   );
 
-  // Lógica de búsqueda
   const filteredDeliveries = useMemo(() => {
     const query = searchQuery.toLowerCase().trim();
     if (!query) return loadedDeliveries;
     return loadedDeliveries.filter((delivery) => {
-      // CORREGIDO: usa id y orderDetails
       const deliveryId = String(delivery.id);
       return (
         (delivery.truck?.placa || "").toLowerCase().includes(query) ||
         deliveryId.toLowerCase().includes(query) ||
         (delivery.orderDetails?.client?.name || "")
           .toLowerCase()
-          .includes(query)
+          .includes(query) ||
+        // --- ✅ CAMBIO: Añadir búsqueda por factura ---
+        delivery.orderDetails?.invoices?.some((invoice) =>
+          invoice.invoice_full_number?.toLowerCase().includes(query)
+        )
       );
     });
   }, [searchQuery, loadedDeliveries]);
 
-  // Abre el modal de autorización
   const handleSelectDelivery = useCallback((delivery: Delivery) => {
-    // CORREGIDO: usa estado
     if (delivery.estado !== "CARGADA") {
       toast.warning("Este despacho no está listo para salir.");
       return;
@@ -206,7 +218,6 @@ export function SecurityExitsClientUI({
     setShowExitModal(true);
   }, []);
 
-  // Cierra cualquier modal y resetea estados
   const handleCloseModals = useCallback(() => {
     setShowExitModal(false);
     setShowImagePreview(false);
@@ -214,7 +225,6 @@ export function SecurityExitsClientUI({
     setPreviewImageUrl(null);
   }, []);
 
-  // Procesa la autorización de salida
   const handleAuthorizeExit = useCallback(async () => {
     if (!selectedDelivery) return;
     if (!exitPhoto) {
@@ -231,7 +241,6 @@ export function SecurityExitsClientUI({
       if (user?.id) formData.append("userId", user.id.toString());
       formData.append("photoFile", exitPhoto);
 
-      // CORREGIDO: usa id
       const res = await fetch(`/api/deliveries/${selectedDelivery.id}`, {
         method: "PATCH",
         body: formData,
@@ -249,7 +258,6 @@ export function SecurityExitsClientUI({
 
       const updatedDelivery: Delivery = JSON.parse(responseBody);
 
-      // Actualizar el estado local para reflejar el cambio inmediatamente
       setAllDeliveries((prev) =>
         prev.map((d) => (d.id === updatedDelivery.id ? updatedDelivery : d))
       );
@@ -275,7 +283,6 @@ export function SecurityExitsClientUI({
 
   return (
     <div className="space-y-6">
-      {/* UI (Sin cambios lógicos) */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between">
         <div>
           <h2 className="text-2xl font-bold text-foreground">
@@ -294,7 +301,7 @@ export function SecurityExitsClientUI({
             Búsqueda Rápida
           </CardTitle>
           <CardDescription>
-            Busca por placa, ID de despacho o nombre del cliente.
+            Busca por placa, ID, cliente o factura.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -366,14 +373,14 @@ export function SecurityExitsClientUI({
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
               {exitedDeliveries.map((delivery) => (
-                <ExitedDeliveryCard key={delivery.id} delivery={delivery} /> // CORREGIDO: usa id
+                <ExitedDeliveryCard key={delivery.id} delivery={delivery} />
               ))}
             </div>
           </CardContent>
         </Card>
       )}
 
-      {/* MODAL DE AUTORIZACIÓN (Actualizado con las propiedades correctas) */}
+      {/* MODAL DE AUTORIZACIÓN */}
       <Dialog open={showExitModal} onOpenChange={setShowExitModal}>
         <DialogContent className="sm:max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader className="pb-4">
@@ -388,30 +395,56 @@ export function SecurityExitsClientUI({
           </DialogHeader>
           {selectedDelivery && (
             <div className="space-y-4">
+              {/* --- ✅ CAMBIO: Mostrar facturas en el modal --- */}
+              {selectedDelivery.orderDetails.invoices &&
+                selectedDelivery.orderDetails.invoices.length > 0 && (
+                  <div>
+                    <p className="text-sm font-medium mb-2 flex items-center gap-2">
+                      <FileText className="h-4 w-4" /> Facturas Asociadas:
+                    </p>
+                    <div className="border rounded-lg p-3 bg-muted/30">
+                      <div className="flex flex-wrap gap-2">
+                        {selectedDelivery.orderDetails.invoices.map(
+                          (invoice: Invoice) => (
+                            <Badge
+                              key={invoice.invoice_full_number}
+                              variant="default"
+                            >
+                              {invoice.invoice_full_number}
+                            </Badge>
+                          )
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
               <div>
                 <p className="text-sm font-medium mb-2 flex items-center gap-2">
                   <Box className="h-4 w-4" /> Items de este Despacho:
                 </p>
                 <div className="border rounded-lg space-y-2 p-3 bg-muted/30">
-                  {/* CORREGIDO: usa dispatchItems y orderDetails */}
-                  {selectedDelivery.dispatchItems?.map((item: DeliveryItem) => {
-                    const orderItem = selectedDelivery.orderDetails.items.find(
-                      (oi) => oi.id === item.pedido_item_id
-                    );
-                    return (
-                      <div
-                        key={item.id}
-                        className="flex justify-between items-center text-sm"
-                      >
-                        <span className="text-muted-foreground">
-                          {orderItem?.product?.name || "Producto no encontrado"}
-                        </span>
-                        <span className="font-medium bg-gray-200 dark:bg-gray-700 px-2 py-1 rounded">
-                          {item.dispatched_quantity} {orderItem?.product?.unit}
-                        </span>
-                      </div>
-                    );
-                  })}
+                  {selectedDelivery.dispatchItems?.map(
+                    (item: DeliveryItem) => {
+                      const orderItem =
+                        selectedDelivery.orderDetails.items.find(
+                          (oi) => oi.id === item.pedido_item_id
+                        );
+                      return (
+                        <div
+                          key={item.id}
+                          className="flex justify-between items-center text-sm"
+                        >
+                          <span className="text-muted-foreground">
+                            {orderItem?.product?.name ||
+                              "Producto no encontrado"}
+                          </span>
+                          <span className="font-medium bg-gray-200 dark:bg-gray-700 px-2 py-1 rounded">
+                            {item.dispatched_quantity} {orderItem?.product?.unit}
+                          </span>
+                        </div>
+                      );
+                    }
+                  )}
                   {(!selectedDelivery.dispatchItems ||
                     selectedDelivery.dispatchItems.length === 0) && (
                     <p className="text-sm text-center text-muted-foreground py-2">
@@ -426,7 +459,6 @@ export function SecurityExitsClientUI({
                     <Camera className="h-4 w-4" />
                     Foto del Patio
                   </h4>
-                  {/* CORREGIDO: usa loadPhoto */}
                   {selectedDelivery.loadPhoto ? (
                     <div className="relative w-full h-48 rounded-lg overflow-hidden group border">
                       <Image
@@ -441,7 +473,6 @@ export function SecurityExitsClientUI({
                         size="icon"
                         className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity"
                         onClick={() =>
-                          // CORREGIDO: usa loadPhoto
                           openImagePreview(selectedDelivery.loadPhoto!)
                         }
                       >
