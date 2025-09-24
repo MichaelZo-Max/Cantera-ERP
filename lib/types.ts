@@ -114,6 +114,10 @@ export interface OrderItem {
   dispatchItems?: DeliveryItem[];
 }
 
+export interface InvoiceProduct extends Product {
+  available_quantity: number;
+}
+
 export interface Order {
   id: number;
   order_number: string;

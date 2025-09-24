@@ -28,7 +28,7 @@ export const createOrderItemSchema = z.object({
 
 /**
  * @description Esquema para la CREACIÓN de un nuevo pedido.
- * Sincronizado para aceptar múltiples facturas.
+ * Sincronizado para aceptar múltiples facturas (de forma opcional).
  */
 export const createOrderSchema = z.object({
   customer_id: z.number().int().positive("El cliente es requerido."),
@@ -43,7 +43,7 @@ export const createOrderSchema = z.object({
       })
     )
     .min(1, "El pedido debe tener al menos un item."),
-  total: z.number().nonnegative(),
+  // El campo 'total' se elimina, ya que debe ser calculado de forma segura en el backend.
   truck_ids: z
     .array(z.number().int().positive())
     .min(1, "Debes seleccionar al menos un camión."),
@@ -51,19 +51,15 @@ export const createOrderSchema = z.object({
     .array(z.number().int().positive())
     .min(1, "Debes seleccionar al menos un chofer."),
 
-  // --- 👇 CAMBIO: Reemplazamos los campos individuales por un array de objetos de factura ---
   invoices: z
     .array(
       z.object({
         invoice_series: z.string(),
         invoice_number: z.number(),
         invoice_n: z.string(),
-      }),
-      {
-        required_error: "Se requiere al menos una factura.",
-      }
+      })
     )
-    .min(1, "El pedido debe estar asociado a al menos una factura."),
+    .optional(),
 });
 
 /**

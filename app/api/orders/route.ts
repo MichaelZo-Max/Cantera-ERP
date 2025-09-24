@@ -4,6 +4,7 @@ import { getUser } from "@/lib/auth";
 import { executeQuery, TYPES } from "@/lib/db";
 import { revalidateTag } from "next/cache";
 import { createOrderSchema } from "@/lib/validations";
+import { InvoiceProduct } from "@/lib/types";
 
 export async function GET() {
   try {
@@ -63,8 +64,6 @@ export async function POST(req: Request) {
     }
 
     const body = await req.json();
-
-    // NOTA: Recuerda actualizar `createOrderSchema` para que espere un array `invoices`
     const validation = createOrderSchema.safeParse(body);
     if (!validation.success) {
       return NextResponse.json(
@@ -76,17 +75,66 @@ export async function POST(req: Request) {
       );
     }
 
-    // --- 👇 CAMBIO: Extraer el array de facturas ---
     const {
       customer_id,
       destination_id,
-      items,
+      items: itemsFromClient, // Renombramos los items del cliente
       truck_ids,
       driver_ids,
-      invoices, // Ahora es un array
+      invoices,
     } = validation.data;
 
-    // --- 👇 CAMBIO: La inserción en APP_PEDIDOS ya no incluye campos de factura ---
+    let trustedItems: typeof itemsFromClient = [];
+
+    // --- 👇 NUEVA LÓGICA DE SEGURIDAD ---
+    if (invoices && invoices.length > 0) {
+      // Si hay facturas, IGNORAMOS los items del cliente y los obtenemos de la DB.
+      
+      // Creamos placeholders para la consulta IN (...)
+      const invoicePlaceholders = invoices.map((_, index) => 
+        `(@series_${index}, @number_${index}, @n_${index})`
+      ).join(',');
+
+      // Preparamos los parámetros para la consulta
+      const invoiceParams = invoices.flatMap((inv, index) => [
+        { name: `series_${index}`, type: TYPES.NVarChar, value: inv.invoice_series },
+        { name: `number_${index}`, type: TYPES.Int, value: inv.invoice_number },
+        { name: `n_${index}`, type: TYPES.NVarChar, value: inv.invoice_n },
+      ]);
+      
+      const itemsQuery = `
+        SELECT
+            p.id,
+            p.name,
+            p.code,
+            p.price_per_unit,
+            p.unit,
+            fi.quantity_pending AS available_quantity -- Usamos la cantidad pendiente de la factura
+        FROM RIP.VW_APP_FACTURA_ITEMS_PENDIENTES fi
+        JOIN RIP.VW_APP_PRODUCTOS p ON fi.product_code = p.code
+        WHERE (fi.invoice_series, fi.invoice_number, fi.invoice_n) IN (VALUES ${invoicePlaceholders});
+      `;
+
+      const productsFromInvoices: InvoiceProduct[] = await executeQuery(itemsQuery, invoiceParams);
+
+      // Convertimos los productos seguros de la DB a la estructura de 'items' del pedido
+      trustedItems = productsFromInvoices.map(p => ({
+        product_id: p.id,
+        quantity: p.available_quantity,
+        price_per_unit: p.price_per_unit ?? 0,
+        unit: p.unit || 'UNIDAD'
+      }));
+
+    } else {
+      // Si no hay facturas, confiamos en los items que el cliente construyó manualmente.
+      trustedItems = itemsFromClient;
+    }
+
+    if (trustedItems.length === 0) {
+        return NextResponse.json({ error: "El pedido debe tener al menos un producto." }, { status: 400 });
+    }
+    // --- FIN DE LA LÓGICA DE SEGURIDAD ---
+
     const orderHeaderSql = `
         INSERT INTO RIP.APP_PEDIDOS (customer_id, destination_id, status, created_by)
         OUTPUT INSERTED.id
@@ -100,15 +148,13 @@ export async function POST(req: Request) {
     ]);
 
     if (!headerResult || headerResult.length === 0 || !headerResult[0].id) {
-      throw new Error(
-        "Falló la creación del encabezado de la orden en la base de datos."
-      );
+      throw new Error("Falló la creación del encabezado de la orden en la base de datos.");
     }
 
     const newOrderId = headerResult[0].id;
 
-    // Insertar los items del pedido (esto no cambia)
-    for (const item of items) {
+    // --- 👇 Usamos la lista de items segura (trustedItems) ---
+    for (const item of trustedItems) {
       const itemSql = `
           INSERT INTO RIP.APP_PEDIDOS_ITEMS (order_id, product_id, quantity, unit, price_per_unit)
           VALUES (@order_id, @product_id, @quantity, @unit, @price_per_unit);
@@ -118,29 +164,27 @@ export async function POST(req: Request) {
         { name: "product_id", type: TYPES.Int, value: item.product_id },
         { name: "quantity", type: TYPES.Decimal, value: item.quantity },
         { name: "unit", type: TYPES.NVarChar, value: item.unit },
-        {
-          name: "price_per_unit",
-          type: TYPES.Decimal,
-          value: item.price_per_unit,
-        },
+        { name: "price_per_unit", type: TYPES.Decimal, value: item.price_per_unit },
       ]);
     }
     
-    // --- 👇 NUEVO: Bucle para asociar cada factura con el pedido ---
-    for (const invoice of invoices) {
-        const invoiceSql = `
-            INSERT INTO RIP.APP_PEDIDOS_FACTURAS (pedido_id, invoice_series, invoice_number, invoice_n)
-            VALUES (@pedido_id, @invoice_series, @invoice_number, @invoice_n);
-        `;
-        await executeQuery(invoiceSql, [
-            { name: "pedido_id", type: TYPES.Int, value: newOrderId },
-            { name: "invoice_series", type: TYPES.NVarChar, value: invoice.invoice_series },
-            { name: "invoice_number", type: TYPES.Int, value: invoice.invoice_number },
-            { name: "invoice_n", type: TYPES.NVarChar, value: invoice.invoice_n },
-        ]);
+    // Si hay facturas, las asociamos
+    if (invoices && invoices.length > 0) {
+        for (const invoice of invoices) {
+            const invoiceSql = `
+                INSERT INTO RIP.APP_PEDIDOS_FACTURAS (pedido_id, invoice_series, invoice_number, invoice_n)
+                VALUES (@pedido_id, @invoice_series, @invoice_number, @invoice_n);
+            `;
+            await executeQuery(invoiceSql, [
+                { name: "pedido_id", type: TYPES.Int, value: newOrderId },
+                { name: "invoice_series", type: TYPES.NVarChar, value: invoice.invoice_series },
+                { name: "invoice_number", type: TYPES.Int, value: invoice.invoice_number },
+                { name: "invoice_n", type: TYPES.NVarChar, value: invoice.invoice_n },
+            ]);
+        }
     }
 
-    // Asociar Camiones (esto no cambia)
+    // Asociar Camiones
     for (const camion_id of truck_ids) {
       const truckSql = `
         INSERT INTO RIP.APP_PEDIDOS_CAMIONES (pedido_id, camion_id)
@@ -152,7 +196,7 @@ export async function POST(req: Request) {
       ]);
     }
 
-    // Asociar Choferes (esto no cambia)
+    // Asociar Choferes
     for (const chofer_id of driver_ids) {
       const driverSql = `
         INSERT INTO RIP.APP_PEDIDOS_CHOFERES (pedido_id, chofer_id)
