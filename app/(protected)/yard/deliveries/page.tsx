@@ -1,3 +1,5 @@
+// app/(protected)/yard/deliveries/page.tsx
+
 import { AppLayout } from "@/components/app-layout";
 import { YardDeliveriesClientUI } from "./yard-deliveries-client";
 import { unstable_noStore as noStore } from "next/cache";
@@ -17,8 +19,8 @@ const mapDbStatusToUi = (status: string): "PENDING" | "CARGADA" | "EXITED" => {
 async function getData() {
   noStore(); // Asegura que los datos sean siempre frescos.
 
-  // --- CONSULTA SQL CORREGIDA ---
-  // El error estaba en el número de columnas del UNION. Ahora ambas SELECT tienen 32 columnas.
+  // --- PASO 1: MODIFICAR LA CONSULTA SQL ---
+  // Añadimos la subconsulta FOR JSON PATH para traer las facturas en ambas partes del UNION.
   const mainQuery = `
     -- CTE para calcular el total despachado por cada item de pedido a través de todos los viajes.
     WITH DispatchedTotals AS (
@@ -28,7 +30,6 @@ async function getData() {
         FROM RIP.APP_DESPACHOS_ITEMS
         GROUP BY pedido_item_id
     )
-    -- Consulta Principal de Despachos (32 columnas)
     SELECT
         'DELIVERY' as type,
         d.id as id, d.status as estado, d.notes, d.load_photo_url as loadPhoto, d.exit_photo_url as exitPhoto,
@@ -39,7 +40,8 @@ async function getData() {
         pi.id as pedido_item_id, pi.quantity as item_quantity, pi.unit as item_unit, pi.price_per_unit,
         prod.id as product_id, prod.name as product_name, prod.unit as product_unit,
         ISNULL(dt.total_dispatched, 0) as total_dispatched_quantity,
-        NULL as order_only_id, NULL as order_only_number, NULL as order_only_customer_id, NULL as order_only_client_name, NULL as order_only_status, NULL as order_only_created_at
+        NULL as order_only_id, NULL as order_only_number, NULL as order_only_customer_id, NULL as order_only_client_name, NULL as order_only_status, NULL as order_only_created_at,
+        (SELECT pf.invoice_series, pf.invoice_number, pf.invoice_n, ISNULL(pf.invoice_series + '-' + CAST(pf.invoice_number AS VARCHAR) + pf.invoice_n COLLATE DATABASE_DEFAULT, '') AS invoice_full_number FROM RIP.APP_PEDIDOS_FACTURAS pf WHERE pf.pedido_id = p.id FOR JSON PATH) as invoices_json
     FROM RIP.APP_DESPACHOS d
     JOIN RIP.APP_PEDIDOS p ON p.id = d.order_id
     JOIN RIP.VW_APP_CLIENTES c ON c.id = p.customer_id
@@ -51,11 +53,11 @@ async function getData() {
 
     UNION ALL
 
-    -- Pedidos Activos (32 columnas)
     SELECT 
         'ACTIVE_ORDER' as type,
         NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, -- 25 NULLs para coincidir
-        p.id, p.order_number, p.customer_id, c.name, p.status, p.created_at
+        p.id, p.order_number, p.customer_id, c.name, p.status, p.created_at,
+        (SELECT pf.invoice_series, pf.invoice_number, pf.invoice_n, ISNULL(pf.invoice_series + '-' + CAST(pf.invoice_number AS VARCHAR) + pf.invoice_n COLLATE DATABASE_DEFAULT, '') AS invoice_full_number FROM RIP.APP_PEDIDOS_FACTURAS pf WHERE pf.pedido_id = p.id FOR JSON PATH) as invoices_json
     FROM RIP.APP_PEDIDOS p
     JOIN RIP.VW_APP_CLIENTES c ON c.id = p.customer_id
     WHERE p.status IN ('PAID', 'PARTIALLY_DISPATCHED');
@@ -68,6 +70,9 @@ async function getData() {
   const activeOrders: Order[] = [];
 
   for (const row of results) {
+    // --- PASO 2: PROCESAR EL JSON DE FACTURAS ---
+    const invoices = row.invoices_json ? JSON.parse(row.invoices_json) : [];
+
     switch (row.type) {
       case "DELIVERY":
         if (!deliveriesMap.has(row.id)) {
@@ -85,6 +90,7 @@ async function getData() {
               created_at: row.orderCreatedAt,
               client: { id: row.client_id, name: row.client_name },
               items: [],
+              invoices: invoices,
             },
             truck: { id: row.truck_id, placa: row.placa },
             driver: {
@@ -126,7 +132,8 @@ async function getData() {
           },
           status: row.order_only_status,
           created_at: row.order_only_created_at,
-          items: [],
+          items: [], // Los items de pedidos activos no se cargan en esta vista principal
+          invoices: invoices, // ✅ Propiedad 'invoices' AÑADIDA
         });
         break;
     }
