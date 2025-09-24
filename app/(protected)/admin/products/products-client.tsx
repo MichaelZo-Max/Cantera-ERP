@@ -123,7 +123,7 @@ export function ProductsClientUI({
                     </CardTitle>
                     <p className="text-sm font-semibold text-primary mt-1">
                       ${(product.price_per_unit || 0).toFixed(2)} /{" "}
-                      {product.unit}
+                      Unidad
                     </p>
                   </div>
                   <Badge
