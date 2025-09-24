@@ -88,7 +88,7 @@ export function OrderForm({
   isSubmitting,
 }: OrderFormProps) {
   // --- Estados del Formulario ---
-  const [selectedcustomer_id, setSelectedcustomer_id] = useState<string | undefined>(initialOrderData?.customer_id?.toString);
+  const [selectedcustomer_id, setSelectedcustomer_id] = useState<string | undefined>(initialOrderData?.customer_id?.toString());
   const [selectedDestinationId, setSelectedDestinationId] = useState<string | undefined>(initialOrderData?.destination_id?.toString());
   const [selectedTruckIds, setSelectedTruckIds] = useState<string[]>(initialOrderData?.trucks?.map((t) => t.id.toString()) ?? []);
   const [selectedDriverIds, setSelectedDriverIds] = useState<string[]>(initialOrderData?.drivers?.map((d) => d.id.toString()) ?? []);
