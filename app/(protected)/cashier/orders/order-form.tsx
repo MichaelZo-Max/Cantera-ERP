@@ -22,6 +22,7 @@ import {
   Truck,
   Package,
   FileText,
+  AlertCircle,
 } from "lucide-react";
 import { toast } from "sonner";
 import type {
@@ -37,14 +38,18 @@ import type {
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { GradientButton } from "@/components/ui/gradient-button";
 import { useDebounce } from "@/hooks/use-debounce";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
-// Interfaz para la respuesta de la API de clientes/productos
+// --- NUEVO ---: Extendemos el tipo Product para incluir la cantidad disponible
+interface ProductWithAvailableQuantity extends Product {
+  available_quantity?: number;
+}
+
 interface PaginatedResponse<T> {
   data: T[];
   totalPages: number;
 }
 
-// Interfaz para la respuesta de la API de facturas
 interface InvoicesApiResponse {
   invoices: Invoice[];
   totalPages: number;
@@ -65,7 +70,6 @@ interface OrderFormProps {
   initialDestinations: Destination[];
   initialTrucks: TruckType[];
   initialDrivers: Driver[];
-  initialInvoices: Invoice[];
   isEditing?: boolean;
   initialOrderData?: Order | null;
   onSubmit: (data: any) => Promise<void>;
@@ -78,27 +82,18 @@ export function OrderForm({
   initialDestinations,
   initialTrucks,
   initialDrivers,
-  initialInvoices,
   isEditing = false,
   initialOrderData,
   onSubmit,
   isSubmitting,
 }: OrderFormProps) {
   // --- Estados del Formulario ---
-  const [selectedcustomer_id, setSelectedcustomer_id] = useState<
-    string | undefined
-  >(initialOrderData?.customer_id?.toString());
-  const [selectedDestinationId, setSelectedDestinationId] = useState<
-    string | undefined
-  >(initialOrderData?.destination_id?.toString());
-  const [selectedTruckIds, setSelectedTruckIds] = useState<string[]>(
-    initialOrderData?.trucks?.map((t) => t.id.toString()) ?? []
-  );
-  const [selectedDriverIds, setSelectedDriverIds] = useState<string[]>(
-    initialOrderData?.drivers?.map((d) => d.id.toString()) ?? []
-  );
+  const [selectedcustomer_id, setSelectedcustomer_id] = useState<string | undefined>(initialOrderData?.customer_id?.toString);
+  const [selectedDestinationId, setSelectedDestinationId] = useState<string | undefined>(initialOrderData?.destination_id?.toString());
+  const [selectedTruckIds, setSelectedTruckIds] = useState<string[]>(initialOrderData?.trucks?.map((t) => t.id.toString()) ?? []);
+  const [selectedDriverIds, setSelectedDriverIds] = useState<string[]>(initialOrderData?.drivers?.map((d) => d.id.toString()) ?? []);
   const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
-  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [selectedProduct, setSelectedProduct] = useState<ProductWithAvailableQuantity | null>(null); // MODIFICADO
   const [currentQuantity, setCurrentQuantity] = useState<number>(0);
   const [selectedInvoices, setSelectedInvoices] = useState<string[]>([]);
 
@@ -109,10 +104,7 @@ export function OrderForm({
   const [clientPage, setClientPage] = useState(1);
   const [clientTotalPages, setClientTotalPages] = useState(10);
   const [isClientsLoading, setIsClientsLoading] = useState(false);
-  const selectedClient = useMemo(
-    () => clients.find((c) => c.id.toString() === selectedcustomer_id),
-    [clients, selectedcustomer_id]
-  );
+  const selectedClient = useMemo(() => clients.find((c) => c.id.toString() === selectedcustomer_id), [clients, selectedcustomer_id]);
 
   // --- Estados para Productos Paginados ---
   const [products, setProducts] = useState<Product[]>(initialProducts);
@@ -123,37 +115,31 @@ export function OrderForm({
   const [isProductsLoading, setIsProductsLoading] = useState(false);
 
   // --- Estados para Facturas Dinámicas ---
-  const [invoices, setInvoices] = useState<Invoice[]>(initialInvoices);
+  const [availableInvoices, setAvailableInvoices] = useState<Invoice[]>([]);
   const [isInvoicesLoading, setIsInvoicesLoading] = useState(false);
 
-  // --- Efecto para inicializar el formulario en modo edición ---
+  // --- MODIFICADO ---: Estado para productos de factura con cantidad
+  const [invoiceProducts, setInvoiceProducts] = useState<ProductWithAvailableQuantity[]>([]);
+  const [isInvoiceProductsLoading, setIsInvoiceProductsLoading] = useState(false);
+
+  // ... (useEffect de edición y carga de facturas permanecen iguales) ...
   useEffect(() => {
     if (isEditing && initialOrderData) {
       setSelectedcustomer_id(initialOrderData.customer_id?.toString());
       setSelectedDestinationId(initialOrderData.destination_id?.toString());
-      setSelectedTruckIds(
-        initialOrderData.trucks?.map((t: TruckType) => t.id.toString()) ?? []
-      );
-      setSelectedDriverIds(
-        initialOrderData.drivers?.map((d: Driver) => d.id.toString()) ?? []
-      );
-
+      setSelectedTruckIds(initialOrderData.trucks?.map((t: TruckType) => t.id.toString()) ?? []);
+      setSelectedDriverIds(initialOrderData.drivers?.map((d: Driver) => d.id.toString()) ?? []);
       if (initialOrderData.items) {
-        const items = initialOrderData.items.map((item) => ({
+        setOrderItems(initialOrderData.items.map((item) => ({
           id: crypto.randomUUID(),
           product: item.product!,
           quantity: item.quantity,
           pricePerUnit: Number(item.price_per_unit),
           subtotal: Number(item.quantity) * Number(item.price_per_unit),
-        }));
-        setOrderItems(items);
+        })));
       }
-
       if (initialOrderData.invoices && initialOrderData.invoices.length > 0) {
-        const invoiceValues = initialOrderData.invoices.map(
-          (inv) =>
-            `${inv.invoice_series}|${inv.invoice_number}|${inv.invoice_n}`
-        );
+        const invoiceValues = initialOrderData.invoices.map((inv) => `${inv.invoice_series}|${inv.invoice_number}|${inv.invoice_n}`);
         setSelectedInvoices(invoiceValues);
       }
     }
@@ -163,48 +149,92 @@ export function OrderForm({
   useEffect(() => {
     const fetchInvoicesForClient = async () => {
       if (!selectedClient) {
-        setInvoices([]);
+        setAvailableInvoices([]);
         return;
       }
-
       setIsInvoicesLoading(true);
       try {
-        const params = new URLSearchParams({
-          customerName: selectedClient.name,
-          pageSize: "1000",
-        });
-
+        const params = new URLSearchParams({ customerName: selectedClient.name, pageSize: "1000" });
         const res = await fetch(`/api/invoices?${params.toString()}`);
         if (!res.ok) throw new Error("No se pudieron cargar las facturas");
-        
         const result: InvoicesApiResponse = await res.json();
-        setInvoices(result.invoices || []);
-        
+        setAvailableInvoices(result.invoices || []);
       } catch (error) {
         toast.error("Error al cargar las facturas del cliente.");
-        setInvoices([]);
+        setAvailableInvoices([]);
       } finally {
         setIsInvoicesLoading(false);
       }
     };
-
     fetchInvoicesForClient();
   }, [selectedClient]);
 
-  // --- Lógica de Búsqueda y Paginación (Clientes y Productos) ---
+  // --- Efecto para cargar productos de facturas (sin cambios en la lógica) ---
+  useEffect(() => {
+    const fetchProductsForInvoices = async () => {
+      if (selectedInvoices.length === 0) {
+        setInvoiceProducts([]);
+        return;
+      }
+      setIsInvoiceProductsLoading(true);
+      try {
+        const invoicesData = selectedInvoices.map((invoiceString) => {
+          const [series, number, n] = invoiceString.split("|");
+          return { invoice_series: series, invoice_number: parseInt(number, 10), invoice_n: n };
+        });
+        const res = await fetch(`/api/invoice-items`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(invoicesData),
+        });
+        if (!res.ok) throw new Error("No se pudieron cargar los productos de las facturas");
+        const result: ProductWithAvailableQuantity[] = await res.json(); // MODIFICADO
+        setInvoiceProducts(result);
+      } catch (error) {
+        toast.error("Error al cargar los productos de las facturas.");
+        setInvoiceProducts([]);
+      } finally {
+        setIsInvoiceProductsLoading(false);
+      }
+    };
+    fetchProductsForInvoices();
+  }, [selectedInvoices]);
+  
+  // ... (lógica de paginación sin cambios) ...
+  useEffect(() => {
+    // Solo busca productos si no hay facturas seleccionadas
+    if (selectedInvoices.length > 0) return;
+
+    const fetchProducts = async () => {
+      setIsProductsLoading(true);
+      const params = new URLSearchParams({ page: String(productPage), limit: "20", q: debouncedProductSearch });
+      try {
+        const res = await fetch(`/api/products?${params.toString()}`);
+        if (!res.ok) throw new Error("No se pudieron cargar los productos");
+        const result: PaginatedResponse<Product> = await res.json();
+        setProducts((prev) => {
+          const existingIds = new Set(prev.map((p) => p.id));
+          const newProducts = result.data.filter((p) => !existingIds.has(p.id));
+          return productPage === 1 ? result.data : [...prev, ...newProducts];
+        });
+        setProductTotalPages(result.totalPages);
+      } catch (error) {
+        toast.error("Error al cargar productos.");
+      } finally {
+        setIsProductsLoading(false);
+      }
+    };
+    fetchProducts();
+  }, [productPage, debouncedProductSearch, selectedInvoices.length]);
+
   useEffect(() => {
     const fetchClients = async () => {
       setIsClientsLoading(true);
-      const params = new URLSearchParams({
-        page: String(clientPage),
-        limit: "20",
-        q: debouncedClientSearch,
-      });
+      const params = new URLSearchParams({ page: String(clientPage), limit: "20", q: debouncedClientSearch });
       try {
         const res = await fetch(`/api/customers?${params.toString()}`);
         if (!res.ok) throw new Error("No se pudieron cargar los clientes");
         const result: PaginatedResponse<Client> = await res.json();
-
         setClients((prev) => {
           const existingIds = new Set(prev.map((c) => c.id));
           const newClients = result.data.filter((c) => !existingIds.has(c.id));
@@ -220,112 +250,101 @@ export function OrderForm({
     fetchClients();
   }, [clientPage, debouncedClientSearch]);
 
-  useEffect(() => {
-    const fetchProducts = async () => {
-      setIsProductsLoading(true);
-      const params = new URLSearchParams({
-        page: String(productPage),
-        limit: "20",
-        q: debouncedProductSearch,
-      });
-      try {
-        const res = await fetch(`/api/products?${params.toString()}`);
-        if (!res.ok) throw new Error("No se pudieron cargar los productos");
-        const result: PaginatedResponse<Product> = await res.json();
-
-        setProducts((prev) => {
-          const existingIds = new Set(prev.map((p) => p.id));
-          const newProducts = result.data.filter((p) => !existingIds.has(p.id));
-          return productPage === 1 ? result.data : [...prev, ...newProducts];
-        });
-        setProductTotalPages(result.totalPages);
-      } catch (error) {
-        toast.error("Error al cargar productos.");
-      } finally {
-        setIsProductsLoading(false);
-      }
-    };
-    fetchProducts();
-  }, [productPage, debouncedProductSearch]);
 
   useEffect(() => setClientPage(1), [debouncedClientSearch]);
   useEffect(() => setProductPage(1), [debouncedProductSearch]);
 
   const filteredDestinations = useMemo(() => {
     if (!selectedcustomer_id) return [];
-    return initialDestinations.filter(
-      (d) => d.customer_id.toString() === selectedcustomer_id
-    );
+    return initialDestinations.filter((d) => d.customer_id.toString() === selectedcustomer_id);
   }, [selectedcustomer_id, initialDestinations]);
 
-  const total = useMemo(
-    () => orderItems.reduce((sum, item) => sum + item.subtotal, 0),
-    [orderItems]
-  );
+  const total = useMemo(() => orderItems.reduce((sum, item) => sum + item.subtotal, 0), [orderItems]);
 
-  const handleAddItem = useCallback(() => {
-    if (selectedProduct && currentQuantity > 0) {
-      const newItem: OrderItem = {
-        id: crypto.randomUUID(),
-        product: selectedProduct,
-        quantity: currentQuantity,
-        pricePerUnit: Number(selectedProduct.price_per_unit),
-        subtotal: currentQuantity * Number(selectedProduct.price_per_unit),
-      };
-      setOrderItems((prevItems) => [...prevItems, newItem]);
-      setSelectedProduct(null);
-      setCurrentQuantity(0);
-      setProductSearch("");
-      toast.success(`${newItem.product.name} ha sido agregado al pedido.`);
-    } else {
-      toast.error("Por favor, selecciona un producto y una cantidad válida.");
+  // --- NUEVO ---: Calculamos la cantidad máxima permitida para el producto seleccionado
+  const availableQuantityForSelectedProduct = useMemo(() => {
+    if (!selectedProduct || selectedInvoices.length === 0) {
+      return undefined; // Sin límite si no hay facturas
     }
-  }, [selectedProduct, currentQuantity]);
+    const totalAvailable = selectedProduct.available_quantity ?? 0;
+    const quantityInCart = orderItems
+      .filter(item => item.product.id === selectedProduct.id)
+      .reduce((sum, item) => sum + item.quantity, 0);
+    return totalAvailable - quantityInCart;
+  }, [selectedProduct, orderItems, selectedInvoices.length]);
+
+  // --- MODIFICADO ---: Ahora `handleAddItem` valida contra la cantidad disponible
+  const handleAddItem = useCallback(() => {
+    if (!selectedProduct || currentQuantity <= 0) {
+      toast.error("Por favor, selecciona un producto y una cantidad válida.");
+      return;
+    }
+    // Nueva validación de cantidad
+    if (availableQuantityForSelectedProduct !== undefined && currentQuantity > availableQuantityForSelectedProduct) {
+      toast.error(`La cantidad no puede superar la disponible en factura (${availableQuantityForSelectedProduct.toFixed(2)}).`);
+      return;
+    }
+    const newItem: OrderItem = {
+      id: crypto.randomUUID(),
+      product: selectedProduct,
+      quantity: currentQuantity,
+      pricePerUnit: Number(selectedProduct.price_per_unit),
+      subtotal: currentQuantity * Number(selectedProduct.price_per_unit),
+    };
+    setOrderItems((prevItems) => [...prevItems, newItem]);
+    setSelectedProduct(null);
+    setCurrentQuantity(0);
+    setProductSearch("");
+    toast.success(`${newItem.product.name} ha sido agregado al pedido.`);
+  }, [selectedProduct, currentQuantity, availableQuantityForSelectedProduct]);
 
   const handleRemoveItem = useCallback((itemId: string) => {
-    setOrderItems((prevItems) =>
-      prevItems.filter((item) => item.id !== itemId)
-    );
+    setOrderItems((prevItems) => prevItems.filter((item) => item.id !== itemId));
     toast.success("Producto eliminado del pedido.");
   }, []);
 
-  const handleProductSelect = useCallback(
-    (productId: string) => {
-      const product = products.find((p) => p.id.toString() === productId);
-      setSelectedProduct(product || null);
-      setCurrentQuantity(product ? 1 : 0);
-    },
-    [products]
-  );
+  const productSelectionPool = useMemo(() => selectedInvoices.length > 0 ? invoiceProducts : products, [selectedInvoices, invoiceProducts, products]);
 
+  const handleProductSelect = useCallback((productId: string) => {
+    const product = productSelectionPool.find((p) => p.id.toString() === productId);
+    setSelectedProduct(product || null);
+    setCurrentQuantity(product ? 1 : 0);
+  }, [productSelectionPool]);
+
+  useEffect(() => {
+    if (selectedInvoices.length > 0) {
+      setOrderItems([]);
+    }
+  }, [selectedInvoices]);
+
+  // ... (handleFormSubmit y canSubmit permanecen iguales) ...
   const handleFormSubmit = () => {
-    if (
-      !selectedcustomer_id ||
-      orderItems.length === 0 ||
-      selectedTruckIds.length === 0 ||
-      selectedDriverIds.length === 0 ||
-      selectedInvoices.length === 0
-    ) {
-      toast.error(
-        "Completa todos los campos requeridos: Cliente, al menos un producto, una factura, un camión y un chofer."
-      );
+    if (!selectedcustomer_id || orderItems.length === 0 || selectedTruckIds.length === 0 || selectedDriverIds.length === 0) {
+      toast.error("Completa todos los campos requeridos: Cliente, al menos un producto, un camión y un chofer.");
       return;
     }
+    // La validación de facturas seleccionadas ahora es opcional
+    if (selectedInvoices.length === 0) {
+      toast.warning("Estás creando un pedido sin facturas asociadas. ¿Deseas continuar?", {
+        action: {
+          label: "Continuar",
+          onClick: () => proceedSubmit(),
+        },
+      });
+    } else {
+      proceedSubmit();
+    }
+  };
 
+  const proceedSubmit = () => {
     const invoicesData = selectedInvoices.map((invoiceString) => {
       const [series, number, n] = invoiceString.split("|");
-      return {
-        invoice_series: series,
-        invoice_number: parseInt(number, 10),
-        invoice_n: n,
-      };
+      return { invoice_series: series, invoice_number: parseInt(number, 10), invoice_n: n };
     });
 
     const orderData = {
-      customer_id: parseInt(selectedcustomer_id, 10),
-      destination_id: selectedDestinationId
-        ? parseInt(selectedDestinationId, 10)
-        : null,
+      customer_id: parseInt(selectedcustomer_id!, 10),
+      destination_id: selectedDestinationId ? parseInt(selectedDestinationId, 10) : null,
       items: orderItems.map((item) => ({
         product_id: item.product.id,
         quantity: item.quantity,
@@ -338,27 +357,16 @@ export function OrderForm({
       invoices: invoicesData,
     };
     onSubmit(orderData);
-  };
+  }
 
-  const canSubmit = useMemo(
-    () =>
-      !!selectedcustomer_id &&
-      orderItems.length > 0 &&
-      selectedTruckIds.length > 0 &&
-      selectedDriverIds.length > 0 &&
-      selectedInvoices.length > 0,
-    [
-      selectedcustomer_id,
-      orderItems,
-      selectedTruckIds,
-      selectedDriverIds,
-      selectedInvoices,
-    ]
-  );
+  const canSubmit = useMemo(() => !!selectedcustomer_id && orderItems.length > 0 && selectedTruckIds.length > 0 && selectedDriverIds.length > 0, [selectedcustomer_id, orderItems, selectedTruckIds, selectedDriverIds]);
+
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 items-start p-2">
+      {/* --- Columna Izquierda (Formularios) --- */}
       <div className="lg:col-span-3 space-y-6">
+        {/* ... (Card de Datos Generales y Transporte sin cambios) ... */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -378,15 +386,9 @@ export function OrderForm({
                     setSelectedInvoices([]);
                   }}
                   placeholder="Selecciona un cliente..."
-                  options={clients.map((client) => ({
-                    value: client.id.toString(),
-                    label: client.name,
-                  }))}
+                  options={clients.map((client) => ({ value: client.id.toString(), label: client.name }))}
                   onSearch={setClientSearch}
-                  onLoadMore={() => {
-                    if (clientPage < clientTotalPages && !isClientsLoading)
-                      setClientPage((p) => p + 1);
-                  }}
+                  onLoadMore={() => { if (clientPage < clientTotalPages && !isClientsLoading) setClientPage((p) => p + 1); }}
                   hasNextPage={clientPage < clientTotalPages}
                   isLoading={isClientsLoading}
                 />
@@ -397,36 +399,25 @@ export function OrderForm({
                   value={selectedDestinationId}
                   onChange={setSelectedDestinationId}
                   placeholder="Selecciona un destino..."
-                  disabled={
-                    !selectedcustomer_id || filteredDestinations.length === 0
-                  }
-                  options={filteredDestinations.map((dest) => ({
-                    value: dest.id.toString(),
-                    label: dest.name,
-                  }))}
+                  disabled={!selectedcustomer_id || filteredDestinations.length === 0}
+                  options={filteredDestinations.map((dest) => ({ value: dest.id.toString(), label: dest.name }))}
                 />
               </div>
             </div>
             <div className="mt-4 space-y-2">
               <Label className="flex items-center gap-2">
-                <FileText size={16} /> Vincular Factura(s) *
+                <FileText size={16} /> Vincular Factura(s) (Opcional)
               </Label>
               <SearchableSelect
                 isMulti
                 value={selectedInvoices}
                 onChange={setSelectedInvoices}
-                placeholder={
-                  selectedClient
-                    ? "Selecciona una o más facturas..."
-                    : "Primero selecciona un cliente"
-                }
+                placeholder={selectedClient ? "Selecciona una o más facturas..." : "Primero selecciona un cliente"}
                 disabled={!selectedcustomer_id || isInvoicesLoading}
                 isLoading={isInvoicesLoading}
-                options={invoices.map((inv) => ({
+                options={availableInvoices.map((inv) => ({
                   value: `${inv.invoice_series}|${inv.invoice_number}|${inv.invoice_n}`,
-                  label: `${inv.invoice_series}-${inv.invoice_number} ($${(
-                    inv.total_usd ?? 0
-                  ).toFixed(2)})`,
+                  label: `${inv.invoice_series}-${inv.invoice_number} ($${(inv.total_usd ?? 0).toFixed(2)})`,
                 }))}
               />
             </div>
@@ -443,28 +434,14 @@ export function OrderForm({
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Camiones *</Label>
-                <SearchableSelect
-                  isMulti
-                  value={selectedTruckIds}
-                  onChange={setSelectedTruckIds}
-                  placeholder="Selecciona camiones..."
-                  options={initialTrucks.map((truck) => ({
-                    value: truck.id.toString(),
-                    label: `${truck.placa} (${truck.brand || "N/A"})`,
-                  }))}
+                <SearchableSelect isMulti value={selectedTruckIds} onChange={setSelectedTruckIds} placeholder="Selecciona camiones..."
+                  options={initialTrucks.map((truck) => ({ value: truck.id.toString(), label: `${truck.placa} (${truck.brand || "N/A"})` }))}
                 />
               </div>
               <div className="space-y-2">
                 <Label>Choferes *</Label>
-                <SearchableSelect
-                  isMulti
-                  value={selectedDriverIds}
-                  onChange={setSelectedDriverIds}
-                  placeholder="Selecciona choferes..."
-                  options={initialDrivers.map((driver) => ({
-                    value: driver.id.toString(),
-                    label: driver.name,
-                  }))}
+                <SearchableSelect isMulti value={selectedDriverIds} onChange={setSelectedDriverIds} placeholder="Selecciona choferes..."
+                  options={initialDrivers.map((driver) => ({ value: driver.id.toString(), label: driver.name }))}
                 />
               </div>
             </div>
@@ -473,40 +450,50 @@ export function OrderForm({
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Package className="text-primary" />
-              Constructor de Items
+              <Package className="text-primary" /> Constructor de Items
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
+            {selectedInvoices.length > 0 ? (
+              <Alert>
+                <AlertCircle className="h-4 w-4" />
+                <AlertTitle>Productos Restringidos por Factura</AlertTitle>
+                <AlertDescription>
+                  Solo puedes agregar productos que pertenezcan a las facturas seleccionadas.
+                </AlertDescription>
+              </Alert>
+            ) : null }
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
               <div className="space-y-2">
                 <Label>Producto</Label>
                 <SearchableSelect
                   value={selectedProduct?.id.toString() || ""}
                   onChange={handleProductSelect}
-                  placeholder="Seleccionar producto..."
-                  options={products.map((product) => ({
+                  placeholder={isInvoiceProductsLoading ? "Cargando productos..." : "Seleccionar producto..."}
+                  options={productSelectionPool.map((product) => ({
                     value: product.id.toString(),
-                    label: `${product.name} ($${Number(
-                      product.price_per_unit
-                    ).toFixed(2)})`,
+                    label: `${product.name} ($${Number(product.price_per_unit).toFixed(2)})`,
                   }))}
-                  onSearch={setProductSearch}
-                  onLoadMore={() => {
-                    if (productPage < productTotalPages && !isProductsLoading)
-                      setProductPage((p) => p + 1);
-                  }}
-                  hasNextPage={productPage < productTotalPages}
-                  isLoading={isProductsLoading}
+                  onSearch={selectedInvoices.length === 0 ? setProductSearch : undefined}
+                  onLoadMore={selectedInvoices.length === 0 ? () => { if (productPage < productTotalPages && !isProductsLoading) setProductPage((p) => p + 1) } : undefined}
+                  hasNextPage={selectedInvoices.length === 0 ? productPage < productTotalPages : false}
+                  isLoading={isProductsLoading || isInvoiceProductsLoading}
                 />
               </div>
               <div className="space-y-2">
                 <QuantityInput
-                  unitBase={(selectedProduct?.unit as UnitBase) || "M3"}
                   value={currentQuantity}
                   onChange={setCurrentQuantity}
                   disabled={!selectedProduct}
+                  // --- NUEVO ---: Pasamos el límite máximo al input
+                  max={availableQuantityForSelectedProduct}
                 />
+                {/* --- NUEVO ---: Mostramos la cantidad disponible al usuario */}
+                {selectedInvoices.length > 0 && availableQuantityForSelectedProduct !== undefined && selectedProduct && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Disponible: <strong>{availableQuantityForSelectedProduct.toFixed(2)}</strong> {selectedProduct.unit}
+                  </p>
+                )}
               </div>
             </div>
             <Button
@@ -520,6 +507,7 @@ export function OrderForm({
           </CardContent>
         </Card>
       </div>
+      {/* --- Columna Derecha (Resumen) sin cambios --- */}
       <div className="lg:col-span-2 space-y-6 lg:sticky top-6">
         <Card>
           <CardHeader>

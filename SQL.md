@@ -489,7 +489,7 @@ LEFT JOIN
     RIP.VW_APP_PEDIDOS vp ON p.id = vp.id;
 GO
 
--- Vista de Facturas Disponibles (sin cambios, pero se mantiene)
+-- Vista de Facturas Disponibles
 IF OBJECT_ID('RIP.VW_APP_FACTURAS_DISPONIBLES', 'V') IS NOT NULL
 BEGIN
     DROP VIEW RIP.VW_APP_FACTURAS_DISPONIBLES;
@@ -504,17 +504,81 @@ SELECT
     C.CODCLIENTE AS customer_id,
     C.NOMBRECLIENTE AS customer_name,
     FV.FECHA AS invoice_date,
-    ROUND(RIP.F_GET_COTIZACION_RIP(FV.TOTALNETO, FV.FECHA, FV.FACTORMONEDA, FV.CODMONEDA, 2), 2) AS total_usd
+    -- Regla de Negocio 3.B: Corregimos el código de moneda destino a 1 para USD
+    ROUND(RIP.F_GET_COTIZACION_RIP(FV.TOTALNETO, FV.FECHA, FV.FACTORMONEDA, FV.CODMONEDA, 1), 2) AS total_usd
 FROM
     dbo.FACTURASVENTA FV
 INNER JOIN
     dbo.CLIENTES C ON FV.CODCLIENTE = C.CODCLIENTE;
 GO
 
-PRINT 'Todas las vistas han sido creadas/actualizadas.';
+PRINT 'Vista RIP.VW_APP_FACTURAS_DISPONIBLES creada/actualizada.';
 GO
 
 PRINT '====================================================================================';
 PRINT '¡Despliegue completado! El esquema y las tablas son compatibles con múltiples facturas.';
 PRINT '====================================================================================';
+GO
+
+-- =================================================================
+-- VISTA PARA OBTENER ITEMS DE FACTURAS
+-- Propósito: Simplifica la consulta de los productos asociados a una o más facturas.
+-- Lógica: Sigue la regla de negocio uniendo Factura -> Albarán -> Líneas y convierte el precio a USD.
+-- =================================================================
+IF OBJECT_ID('RIP.VW_APP_FACTURA_ITEMS', 'V') IS NOT NULL
+BEGIN
+    DROP VIEW RIP.VW_APP_FACTURA_ITEMS;
+END
+GO
+
+CREATE VIEW RIP.VW_APP_FACTURA_ITEMS AS
+SELECT
+    FV.NUMSERIE AS invoice_series,
+    FV.NUMFACTURA AS invoice_number,
+    FV.N AS invoice_n,
+    A.CODARTICULO AS id,
+    A.REFPROVEEDOR AS codigo,
+    A.DESCRIPCION AS name,
+    CASE
+        WHEN A.UNIDADMEDIDA IN ('m3', 'Ton', 'kg') THEN 'GRANEL'
+        WHEN A.UNIDADMEDIDA IN ('SACO', 'BOLSA', 'CUÑETE') THEN 'PAQUETE'
+        WHEN A.FAMILIA LIKE '%SERVICIO%' THEN 'SERVICIO'
+        ELSE 'UNIDAD'
+    END AS sell_format,
+    -- Regla de Negocio 3.B: Convertimos el precio de la línea a USD (código 1)
+    ROUND(RIP.F_GET_COTIZACION_RIP(AVL.PRECIO, FV.FECHA, FV.FACTORMONEDA, FV.CODMONEDA, 1), 2) AS price_per_unit_usd,
+    SUM(AVL.UNIDADESTOTAL) AS quantity, -- Regla de Negocio 2.1: La cantidad es la suma de UNIDADESTOTAL
+    A.UNIDADMEDIDA AS unit,
+    CASE WHEN A.DESCATALOGADO = 'F' THEN 1 ELSE 0 END AS is_active
+FROM
+    dbo.FACTURASVENTA FV
+JOIN
+    dbo.ALBVENTACAB AVC ON FV.NUMSERIE = AVC.NUMSERIEFAC AND FV.NUMFACTURA = AVC.NUMFAC AND FV.N = AVC.N
+JOIN
+    dbo.ALBVENTALIN AVL ON AVC.NUMSERIE = AVL.NUMSERIE AND AVC.NUMALBARAN = AVL.NUMALBARAN AND AVC.N = AVL.N
+JOIN
+    dbo.ARTICULOS A ON AVL.CODARTICULO = A.CODARTICULO
+GROUP BY
+    FV.NUMSERIE,
+    FV.NUMFACTURA,
+    FV.N,
+    A.CODARTICULO,
+    A.REFPROVEEDOR,
+    A.DESCRIPCION,
+    CASE
+        WHEN A.UNIDADMEDIDA IN ('m3', 'Ton', 'kg') THEN 'GRANEL'
+        WHEN A.UNIDADMEDIDA IN ('SACO', 'BOLSA', 'CUÑETE') THEN 'PAQUETE'
+        WHEN A.FAMILIA LIKE '%SERVICIO%' THEN 'SERVICIO'
+        ELSE 'UNIDAD'
+    END,
+    -- Agrupamos también por los campos necesarios para la conversión
+    FV.FECHA,
+    FV.FACTORMONEDA,
+    FV.CODMONEDA,
+    AVL.PRECIO,
+    A.UNIDADMEDIDA,
+    A.DESCATALOGADO;
+GO
+
+PRINT 'Vista RIP.VW_APP_FACTURA_ITEMS creada/actualizada con precios en USD.';
 GO
