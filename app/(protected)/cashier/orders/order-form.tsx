@@ -40,7 +40,7 @@ import { GradientButton } from "@/components/ui/gradient-button";
 import { useDebounce } from "@/hooks/use-debounce";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
-// --- NUEVO ---: Extendemos el tipo Product para incluir la cantidad disponible
+// --- Tipo extendido para incluir la cantidad disponible desde la factura ---
 interface ProductWithAvailableQuantity extends Product {
   available_quantity?: number;
 }
@@ -93,7 +93,7 @@ export function OrderForm({
   const [selectedTruckIds, setSelectedTruckIds] = useState<string[]>(initialOrderData?.trucks?.map((t) => t.id.toString()) ?? []);
   const [selectedDriverIds, setSelectedDriverIds] = useState<string[]>(initialOrderData?.drivers?.map((d) => d.id.toString()) ?? []);
   const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
-  const [selectedProduct, setSelectedProduct] = useState<ProductWithAvailableQuantity | null>(null); // MODIFICADO
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [currentQuantity, setCurrentQuantity] = useState<number>(0);
   const [selectedInvoices, setSelectedInvoices] = useState<string[]>([]);
 
@@ -117,12 +117,9 @@ export function OrderForm({
   // --- Estados para Facturas Dinámicas ---
   const [availableInvoices, setAvailableInvoices] = useState<Invoice[]>([]);
   const [isInvoicesLoading, setIsInvoicesLoading] = useState(false);
+  const [isInvoiceItemsLoading, setIsInvoiceItemsLoading] = useState(false);
 
-  // --- MODIFICADO ---: Estado para productos de factura con cantidad
-  const [invoiceProducts, setInvoiceProducts] = useState<ProductWithAvailableQuantity[]>([]);
-  const [isInvoiceProductsLoading, setIsInvoiceProductsLoading] = useState(false);
 
-  // ... (useEffect de edición y carga de facturas permanecen iguales) ...
   useEffect(() => {
     if (isEditing && initialOrderData) {
       setSelectedcustomer_id(initialOrderData.customer_id?.toString());
@@ -169,40 +166,64 @@ export function OrderForm({
     fetchInvoicesForClient();
   }, [selectedClient]);
 
-  // --- Efecto para cargar productos de facturas (sin cambios en la lógica) ---
+  // --- NUEVO: Efecto para cargar productos de facturas y agregarlos automáticamente al pedido ---
   useEffect(() => {
-    const fetchProductsForInvoices = async () => {
+    const fetchAndSetInvoiceItems = async () => {
+      // Si no hay facturas seleccionadas, limpiamos los items y terminamos
       if (selectedInvoices.length === 0) {
-        setInvoiceProducts([]);
+        setOrderItems([]);
         return;
       }
-      setIsInvoiceProductsLoading(true);
+      
+      setIsInvoiceItemsLoading(true);
+      toast.info("Cargando productos de las facturas...");
+      
       try {
         const invoicesData = selectedInvoices.map((invoiceString) => {
           const [series, number, n] = invoiceString.split("|");
           return { invoice_series: series, invoice_number: parseInt(number, 10), invoice_n: n };
         });
+        
         const res = await fetch(`/api/invoice-items`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(invoicesData),
         });
+
         if (!res.ok) throw new Error("No se pudieron cargar los productos de las facturas");
-        const result: ProductWithAvailableQuantity[] = await res.json(); // MODIFICADO
-        setInvoiceProducts(result);
+        
+        const productsFromInvoices: ProductWithAvailableQuantity[] = await res.json();
+
+        // Convertir los productos de la factura en OrderItems
+        const newOrderItems = productsFromInvoices.map((product) => ({
+          id: crypto.randomUUID(),
+          product: product,
+          quantity: product.available_quantity ?? 0, // Usamos la cantidad disponible de la factura
+          pricePerUnit: Number(product.price_per_unit),
+          subtotal: (product.available_quantity ?? 0) * Number(product.price_per_unit),
+        }));
+
+        setOrderItems(newOrderItems);
+        
+        if (newOrderItems.length > 0) {
+          toast.success("Se han cargado todos los productos de las facturas seleccionadas.");
+        } else {
+          toast.warning("Las facturas seleccionadas no tienen productos para despachar.");
+        }
+
       } catch (error) {
         toast.error("Error al cargar los productos de las facturas.");
-        setInvoiceProducts([]);
+        setOrderItems([]);
       } finally {
-        setIsInvoiceProductsLoading(false);
+        setIsInvoiceItemsLoading(false);
       }
     };
-    fetchProductsForInvoices();
+
+    fetchAndSetInvoiceItems();
   }, [selectedInvoices]);
   
-  // ... (lógica de paginación sin cambios) ...
+  // Lógica de paginación
   useEffect(() => {
-    // Solo busca productos si no hay facturas seleccionadas
     if (selectedInvoices.length > 0) return;
 
     const fetchProducts = async () => {
@@ -261,27 +282,9 @@ export function OrderForm({
 
   const total = useMemo(() => orderItems.reduce((sum, item) => sum + item.subtotal, 0), [orderItems]);
 
-  // --- NUEVO ---: Calculamos la cantidad máxima permitida para el producto seleccionado
-  const availableQuantityForSelectedProduct = useMemo(() => {
-    if (!selectedProduct || selectedInvoices.length === 0) {
-      return undefined; // Sin límite si no hay facturas
-    }
-    const totalAvailable = selectedProduct.available_quantity ?? 0;
-    const quantityInCart = orderItems
-      .filter(item => item.product.id === selectedProduct.id)
-      .reduce((sum, item) => sum + item.quantity, 0);
-    return totalAvailable - quantityInCart;
-  }, [selectedProduct, orderItems, selectedInvoices.length]);
-
-  // --- MODIFICADO ---: Ahora `handleAddItem` valida contra la cantidad disponible
   const handleAddItem = useCallback(() => {
     if (!selectedProduct || currentQuantity <= 0) {
       toast.error("Por favor, selecciona un producto y una cantidad válida.");
-      return;
-    }
-    // Nueva validación de cantidad
-    if (availableQuantityForSelectedProduct !== undefined && currentQuantity > availableQuantityForSelectedProduct) {
-      toast.error(`La cantidad no puede superar la disponible en factura (${availableQuantityForSelectedProduct.toFixed(2)}).`);
       return;
     }
     const newItem: OrderItem = {
@@ -296,34 +299,24 @@ export function OrderForm({
     setCurrentQuantity(0);
     setProductSearch("");
     toast.success(`${newItem.product.name} ha sido agregado al pedido.`);
-  }, [selectedProduct, currentQuantity, availableQuantityForSelectedProduct]);
+  }, [selectedProduct, currentQuantity]);
 
   const handleRemoveItem = useCallback((itemId: string) => {
     setOrderItems((prevItems) => prevItems.filter((item) => item.id !== itemId));
     toast.success("Producto eliminado del pedido.");
   }, []);
 
-  const productSelectionPool = useMemo(() => selectedInvoices.length > 0 ? invoiceProducts : products, [selectedInvoices, invoiceProducts, products]);
-
   const handleProductSelect = useCallback((productId: string) => {
-    const product = productSelectionPool.find((p) => p.id.toString() === productId);
+    const product = products.find((p) => p.id.toString() === productId);
     setSelectedProduct(product || null);
     setCurrentQuantity(product ? 1 : 0);
-  }, [productSelectionPool]);
+  }, [products]);
 
-  useEffect(() => {
-    if (selectedInvoices.length > 0) {
-      setOrderItems([]);
-    }
-  }, [selectedInvoices]);
-
-  // ... (handleFormSubmit y canSubmit permanecen iguales) ...
   const handleFormSubmit = () => {
     if (!selectedcustomer_id || orderItems.length === 0 || selectedTruckIds.length === 0 || selectedDriverIds.length === 0) {
       toast.error("Completa todos los campos requeridos: Cliente, al menos un producto, un camión y un chofer.");
       return;
     }
-    // La validación de facturas seleccionadas ahora es opcional
     if (selectedInvoices.length === 0) {
       toast.warning("Estás creando un pedido sin facturas asociadas. ¿Deseas continuar?", {
         action: {
@@ -366,7 +359,6 @@ export function OrderForm({
     <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 items-start p-2">
       {/* --- Columna Izquierda (Formularios) --- */}
       <div className="lg:col-span-3 space-y-6">
-        {/* ... (Card de Datos Generales y Transporte sin cambios) ... */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -423,6 +415,7 @@ export function OrderForm({
             </div>
           </CardContent>
         </Card>
+        
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -447,67 +440,63 @@ export function OrderForm({
             </div>
           </CardContent>
         </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Package className="text-primary" /> Constructor de Items
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {selectedInvoices.length > 0 ? (
-              <Alert>
-                <AlertCircle className="h-4 w-4" />
-                <AlertTitle>Productos Restringidos por Factura</AlertTitle>
-                <AlertDescription>
-                  Solo puedes agregar productos que pertenezcan a las facturas seleccionadas.
-                </AlertDescription>
-              </Alert>
-            ) : null }
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
-              <div className="space-y-2">
-                <Label>Producto</Label>
-                <SearchableSelect
-                  value={selectedProduct?.id.toString() || ""}
-                  onChange={handleProductSelect}
-                  placeholder={isInvoiceProductsLoading ? "Cargando productos..." : "Seleccionar producto..."}
-                  options={productSelectionPool.map((product) => ({
-                    value: product.id.toString(),
-                    label: `${product.name} ($${Number(product.price_per_unit).toFixed(2)})`,
-                  }))}
-                  onSearch={selectedInvoices.length === 0 ? setProductSearch : undefined}
-                  onLoadMore={selectedInvoices.length === 0 ? () => { if (productPage < productTotalPages && !isProductsLoading) setProductPage((p) => p + 1) } : undefined}
-                  hasNextPage={selectedInvoices.length === 0 ? productPage < productTotalPages : false}
-                  isLoading={isProductsLoading || isInvoiceProductsLoading}
-                />
+        
+        {/* --- MODIFICADO: El constructor de items solo aparece si NO hay facturas seleccionadas --- */}
+        {selectedInvoices.length === 0 ? (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Package className="text-primary" /> Constructor de Items
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
+                <div className="space-y-2">
+                  <Label>Producto</Label>
+                  <SearchableSelect
+                    value={selectedProduct?.id.toString() || ""}
+                    onChange={handleProductSelect}
+                    placeholder={isProductsLoading ? "Cargando productos..." : "Seleccionar producto..."}
+                    options={products.map((product) => ({
+                      value: product.id.toString(),
+                      label: `${product.name} ($${Number(product.price_per_unit).toFixed(2)})`,
+                    }))}
+                    onSearch={setProductSearch}
+                    onLoadMore={() => { if (productPage < productTotalPages && !isProductsLoading) setProductPage((p) => p + 1) }}
+                    hasNextPage={productPage < productTotalPages}
+                    isLoading={isProductsLoading}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <QuantityInput
+                    value={currentQuantity}
+                    onChange={setCurrentQuantity}
+                    disabled={!selectedProduct}
+                  />
+                </div>
               </div>
-              <div className="space-y-2">
-                <QuantityInput
-                  value={currentQuantity}
-                  onChange={setCurrentQuantity}
-                  disabled={!selectedProduct}
-                  // --- NUEVO ---: Pasamos el límite máximo al input
-                  max={availableQuantityForSelectedProduct}
-                />
-                {/* --- NUEVO ---: Mostramos la cantidad disponible al usuario */}
-                {selectedInvoices.length > 0 && availableQuantityForSelectedProduct !== undefined && selectedProduct && (
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Disponible: <strong>{availableQuantityForSelectedProduct.toFixed(2)}</strong> {selectedProduct.unit}
-                  </p>
-                )}
-              </div>
-            </div>
-            <Button
-              onClick={handleAddItem}
-              disabled={!selectedProduct || currentQuantity <= 0}
-              className="w-full"
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              Agregar al Pedido
-            </Button>
-          </CardContent>
-        </Card>
+              <Button
+                onClick={handleAddItem}
+                disabled={!selectedProduct || currentQuantity <= 0}
+                className="w-full"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Agregar al Pedido
+              </Button>
+            </CardContent>
+          </Card>
+        ) : (
+          <Alert>
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>Productos Cargados desde Factura</AlertTitle>
+            <AlertDescription>
+              Los productos del pedido están definidos por las facturas seleccionadas. Para modificarlos, cambia la selección de facturas.
+            </AlertDescription>
+          </Alert>
+        )}
       </div>
-      {/* --- Columna Derecha (Resumen) sin cambios --- */}
+
+      {/* --- Columna Derecha (Resumen) --- */}
       <div className="lg:col-span-2 space-y-6 lg:sticky top-6">
         <Card>
           <CardHeader>
@@ -523,12 +512,12 @@ export function OrderForm({
             </div>
             <GradientButton
               onClick={handleFormSubmit}
-              disabled={!canSubmit || isSubmitting}
+              disabled={!canSubmit || isSubmitting || isInvoiceItemsLoading}
               size="lg"
               className="w-full"
             >
               <CreditCard className="h-5 w-5 mr-2" />
-              {isSubmitting
+              {isSubmitting || isInvoiceItemsLoading
                 ? "Procesando..."
                 : isEditing
                 ? "Actualizar Pedido"
@@ -536,6 +525,7 @@ export function OrderForm({
             </GradientButton>
           </CardContent>
         </Card>
+        
         {orderItems.length > 0 && (
           <Card>
             <CardHeader>
@@ -564,14 +554,17 @@ export function OrderForm({
                         ${item.subtotal.toFixed(2)}
                       </TableCell>
                       <TableCell className="text-right">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleRemoveItem(item.id)}
-                          className="h-8 w-8"
-                        >
-                          <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
+                        {/* --- MODIFICADO: El botón de eliminar solo aparece si no hay facturas --- */}
+                        {selectedInvoices.length === 0 && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleRemoveItem(item.id)}
+                            className="h-8 w-8"
+                          >
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        )}
                       </TableCell>
                     </TableRow>
                   ))}
