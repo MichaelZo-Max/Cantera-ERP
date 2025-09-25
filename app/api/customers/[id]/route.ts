@@ -7,7 +7,6 @@ import { z } from "zod";
 
 export const dynamic = "force-dynamic";
 
-// ✨ MEJORA: Utilidad para traer un cliente usando la VISTA para consistencia.
 async function fetchCustomerById(id: number) {
   const rows = await executeQuery<any>(
     `SELECT * FROM RIP.VW_APP_CLIENTES WHERE id = @id;`,
@@ -16,7 +15,6 @@ async function fetchCustomerById(id: number) {
   const r = rows[0];
   if (!r) return null;
 
-  // El mapeo es directo gracias a la vista.
   return {
     id: r.id,
     name: r.name ?? "",
@@ -24,7 +22,7 @@ async function fetchCustomerById(id: number) {
     address: r.address ?? null,
     phone: r.phone ?? null,
     email: r.email ?? null,
-    is_active: r.is_active,
+    is_active: r.is_active === 1,
   };
 }
 

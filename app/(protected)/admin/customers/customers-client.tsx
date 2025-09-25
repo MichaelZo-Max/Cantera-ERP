@@ -58,39 +58,48 @@ type FormErrors = {
 };
 
 // --- Función mejorada para generar los items de la paginación ---
-const getPaginationItems = (currentPage: number, pageCount: number, siblingCount = 1) => {
-    const totalPageNumbers = siblingCount + 5;
+const getPaginationItems = (
+  currentPage: number,
+  pageCount: number,
+  siblingCount = 1
+) => {
+  const totalPageNumbers = siblingCount + 5;
 
-    if (pageCount <= totalPageNumbers) {
-        return Array.from({ length: pageCount }, (_, i) => i + 1);
-    }
+  if (pageCount <= totalPageNumbers) {
+    return Array.from({ length: pageCount }, (_, i) => i + 1);
+  }
 
-    const leftSiblingIndex = Math.max(currentPage - siblingCount, 1);
-    const rightSiblingIndex = Math.min(currentPage + siblingCount, pageCount);
+  const leftSiblingIndex = Math.max(currentPage - siblingCount, 1);
+  const rightSiblingIndex = Math.min(currentPage + siblingCount, pageCount);
 
-    const shouldShowLeftDots = leftSiblingIndex > 2;
-    const shouldShowRightDots = rightSiblingIndex < pageCount - 1;
+  const shouldShowLeftDots = leftSiblingIndex > 2;
+  const shouldShowRightDots = rightSiblingIndex < pageCount - 1;
 
-    if (!shouldShowLeftDots && shouldShowRightDots) {
-        let leftItemCount = 3 + 2 * siblingCount;
-        let leftRange = Array.from({ length: leftItemCount }, (_, i) => i + 1);
-        return [...leftRange, "...", pageCount];
-    }
+  if (!shouldShowLeftDots && shouldShowRightDots) {
+    let leftItemCount = 3 + 2 * siblingCount;
+    let leftRange = Array.from({ length: leftItemCount }, (_, i) => i + 1);
+    return [...leftRange, "...", pageCount];
+  }
 
-    if (shouldShowLeftDots && !shouldShowRightDots) {
-        let rightItemCount = 3 + 2 * siblingCount;
-        let rightRange = Array.from({ length: rightItemCount }, (_, i) => pageCount - rightItemCount + i + 1);
-        return [1, "...", ...rightRange];
-    }
+  if (shouldShowLeftDots && !shouldShowRightDots) {
+    let rightItemCount = 3 + 2 * siblingCount;
+    let rightRange = Array.from(
+      { length: rightItemCount },
+      (_, i) => pageCount - rightItemCount + i + 1
+    );
+    return [1, "...", ...rightRange];
+  }
 
-    if (shouldShowLeftDots && shouldShowRightDots) {
-        let middleRange = Array.from({ length: rightSiblingIndex - leftSiblingIndex + 1 }, (_, i) => leftSiblingIndex + i);
-        return [1, "...", ...middleRange, "...", pageCount];
-    }
+  if (shouldShowLeftDots && shouldShowRightDots) {
+    let middleRange = Array.from(
+      { length: rightSiblingIndex - leftSiblingIndex + 1 },
+      (_, i) => leftSiblingIndex + i
+    );
+    return [1, "...", ...middleRange, "...", pageCount];
+  }
 
-    return [];
+  return [];
 };
-
 
 export function CustomersClientUI({
   data,
@@ -427,7 +436,7 @@ export function CustomersClientUI({
                 }
               />
             </PaginationItem>
-            
+
             {/* Lógica de renderizado mejorada */}
             {paginationItems.map((item, index) =>
               item === "..." ? (
@@ -442,7 +451,6 @@ export function CustomersClientUI({
                       e.preventDefault();
                       handlePageChange(item as number);
                     }}
-                    // ✨ CORRECCIÓN FINAL: Usando 'is_active' como confirmaste.
                     is_active={currentPage === item}
                   >
                     {item}
@@ -484,7 +492,53 @@ export function CustomersClientUI({
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-6 pt-4">
-           {/* ...el resto del formulario no cambia... */}
+            {/* Campo para el Nombre */}
+            <div>
+              <Label htmlFor="name">Nombre del Cliente</Label>
+              <Input
+                id="name"
+                placeholder="Ej: John Doe"
+                value={formData.name} // <-- AÑADE ESTO: Muestra el valor del estado.
+                onChange={(e) =>
+                  setFormData({ ...formData, name: e.target.value })
+                } // <-- AÑADE ESTO: Actualiza el estado al escribir.
+              />
+              {formErrors.name && (
+                <p className="text-red-500 text-sm mt-1">{formErrors.name}</p>
+              )}
+            </div>
+
+            {/* Campo para el RIF */}
+            <div>
+              <Label htmlFor="rif">RIF</Label>
+              <Input
+                id="rif"
+                placeholder="Ej: J-12345678-9"
+                value={formData.rif} // <-- AÑADE ESTO
+                onChange={(e) =>
+                  setFormData({ ...formData, rif: e.target.value })
+                } // <-- AÑADE ESTO
+              />
+              {formErrors.rif && (
+                <p className="text-red-500 text-sm mt-1">{formErrors.rif}</p>
+              )}
+            </div>
+
+            {/* Repite este patrón para los demás campos: address, email, phone... */}
+
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setShowDialog(false)}
+                disabled={isSubmitting}
+              >
+                Cancelar
+              </Button>
+              <GradientButton type="submit" disabled={isSubmitting}>
+                {isSubmitting ? "Guardando..." : "Guardar Cambios"}
+              </GradientButton>
+            </DialogFooter>
           </form>
         </DialogContent>
       </Dialog>

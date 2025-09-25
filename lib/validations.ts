@@ -132,6 +132,7 @@ export const customerSchema = z.object({
   email: z
     .string()
     .email("El formato del email no es válido.")
+    .or(z.literal(''))
     .optional()
     .transform((val) => (val === "" ? undefined : val)),
   phone: z
