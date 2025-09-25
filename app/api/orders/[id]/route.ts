@@ -257,11 +257,15 @@ export async function PUT(
     }
 
     revalidateTag("orders");
-    revalidateTag(`order-${id}`);
+    
+    const getOrderNumberSql = `SELECT order_number FROM RIP.APP_PEDIDOS WHERE id = @id;`;
+    const orderResult = await executeQuery(getOrderNumberSql, [{ name: "id", type: TYPES.Int, value: id }]);
+    const order_number = orderResult[0]?.order_number;
 
     return NextResponse.json({
       message: "Pedido actualizado correctamente",
       id: id,
+      order_number: order_number,
     });
   } catch (error) {
     console.error(`[API_ORDERS_ID_PUT]`, error);
