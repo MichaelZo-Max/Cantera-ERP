@@ -101,7 +101,7 @@ export function OrdersListClientUI({ initialOrders }: { initialOrders: Order[] }
         description="Consulta y gestiona los pedidos"
         actions={
           <Button asChild>
-            <Link href="/cashier/orders/new">
+            <Link href="/cashier/orders">
               <FileText className="h-4 w-4 mr-2" />
               <span>Nuevo Pedido</span>
             </Link>

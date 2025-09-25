@@ -284,7 +284,7 @@ export function UsersClientUI({ initialUsers }: { initialUsers: User[] }) {
         ) : (
           filteredUsers.map((user, index) => (
             <AnimatedCard
-              key={user.id}
+              key={user.id.toString()}
               hoverEffect="lift"
               animateIn
               delay={index * 100}

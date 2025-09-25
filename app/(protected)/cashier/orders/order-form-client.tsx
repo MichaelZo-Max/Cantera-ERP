@@ -62,7 +62,6 @@ export function OrderFormClient({
       initialDestinations={destinations}
       initialTrucks={trucks}
       initialDrivers={drivers}
-      initialInvoices={invoices} // Pasa el array vacío
       onSubmit={handleCreateOrder}
       isSubmitting={isSubmitting}
       isEditing={false}

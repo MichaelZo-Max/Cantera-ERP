@@ -117,8 +117,66 @@ export async function PUT(
       return NextResponse.json(validation.error.errors, { status: 400 });
     }
 
-    const { items, truck_ids, driver_ids, invoices, ...orderData } =
-      validation.data;
+    const {
+      items: itemsFromClient, // Renombramos para claridad
+      truck_ids,
+      driver_ids,
+      invoices,
+      ...orderData
+    } = validation.data;
+
+    // --- 👇 LÓGICA DE SEGURIDAD PARA OBTENER ITEMS CONFIABLES ---
+    let trustedItems: typeof itemsFromClient = [];
+
+    if (invoices && invoices.length > 0) {
+      // Si hay facturas, IGNORAMOS los items del cliente y los obtenemos de la DB.
+      const invoiceParams = invoices.flatMap((inv, index) => [
+        { name: `series_${index}`, type: TYPES.NVarChar, value: inv.invoice_series },
+        { name: `number_${index}`, type: TYPES.Int, value: inv.invoice_number },
+        { name: `n_${index}`, type: TYPES.NVarChar, value: inv.invoice_n },
+      ]);
+
+      const conditions = invoices.map((_, index) =>
+          `(invoice_series = @series_${index} AND invoice_number = @number_${index} AND invoice_n = @n_${index})`
+        ).join(" OR ");
+
+      const itemsQuery = `
+        SELECT
+            product_id AS id,
+            product_name AS name,
+            product_code AS code,
+            price_per_unit,
+            unit,
+            quantity_pending AS available_quantity
+        FROM 
+            RIP.VW_APP_FACTURA_ITEMS_PENDIENTES
+        WHERE 
+            ${conditions};
+      `;
+      
+      const productsFromInvoices = await executeQuery(itemsQuery, invoiceParams);
+
+      // Convertimos los productos seguros de la DB a la estructura de 'items' del pedido
+      trustedItems = productsFromInvoices.map((p: any) => ({
+        product_id: p.id,
+        quantity: p.available_quantity,
+        price_per_unit: p.price_per_unit ?? 0,
+        unit: p.unit || 'UNIDAD'
+      }));
+
+    } else {
+      // Si no hay facturas, es un pedido manual y confiamos en los items del cliente.
+      trustedItems = itemsFromClient;
+    }
+
+    if (trustedItems.length === 0) {
+        return NextResponse.json({ error: "El pedido debe tener al menos un producto." }, { status: 400 });
+    }
+    // --- FIN DE LA LÓGICA DE SEGURIDAD ---
+
+
+    // ===== INICIO DE LA TRANSACCIÓN EN LA BASE DE DATOS =====
+    // (Opcional pero recomendado: envolver todo esto en una transacción)
 
     const updateOrderQuery = `
       UPDATE RIP.APP_PEDIDOS
@@ -130,67 +188,49 @@ export async function PUT(
     await executeQuery(updateOrderQuery, [
       { name: "id", type: TYPES.Int, value: id },
       { name: "customer_id", type: TYPES.Int, value: orderData.customer_id },
-      {
-        name: "destination_id",
-        type: TYPES.Int,
-        value: orderData.destination_id,
-      },
+      { name: "destination_id", type: TYPES.Int, value: orderData.destination_id },
     ]);
 
-    // 1. Actualizar Items (sin cambios, método "borrar e insertar")
+    // 1. Actualizar Items (usando la lista segura "trustedItems")
     await executeQuery(
       `DELETE FROM RIP.APP_PEDIDOS_ITEMS WHERE order_id = @id`,
       [{ name: "id", type: TYPES.Int, value: id }]
     );
-    for (const item of items) {
+    for (const item of trustedItems) { // <-- ❗️ Usamos la lista segura
       const insertItemQuery = `
-
-      INSERT INTO RIP.APP_PEDIDOS_ITEMS (order_id, product_id, quantity, price_per_unit, unit)
-
-      VALUES (@order_id, @product_id, @quantity, @price_per_unit, @unit);
-
-    `;
-
+        INSERT INTO RIP.APP_PEDIDOS_ITEMS (order_id, product_id, quantity, price_per_unit, unit)
+        VALUES (@order_id, @product_id, @quantity, @price_per_unit, @unit);
+      `;
       await executeQuery(insertItemQuery, [
         { name: "order_id", type: TYPES.Int, value: id },
         { name: "product_id", type: TYPES.Int, value: item.product_id },
         { name: "quantity", type: TYPES.Decimal, value: item.quantity },
-        {
-          name: "price_per_unit",
-          type: TYPES.Decimal,
-          value: item.price_per_unit,
-        },
+        { name: "price_per_unit", type: TYPES.Decimal, value: item.price_per_unit },
         { name: "unit", type: TYPES.NVarChar, value: item.unit },
       ]);
     }
 
+    // 2. Actualizar Facturas
     await executeQuery(
       `DELETE FROM RIP.APP_PEDIDOS_FACTURAS WHERE pedido_id = @id`,
       [{ name: "id", type: TYPES.Int, value: id }]
     );
-    // 3. Insertar las nuevas asociaciones de facturas
-    for (const invoice of invoices) {
-      const insertInvoiceQuery = `
-            INSERT INTO RIP.APP_PEDIDOS_FACTURAS (pedido_id, invoice_series, invoice_number, invoice_n)
-            VALUES (@pedido_id, @invoice_series, @invoice_number, @invoice_n);
+    if (invoices && Array.isArray(invoices)) {
+      for (const invoice of invoices) {
+        const insertInvoiceQuery = `
+          INSERT INTO RIP.APP_PEDIDOS_FACTURAS (pedido_id, invoice_series, invoice_number, invoice_n)
+          VALUES (@pedido_id, @invoice_series, @invoice_number, @invoice_n);
         `;
-      await executeQuery(insertInvoiceQuery, [
-        { name: "pedido_id", type: TYPES.Int, value: id },
-        {
-          name: "invoice_series",
-          type: TYPES.NVarChar,
-          value: invoice.invoice_series,
-        },
-        {
-          name: "invoice_number",
-          type: TYPES.Int,
-          value: invoice.invoice_number,
-        },
-        { name: "invoice_n", type: TYPES.NVarChar, value: invoice.invoice_n },
-      ]);
+        await executeQuery(insertInvoiceQuery, [
+          { name: "pedido_id", type: TYPES.Int, value: id },
+          { name: "invoice_series", type: TYPES.NVarChar, value: invoice.invoice_series },
+          { name: "invoice_number", type: TYPES.Int, value: invoice.invoice_number },
+          { name: "invoice_n", type: TYPES.NVarChar, value: invoice.invoice_n },
+        ]);
+      }
     }
 
-    // 4. Actualizar Camiones (sin cambios)
+    // 3. Actualizar Camiones
     await executeQuery(
       `DELETE FROM RIP.APP_PEDIDOS_CAMIONES WHERE pedido_id = @id`,
       [{ name: "id", type: TYPES.Int, value: id }]
@@ -203,7 +243,7 @@ export async function PUT(
       ]);
     }
 
-    // 5. Actualizar Choferes (sin cambios)
+    // 4. Actualizar Choferes
     await executeQuery(
       `DELETE FROM RIP.APP_PEDIDOS_CHOFERES WHERE pedido_id = @id`,
       [{ name: "id", type: TYPES.Int, value: id }]

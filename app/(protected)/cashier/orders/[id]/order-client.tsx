@@ -57,7 +57,6 @@ export function OrderClient({ orderData, catalogs }: OrderClientProps) {
       initialDestinations={catalogs.destinations}
       initialTrucks={catalogs.trucks}
       initialDrivers={catalogs.drivers}
-      initialInvoices={orderData.invoices || []}
       isEditing
       initialOrderData={orderData}
       onSubmit={handleUpdateOrder}

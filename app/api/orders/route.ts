@@ -30,9 +30,7 @@ export async function GET() {
       ...order,
       // Si `invoices` es un string, lo parseamos. Si no, devolvemos un array vacío.
       invoices:
-        typeof order.invoices === "string"
-          ? JSON.parse(order.invoices)
-          : [],
+        typeof order.invoices === "string" ? JSON.parse(order.invoices) : [],
       client: {
         id: order.customer_id,
         name: order.customer_name,
@@ -86,52 +84,64 @@ export async function POST(req: Request) {
 
     let trustedItems: typeof itemsFromClient = [];
 
-    // --- 👇 NUEVA LÓGICA DE SEGURIDAD ---
     if (invoices && invoices.length > 0) {
       // Si hay facturas, IGNORAMOS los items del cliente y los obtenemos de la DB.
-      
-      // Creamos placeholders para la consulta IN (...)
-      const invoicePlaceholders = invoices.map((_, index) => 
-        `(@series_${index}, @number_${index}, @n_${index})`
-      ).join(',');
 
-      // Preparamos los parámetros para la consulta
+      // 1. Preparamos los parámetros para la consulta (esto no cambia)
       const invoiceParams = invoices.flatMap((inv, index) => [
-        { name: `series_${index}`, type: TYPES.NVarChar, value: inv.invoice_series },
+        {
+          name: `series_${index}`,
+          type: TYPES.NVarChar,
+          value: inv.invoice_series,
+        },
         { name: `number_${index}`, type: TYPES.Int, value: inv.invoice_number },
         { name: `n_${index}`, type: TYPES.NVarChar, value: inv.invoice_n },
       ]);
-      
-      const itemsQuery = `
-        SELECT
-            p.id,
-            p.name,
-            p.code,
-            p.price_per_unit,
-            p.unit,
-            fi.quantity_pending AS available_quantity -- Usamos la cantidad pendiente de la factura
-        FROM RIP.VW_APP_FACTURA_ITEMS_PENDIENTES fi
-        JOIN RIP.VW_APP_PRODUCTOS p ON fi.product_code = p.code
-        WHERE (fi.invoice_series, fi.invoice_number, fi.invoice_n) IN (VALUES ${invoicePlaceholders});
-      `;
 
-      const productsFromInvoices: InvoiceProduct[] = await executeQuery(itemsQuery, invoiceParams);
+      const conditions = invoices
+        .map(
+          (_, index) =>
+            `(invoice_series = @series_${index} AND invoice_number = @number_${index} AND invoice_n = @n_${index})`
+        )
+        .join(" OR ");
+
+      // 3. Construimos la consulta final con la nueva cláusula WHERE
+      const itemsQuery = `
+    SELECT
+        product_id AS id,
+        product_name AS name,
+        product_code AS code,
+        price_per_unit,
+        unit,
+        quantity_pending AS available_quantity
+    FROM 
+        RIP.VW_APP_FACTURA_ITEMS_PENDIENTES
+    WHERE 
+        ${conditions};
+`;
+
+      const productsFromInvoices: InvoiceProduct[] = await executeQuery(
+        itemsQuery,
+        invoiceParams
+      );
 
       // Convertimos los productos seguros de la DB a la estructura de 'items' del pedido
-      trustedItems = productsFromInvoices.map(p => ({
+      trustedItems = productsFromInvoices.map((p) => ({
         product_id: p.id,
         quantity: p.available_quantity,
         price_per_unit: p.price_per_unit ?? 0,
-        unit: p.unit || 'UNIDAD'
+        unit: p.unit || "UNIDAD",
       }));
-
     } else {
       // Si no hay facturas, confiamos en los items que el cliente construyó manualmente.
       trustedItems = itemsFromClient;
     }
 
     if (trustedItems.length === 0) {
-        return NextResponse.json({ error: "El pedido debe tener al menos un producto." }, { status: 400 });
+      return NextResponse.json(
+        { error: "El pedido debe tener al menos un producto." },
+        { status: 400 }
+      );
     }
     // --- FIN DE LA LÓGICA DE SEGURIDAD ---
 
@@ -148,7 +158,9 @@ export async function POST(req: Request) {
     ]);
 
     if (!headerResult || headerResult.length === 0 || !headerResult[0].id) {
-      throw new Error("Falló la creación del encabezado de la orden en la base de datos.");
+      throw new Error(
+        "Falló la creación del encabezado de la orden en la base de datos."
+      );
     }
 
     const newOrderId = headerResult[0].id;
@@ -164,24 +176,36 @@ export async function POST(req: Request) {
         { name: "product_id", type: TYPES.Int, value: item.product_id },
         { name: "quantity", type: TYPES.Decimal, value: item.quantity },
         { name: "unit", type: TYPES.NVarChar, value: item.unit },
-        { name: "price_per_unit", type: TYPES.Decimal, value: item.price_per_unit },
+        {
+          name: "price_per_unit",
+          type: TYPES.Decimal,
+          value: item.price_per_unit,
+        },
       ]);
     }
-    
+
     // Si hay facturas, las asociamos
     if (invoices && invoices.length > 0) {
-        for (const invoice of invoices) {
-            const invoiceSql = `
+      for (const invoice of invoices) {
+        const invoiceSql = `
                 INSERT INTO RIP.APP_PEDIDOS_FACTURAS (pedido_id, invoice_series, invoice_number, invoice_n)
                 VALUES (@pedido_id, @invoice_series, @invoice_number, @invoice_n);
             `;
-            await executeQuery(invoiceSql, [
-                { name: "pedido_id", type: TYPES.Int, value: newOrderId },
-                { name: "invoice_series", type: TYPES.NVarChar, value: invoice.invoice_series },
-                { name: "invoice_number", type: TYPES.Int, value: invoice.invoice_number },
-                { name: "invoice_n", type: TYPES.NVarChar, value: invoice.invoice_n },
-            ]);
-        }
+        await executeQuery(invoiceSql, [
+          { name: "pedido_id", type: TYPES.Int, value: newOrderId },
+          {
+            name: "invoice_series",
+            type: TYPES.NVarChar,
+            value: invoice.invoice_series,
+          },
+          {
+            name: "invoice_number",
+            type: TYPES.Int,
+            value: invoice.invoice_number,
+          },
+          { name: "invoice_n", type: TYPES.NVarChar, value: invoice.invoice_n },
+        ]);
+      }
     }
 
     // Asociar Camiones

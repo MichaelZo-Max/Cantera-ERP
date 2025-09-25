@@ -582,3 +582,51 @@ GO
 
 PRINT 'Vista RIP.VW_APP_FACTURA_ITEMS creada/actualizada con precios en USD.';
 GO
+
+-- =================================================================
+-- VISTA PARA OBTENER ITEMS PENDIENTES DE DESPACHO DE LAS FACTURAS
+-- Propósito: Calcula la cantidad de cada producto en una factura que aún no ha sido despachada.
+-- Lógica:
+-- 1. Usa la vista VW_APP_FACTURA_ITEMS para obtener el total de items por factura.
+-- 2. Calcula cuánto de cada item ya fue despachado en todos los pedidos.
+-- 3. Resta el total despachado del total de la factura para obtener el pendiente.
+-- =================================================================
+IF OBJECT_ID('RIP.VW_APP_FACTURA_ITEMS_PENDIENTES', 'V') IS NOT NULL
+BEGIN
+    DROP VIEW RIP.VW_APP_FACTURA_ITEMS_PENDIENTES;
+END
+GO
+
+CREATE VIEW RIP.VW_APP_FACTURA_ITEMS_PENDIENTES AS
+-- CTE para calcular el total despachado por producto a través de todos los pedidos
+WITH CantidadDespachada AS (
+    SELECT
+        pi.product_id,
+        SUM(di.dispatched_quantity) AS total_dispatched
+    FROM RIP.APP_DESPACHOS_ITEMS di
+    JOIN RIP.APP_PEDIDOS_ITEMS pi ON di.pedido_item_id = pi.id
+    GROUP BY pi.product_id
+)
+SELECT
+    fi.invoice_series,
+    fi.invoice_number,
+    fi.invoice_n,
+    fi.id AS product_id,  -- id del producto
+    fi.codigo AS product_code, -- código de referencia que usa tu API
+    fi.name AS product_name,
+    fi.price_per_unit,
+    fi.unit,
+    fi.quantity AS total_quantity_in_invoice, -- Cantidad total del item en la factura
+    ISNULL(cd.total_dispatched, 0) AS dispatched_quantity, -- Cantidad ya despachada de ese producto
+    (fi.quantity - ISNULL(cd.total_dispatched, 0)) AS quantity_pending -- La resta es lo que queda disponible
+FROM
+    RIP.VW_APP_FACTURA_ITEMS fi
+LEFT JOIN
+    CantidadDespachada cd ON fi.id = cd.product_id
+WHERE
+    -- Solo mostramos items que todavía tienen cantidad pendiente de despacho
+    (fi.quantity - ISNULL(cd.total_dispatched, 0)) > 0;
+GO
+
+PRINT 'Vista RIP.VW_APP_FACTURA_ITEMS_PENDIENTES creada/actualizada.';
+GO
