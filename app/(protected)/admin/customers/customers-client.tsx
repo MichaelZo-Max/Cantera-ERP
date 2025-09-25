@@ -451,6 +451,7 @@ export function CustomersClientUI({
                       e.preventDefault();
                       handlePageChange(item as number);
                     }}
+                    // ✨ CORRECCIÓN FINAL: Usando 'is_active' como confirmaste.
                     is_active={currentPage === item}
                   >
                     {item}
@@ -491,17 +492,18 @@ export function CustomersClientUI({
                 : "Completa los datos del nuevo cliente."}
             </DialogDescription>
           </DialogHeader>
-          <form onSubmit={handleSubmit} className="space-y-6 pt-4">
+          <form onSubmit={handleSubmit} className="space-y-4 pt-4">
             {/* Campo para el Nombre */}
             <div>
               <Label htmlFor="name">Nombre del Cliente</Label>
               <Input
                 id="name"
                 placeholder="Ej: John Doe"
-                value={formData.name} // <-- AÑADE ESTO: Muestra el valor del estado.
+                value={formData.name}
                 onChange={(e) =>
                   setFormData({ ...formData, name: e.target.value })
-                } // <-- AÑADE ESTO: Actualiza el estado al escribir.
+                }
+                className="mt-1.5" // <-- AÑADE ESTA LÍNEA
               />
               {formErrors.name && (
                 <p className="text-red-500 text-sm mt-1">{formErrors.name}</p>
@@ -514,19 +516,72 @@ export function CustomersClientUI({
               <Input
                 id="rif"
                 placeholder="Ej: J-12345678-9"
-                value={formData.rif} // <-- AÑADE ESTO
+                value={formData.rif}
                 onChange={(e) =>
                   setFormData({ ...formData, rif: e.target.value })
-                } // <-- AÑADE ESTO
+                }
+                className="mt-1.5" // <-- AÑADE ESTA LÍNEA
               />
               {formErrors.rif && (
                 <p className="text-red-500 text-sm mt-1">{formErrors.rif}</p>
               )}
             </div>
 
-            {/* Repite este patrón para los demás campos: address, email, phone... */}
+            {/* Campo para la Dirección */}
+            <div>
+              <Label htmlFor="address">Dirección</Label>
+              <Input
+                id="address"
+                placeholder="Ej: Av. Principal, Edificio Central"
+                value={formData.address}
+                onChange={(e) =>
+                  setFormData({ ...formData, address: e.target.value })
+                }
+                className="mt-1.5" // <-- AÑADE ESTA LÍNEA
+              />
+              {formErrors.address && (
+                <p className="text-red-500 text-sm mt-1">
+                  {formErrors.address}
+                </p>
+              )}
+            </div>
 
-            <DialogFooter>
+            {/* Campo para el Email */}
+            <div>
+              <Label htmlFor="email">Email</Label>
+              <Input
+                id="email"
+                type="email"
+                placeholder="Ej: cliente@ejemplo.com"
+                value={formData.email}
+                onChange={(e) =>
+                  setFormData({ ...formData, email: e.target.value })
+                }
+                className="mt-1.5" // <-- AÑADE ESTA LÍNEA
+              />
+              {formErrors.email && (
+                <p className="text-red-500 text-sm mt-1">{formErrors.email}</p>
+              )}
+            </div>
+
+            {/* Campo para el Teléfono */}
+            <div>
+              <Label htmlFor="phone">Teléfono</Label>
+              <Input
+                id="phone"
+                placeholder="Ej: 0412-3456789"
+                value={formData.phone}
+                onChange={(e) =>
+                  setFormData({ ...formData, phone: e.target.value })
+                }
+                className="mt-1.5" // <-- AÑADE ESTA LÍNEA
+              />
+              {formErrors.phone && (
+                <p className="text-red-500 text-sm mt-1">{formErrors.phone}</p>
+              )}
+            </div>
+
+            <DialogFooter className="pt-4">
               <Button
                 type="button"
                 variant="outline"
@@ -536,7 +591,12 @@ export function CustomersClientUI({
                 Cancelar
               </Button>
               <GradientButton type="submit" disabled={isSubmitting}>
-                {isSubmitting ? "Guardando..." : "Guardar Cambios"}
+                <Save className="h-4 w-4 mr-2" />
+                {isSubmitting
+                  ? "Guardando..."
+                  : editingCustomer
+                  ? "Guardar Cambios"
+                  : "Crear Cliente"}
               </GradientButton>
             </DialogFooter>
           </form>
