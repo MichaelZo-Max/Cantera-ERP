@@ -19,8 +19,9 @@ const mapDbStatusToUi = (status: string): "PENDING" | "CARGADA" | "EXITED" => {
 async function getData() {
   noStore(); // Asegura que los datos sean siempre frescos.
 
-  // --- PASO 1: MODIFICAR LA CONSULTA SQL ---
-  // Añadimos la subconsulta FOR JSON PATH para traer las facturas en ambas partes del UNION.
+  // --- ✨ CONSULTA SQL OPTIMIZADA ---
+  // Se reemplazan los JOIN a las vistas por JOINs directos a las tablas base
+  // para aprovechar los nuevos índices y mejorar el rendimiento.
   const mainQuery = `
     -- CTE para calcular el total despachado por cada item de pedido a través de todos los viajes.
     WITH DispatchedTotals AS (
@@ -34,43 +35,42 @@ async function getData() {
         'DELIVERY' as type,
         d.id as id, d.status as estado, d.notes, d.load_photo_url as loadPhoto, d.exit_photo_url as exitPhoto,
         p.id as order_id, p.order_number, p.status as orderStatus, p.created_at as orderCreatedAt, p.customer_id,
-        c.id as client_id, c.name as client_name,
+        c.CODCLIENTE as client_id, c.NOMBRECLIENTE as client_name, -- ✅ CAMBIO: Tabla directa dbo.CLIENTES
         t.id as truck_id, t.placa,
         dr.id as driver_id, dr.name as driver_name, dr.phone as driver_phone,
         pi.id as pedido_item_id, pi.quantity as item_quantity, pi.unit as item_unit, pi.price_per_unit,
-        prod.id as product_id, prod.name as product_name, prod.unit as product_unit,
+        prod.CODARTICULO as product_id, prod.DESCRIPCION as product_name, prod.UNIDADMEDIDA as product_unit, -- ✅ CAMBIO: Tabla directa dbo.ARTICULOS
         ISNULL(dt.total_dispatched, 0) as total_dispatched_quantity,
         NULL as order_only_id, NULL as order_only_number, NULL as order_only_customer_id, NULL as order_only_client_name, NULL as order_only_status, NULL as order_only_created_at,
         (SELECT pf.invoice_series, pf.invoice_number, pf.invoice_n, ISNULL(pf.invoice_series + '-' + CAST(pf.invoice_number AS VARCHAR) + pf.invoice_n COLLATE DATABASE_DEFAULT, '') AS invoice_full_number FROM RIP.APP_PEDIDOS_FACTURAS pf WHERE pf.pedido_id = p.id FOR JSON PATH) as invoices_json
     FROM RIP.APP_DESPACHOS d
     JOIN RIP.APP_PEDIDOS p ON p.id = d.order_id
-    JOIN RIP.VW_APP_CLIENTES c ON c.id = p.customer_id
+    JOIN dbo.CLIENTES c ON c.CODCLIENTE = p.customer_id -- ✅ CAMBIO: JOIN a tabla directa
     JOIN RIP.APP_CAMIONES t ON t.id = d.truck_id
     JOIN RIP.APP_CHOFERES dr ON dr.id = d.driver_id
     LEFT JOIN RIP.APP_PEDIDOS_ITEMS pi ON pi.order_id = p.id
-    LEFT JOIN RIP.VW_APP_PRODUCTOS prod ON prod.id = pi.product_id
+    LEFT JOIN dbo.ARTICULOS prod ON prod.CODARTICULO = pi.product_id -- ✅ CAMBIO: JOIN a tabla directa
     LEFT JOIN DispatchedTotals dt ON dt.pedido_item_id = pi.id
 
     UNION ALL
 
-    SELECT 
+    SELECT
         'ACTIVE_ORDER' as type,
         NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, -- 25 NULLs para coincidir
-        p.id, p.order_number, p.customer_id, c.name, p.status, p.created_at,
+        p.id, p.order_number, p.customer_id, c.NOMBRECLIENTE, p.status, p.created_at, -- ✅ CAMBIO: Tabla directa dbo.CLIENTES
         (SELECT pf.invoice_series, pf.invoice_number, pf.invoice_n, ISNULL(pf.invoice_series + '-' + CAST(pf.invoice_number AS VARCHAR) + pf.invoice_n COLLATE DATABASE_DEFAULT, '') AS invoice_full_number FROM RIP.APP_PEDIDOS_FACTURAS pf WHERE pf.pedido_id = p.id FOR JSON PATH) as invoices_json
     FROM RIP.APP_PEDIDOS p
-    JOIN RIP.VW_APP_CLIENTES c ON c.id = p.customer_id
+    JOIN dbo.CLIENTES c ON c.CODCLIENTE = p.customer_id -- ✅ CAMBIO: JOIN a tabla directa
     WHERE p.status IN ('PAID', 'PARTIALLY_DISPATCHED');
   `;
 
   const results = await executeQuery(mainQuery);
 
-  // Procesamiento de los resultados para construir los objetos
+  // Procesamiento de los resultados para construir los objetos (sin cambios aquí)
   const deliveriesMap = new Map<number, Delivery>();
   const activeOrders: Order[] = [];
 
   for (const row of results) {
-    // --- PASO 2: PROCESAR EL JSON DE FACTURAS ---
     const invoices = row.invoices_json ? JSON.parse(row.invoices_json) : [];
 
     switch (row.type) {
@@ -132,14 +132,13 @@ async function getData() {
           },
           status: row.order_only_status,
           created_at: row.order_only_created_at,
-          items: [], // Los items de pedidos activos no se cargan en esta vista principal
-          invoices: invoices, // ✅ Propiedad 'invoices' AÑADIDA
+          items: [],
+          invoices: invoices,
         });
         break;
     }
   }
 
-  // Ordenar los pedidos activos por fecha de creación descendente
   activeOrders.sort(
     (a, b) =>
       new Date(b.created_at).getTime() - new Date(a.created_at).getTime()

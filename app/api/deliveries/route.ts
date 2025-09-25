@@ -9,7 +9,7 @@ import { createDeliverySchema } from "@/lib/validations";
 
 export const dynamic = "force-dynamic";
 
-// --- Helpers ---
+// --- Helpers (sin cambios) ---
 function mapDbStatusToUi(status: string): "PENDING" | "CARGADA" | "EXITED" {
   if (!status) return "PENDING";
   const s = status.toUpperCase();
@@ -19,82 +19,59 @@ function mapDbStatusToUi(status: string): "PENDING" | "CARGADA" | "EXITED" {
   return "PENDING";
 }
 
-// ======================= GET /api/deliveries =======================
+// ======================= GET /api/deliveries (OPTIMIZADO) =======================
 export async function GET(_request: Request) {
   try {
+    // ✅ CONSULTA OPTIMIZADA: Se usan JOINs a tablas directas.
     const listQuery = `
       SELECT
-          d.id,
-          d.status              AS estado,
-          d.notes,
-          d.load_photo_url      AS loadPhoto,
-          d.exit_photo_url      AS exitPhoto,
-          p.id                  AS order_id,
-          p.order_number,
-          p.customer_id,
-          p.status              AS order_status,
-          p.created_at          AS order_created_at,
-          c.id                  AS client_id,
-          c.name                AS client_name,
-          t.id                  AS truck_id,
-          t.placa,
-          dr.id                 AS driver_id,
-          dr.name               AS driver_name,
-          dr.phone              AS driver_phone,
+          d.id, d.status AS estado, d.notes, d.load_photo_url AS loadPhoto, d.exit_photo_url AS exitPhoto,
+          p.id AS order_id, p.order_number, p.customer_id, p.status AS order_status, p.created_at AS order_created_at,
+          c.CODCLIENTE AS client_id, c.NOMBRECLIENTE AS client_name, -- ✅ CAMBIO
+          t.id AS truck_id, t.placa,
+          dr.id AS driver_id, dr.name AS driver_name, dr.phone AS driver_phone,
           (
               SELECT 
-                  pf.invoice_series,
-                  pf.invoice_number,
-                  pf.invoice_n,
+                  pf.invoice_series, pf.invoice_number, pf.invoice_n,
                   ISNULL(pf.invoice_series + '-' + CAST(pf.invoice_number AS VARCHAR) + pf.invoice_n COLLATE DATABASE_DEFAULT, '') AS invoice_full_number
               FROM RIP.APP_PEDIDOS_FACTURAS pf
               WHERE pf.pedido_id = p.id
               FOR JSON PATH
           ) AS order_invoices_json
       FROM RIP.APP_DESPACHOS d
-      JOIN RIP.APP_PEDIDOS p              ON p.id = d.order_id
-      JOIN RIP.VW_APP_CLIENTES c          ON c.id = p.customer_id
-      JOIN RIP.APP_CAMIONES t             ON t.id = d.truck_id
-      JOIN RIP.APP_CHOFERES dr            ON dr.id = d.driver_id
+      JOIN RIP.APP_PEDIDOS p        ON p.id = d.order_id
+      JOIN dbo.CLIENTES c           ON c.CODCLIENTE = p.customer_id -- ✅ CAMBIO
+      JOIN RIP.APP_CAMIONES t       ON t.id = d.truck_id
+      JOIN RIP.APP_CHOFERES dr      ON dr.id = d.driver_id
       ORDER BY d.id DESC;
     `;
-
     const deliveryRows = await executeQuery(listQuery, []);
     
-    // Usamos un Map para evitar procesar la misma orden múltiples veces
     const orderItemsCache = new Map<number, OrderItem[]>();
-    
     const deliveries: Delivery[] = [];
 
     for (const row of deliveryRows) {
       const orderId = row.order_id;
       const deliveryId = row.id;
 
+      // ✅ CONSULTA OPTIMIZADA para items de despacho
       const dispatchItemsQuery = `
         SELECT
-          di.id,
-          di.dispatched_quantity,
-          di.pedido_item_id,
-          oi.product_id,
-          oi.quantity,        -- Añadido
-          oi.price_per_unit,  -- Añadido
-          oi.unit,            -- Añadido
-          oi.order_id,        -- Añadido
-          prod.name as product_name
+          di.id, di.dispatched_quantity, di.pedido_item_id,
+          oi.product_id, oi.quantity, oi.price_per_unit, oi.unit, oi.order_id,
+          prod.DESCRIPCION as product_name -- ✅ CAMBIO
         FROM RIP.APP_DESPACHOS_ITEMS di
         JOIN RIP.APP_PEDIDOS_ITEMS oi ON oi.id = di.pedido_item_id
-        JOIN RIP.VW_APP_PRODUCTOS prod ON prod.id = oi.product_id
+        JOIN dbo.ARTICULOS prod ON prod.CODARTICULO = oi.product_id -- ✅ CAMBIO
         WHERE di.despacho_id = @delivery_id;
       `;
       const dispatchItemRows = await executeQuery(dispatchItemsQuery, [{ name: "delivery_id", type: TYPES.Int, value: deliveryId }]);
       
-      // --- 👇 REEMPLAZA EL MAPEO CON ESTA ESTRUCTURA COMPLETA ---
       const dispatchItems = dispatchItemRows.map((item: any) => ({
         id: item.id,
         despacho_id: deliveryId,
         pedido_item_id: item.pedido_item_id,
         dispatched_quantity: item.dispatched_quantity,
-        // Construimos el 'orderItem' anidado para que coincida con el tipo OrderItem
         orderItem: {
           id: item.pedido_item_id,
           order_id: item.order_id,
@@ -109,14 +86,15 @@ export async function GET(_request: Request) {
           },
         },
       }));
-      // Si aún no hemos buscado los items para esta orden, los buscamos ahora
+      
       if (!orderItemsCache.has(orderId)) {
+        // ✅ CONSULTA OPTIMIZADA para items de pedido
         const itemsQuery = `
             SELECT
                 oi.id, oi.product_id, oi.quantity, oi.unit, oi.price_per_unit,
-                prod.name AS product_name
+                prod.DESCRIPCION AS product_name -- ✅ CAMBIO
             FROM RIP.APP_PEDIDOS_ITEMS oi
-            JOIN RIP.VW_APP_PRODUCTOS prod ON prod.id = oi.product_id
+            JOIN dbo.ARTICULOS prod ON prod.CODARTICULO = oi.product_id -- ✅ CAMBIO
             WHERE oi.order_id = @order_id
             ORDER BY oi.id ASC;
         `;
@@ -160,7 +138,7 @@ export async function GET(_request: Request) {
           name: row.driver_name,
           phone: row.driver_phone ?? undefined,
         },
-        dispatchItems: dispatchItems, // <-- Reemplaza el array vacío con los datos reales
+        dispatchItems: dispatchItems,
       });
     }
 
@@ -171,14 +149,13 @@ export async function GET(_request: Request) {
   }
 }
 
-// ======================= POST /api/deliveries =======================
+// ======================= POST /api/deliveries (OPTIMIZADO) =======================
 export async function POST(request: Request) {
   try {
     const body = await request.json();
     const parsed = createDeliverySchema.parse(body);
     const { order_id, truck_id, driver_id } = parsed;
 
-    // 1. Insertar el nuevo despacho
     const insertQuery = `
       INSERT INTO RIP.APP_DESPACHOS (order_id, truck_id, driver_id, status)
       OUTPUT INSERTED.id
@@ -195,12 +172,12 @@ export async function POST(request: Request) {
     }
     const newDeliveryId = insertResult[0].id;
 
-    // 2. Obtener los detalles completos del despacho recién creado
+    // ✅ CONSULTA OPTIMIZADA
     const selectQuery = `
       SELECT
         d.id, d.status AS estado, d.notes, d.load_photo_url AS loadPhoto, d.exit_photo_url AS exitPhoto,
         p.id AS order_id, p.order_number, p.customer_id, p.status AS order_status, p.created_at AS order_created_at,
-        c.id AS client_id, c.name AS client_name,
+        c.CODCLIENTE AS client_id, c.NOMBRECLIENTE AS client_name, -- ✅ CAMBIO
         t.id AS truck_id, t.placa,
         dr.id AS driver_id, dr.name AS driver_name, dr.phone AS driver_phone,
         (
@@ -212,7 +189,7 @@ export async function POST(request: Request) {
         ) AS order_invoices_json
       FROM RIP.APP_DESPACHOS d
       JOIN RIP.APP_PEDIDOS p ON p.id = d.order_id
-      JOIN RIP.VW_APP_CLIENTES c ON c.id = p.customer_id
+      JOIN dbo.CLIENTES c ON c.CODCLIENTE = p.customer_id -- ✅ CAMBIO
       LEFT JOIN RIP.APP_CAMIONES t ON t.id = d.truck_id
       LEFT JOIN RIP.APP_CHOFERES dr ON dr.id = d.driver_id
       WHERE d.id = @delivery_id;
@@ -227,18 +204,17 @@ export async function POST(request: Request) {
     const r = deliveryRows[0];
     const invoices = r.order_invoices_json ? JSON.parse(r.order_invoices_json) : [];
 
-    // 3. Obtener los items del pedido asociado (ahora que tenemos el order_id)
+    // ✅ CONSULTA OPTIMIZADA
     const itemsQuery = `
       SELECT
         oi.id, oi.product_id, oi.quantity, oi.unit, oi.price_per_unit,
-        prod.name AS product_name
+        prod.DESCRIPCION AS product_name -- ✅ CAMBIO
       FROM RIP.APP_PEDIDOS_ITEMS oi
-      JOIN RIP.VW_APP_PRODUCTOS prod ON prod.id = oi.product_id
+      JOIN dbo.ARTICULOS prod ON prod.CODARTICULO = oi.product_id -- ✅ CAMBIO
       WHERE oi.order_id = @order_id
       ORDER BY oi.id ASC;
     `;
     const itemRows = await executeQuery(itemsQuery, [
-      // --- ESTA ES LA CORRECCIÓN CLAVE ---
       { name: "order_id", type: TYPES.Int, value: r.order_id }, 
     ]);
 
@@ -257,7 +233,6 @@ export async function POST(request: Request) {
       dispatchItems: [],
     }));
     
-    // 4. Construir el payload de respuesta completo
     const payload: Delivery = {
       id: r.id,
       estado: mapDbStatusToUi(r.estado),

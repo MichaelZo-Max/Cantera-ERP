@@ -630,3 +630,42 @@ GO
 
 PRINT 'Vista RIP.VW_APP_FACTURA_ITEMS_PENDIENTES creada/actualizada.';
 GO
+-- Índices para la tabla de Despachos (APP_DESPACHOS)
+-- Clave para búsquedas rápidas por estado, orden, camión y conductor.
+CREATE INDEX IX_APP_DESPACHOS_status ON RIP.APP_DESPACHOS(status);
+CREATE INDEX IX_APP_DESPACHOS_order_id ON RIP.APP_DESPACHOS(order_id);
+CREATE INDEX IX_APP_DESPACHOS_truck_id ON RIP.APP_DESPACHOS(truck_id);
+CREATE INDEX IX_APP_DESPACHOS_driver_id ON RIP.APP_DESPACHOS(driver_id);
+GO
+
+-- Índices para la tabla de Pedidos (APP_PEDIDOS)
+-- Clave para búsquedas por cliente y estado.
+CREATE INDEX IX_APP_PEDIDOS_customer_id ON RIP.APP_PEDIDOS(customer_id);
+CREATE INDEX IX_APP_PEDIDOS_status ON RIP.APP_PEDIDOS(status);
+GO
+
+-- Índices para Items de Pedido (APP_PEDIDOS_ITEMS)
+-- Acelera los joins desde los items hacia el pedido y el producto.
+CREATE INDEX IX_APP_PEDIDOS_ITEMS_order_id ON RIP.APP_PEDIDOS_ITEMS(order_id);
+CREATE INDEX IX_APP_PEDIDOS_ITEMS_product_id ON RIP.APP_PEDIDOS_ITEMS(product_id);
+GO
+
+-- Índices para Items de Despacho (APP_DESPACHOS_ITEMS)
+-- Acelera el cálculo de cantidades despachadas.
+CREATE INDEX IX_APP_DESPACHOS_ITEMS_despacho_id ON RIP.APP_DESPACHOS_ITEMS(despacho_id);
+CREATE INDEX IX_APP_DESPACHOS_ITEMS_pedido_item_id ON RIP.APP_DESPACHOS_ITEMS(pedido_item_id);
+GO
+
+-- Índices para la tabla de unión de Facturas (APP_PEDIDOS_FACTURAS)
+-- Acelera la búsqueda de facturas por pedido.
+CREATE INDEX IX_APP_PEDIDOS_FACTURAS_pedido_id ON RIP.APP_PEDIDOS_FACTURAS(pedido_id);
+GO
+
+-- Índices para tablas de unión de Transporte
+-- Aceleran la búsqueda de camiones y choferes autorizados por pedido.
+CREATE INDEX IX_APP_PEDIDOS_CAMIONES_pedido_id ON RIP.APP_PEDIDOS_CAMIONES(pedido_id);
+CREATE INDEX IX_APP_PEDIDOS_CHOFERES_pedido_id ON RIP.APP_PEDIDOS_CHOFERES(pedido_id);
+GO
+
+PRINT '¡Índices de rendimiento creados correctamente!';
+GO
