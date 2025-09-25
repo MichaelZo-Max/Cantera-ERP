@@ -14,6 +14,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Mail, Lock, Info, ChevronUp, ChevronDown } from "lucide-react"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { useTheme } from "next-themes"
+import { TextGenerateEffect } from "@/components/ui/text-generate-effect" // 1. Importar el componente
 
 export function LoginForm() {
   const router = useRouter()
@@ -104,9 +105,13 @@ export function LoginForm() {
               />
             </div>
             <div className="space-y-2">
-              <CardTitle className="text-3xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-                Bienvenid@ de nuevo!
-              </CardTitle>
+              {/* 2. Reemplazar CardTitle con TextGenerateEffect */}
+              <div className="bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
+                 <TextGenerateEffect
+                    words="Bienvenid@ de nuevo!"
+                    className="text-3xl font-bold"
+                 />
+              </div>
               <CardDescription className="text-base">Sistema de gestión para canteras</CardDescription>
             </div>
           </CardHeader>

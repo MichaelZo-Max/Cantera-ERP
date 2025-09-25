@@ -20,8 +20,7 @@ interface AppLayoutProps {
 export function AppLayout({ children, title }: AppLayoutProps) {
   const { user, logout } = useAuth()
   const pathname = usePathname()
-  const { theme } = useTheme();
-
+  const { theme } = useTheme()
 
   const getRoleDisplayName = (role: string) => {
     const roleNames = {
@@ -45,7 +44,11 @@ export function AppLayout({ children, title }: AppLayoutProps) {
               <div className="flex items-center space-x-3 sm:space-x-4 min-w-0">
                 <div className="flex-shrink-0">
                   <Image
-                    src={theme === 'dark' ? '/logo-cantera-blanco.webp' : '/logo-cantera-negro.webp'}
+                    src={
+                      theme === "dark"
+                        ? "/logo-cantera-blanco.webp"
+                        : "/logo-cantera-negro.webp"
+                    }
                     alt="Cantera ERP Logo"
                     width={48}
                     height={48}
@@ -54,28 +57,40 @@ export function AppLayout({ children, title }: AppLayoutProps) {
                   />
                 </div>
                 <div className="min-w-0">
-                  <h1 className="text-xl sm:text-2xl font-bold text-foreground truncate">Cantera ERP</h1>
-                  <span className="text-xs text-muted-foreground font-medium hidden sm:block">{title}</span>
+                  <h1 className="text-xl sm:text-2xl font-bold text-foreground truncate">
+                    Cantera ERP
+                  </h1>
+                  <span className="text-xs text-muted-foreground font-medium hidden sm:block">
+                    {title}
+                  </span>
                 </div>
               </div>
             </div>
 
             <div className="flex items-center space-x-2 sm:space-x-4 animate-fade-in flex-shrink-0">
-              <div className="hidden sm:flex items-center space-x-3 px-3 py-2 bg-muted/50 rounded-lg border border-border/50">
+              {/* 👇 CAMBIO AQUÍ: Eliminado 'bg-background' */}
+              <div className="hidden sm:flex items-center space-x-3 px-3 py-2 rounded-lg border border-border/50">
                 <div className="p-1.5 bg-primary/10 rounded-full">
                   <User className="h-3.5 w-3.5 text-primary" />
                 </div>
                 <div className="text-sm">
-                  <div className="font-medium text-foreground">{user?.name}</div>
-                  <div className="text-xs text-muted-foreground">{getRoleDisplayName(user?.role || "")}</div>
+                  <div className="font-medium text-foreground">
+                    {user?.name}
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    {getRoleDisplayName(user?.role || "")}
+                  </div>
                 </div>
               </div>
 
-              <div className="sm:hidden flex items-center space-x-2 px-2 py-1.5 bg-muted/50 rounded-lg border border-border/50">
+              {/* 👇 Y CAMBIO AQUÍ TAMBIÉN (para vista móvil) */}
+              <div className="sm:hidden flex items-center space-x-2 px-2 py-1.5 rounded-lg border border-border/50">
                 <div className="p-1 bg-primary/10 rounded-full">
                   <User className="h-3 w-3 text-primary" />
                 </div>
-                <div className="text-xs font-medium text-foreground truncate max-w-20">{user?.name?.split(" ")[0]}</div>
+                <div className="text-xs font-medium text-foreground truncate max-w-20">
+                  {user?.name?.split(" ")[0]}
+                </div>
               </div>
 
               <ThemeToggle />
@@ -108,7 +123,7 @@ export function AppLayout({ children, title }: AppLayoutProps) {
         )}
         <div className="space-y-4 sm:space-y-6">{children}</div>
       </main>
-      
+
       <Footer />
     </div>
   )
