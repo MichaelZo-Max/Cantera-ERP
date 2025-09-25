@@ -42,10 +42,9 @@ import { LoadingSkeleton } from "@/components/ui/loading-skeleton";
 import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
 import { useConfirmation } from "@/hooks/use-confirmation";
 import { EmptyState } from "@/components/ui/empty-state";
-import { createUserSchema, updateUserSchema } from "@/lib/validations"; // ✨ 2. Importar esquemas
+import { createUserSchema, updateUserSchema } from "@/lib/validations";
 import { cn } from "@/lib/utils";
 
-// ✨ 3. Definir tipo para errores del formulario
 type FormErrors = {
   name?: string[];
   email?: string[];
@@ -65,7 +64,7 @@ export function UsersClientUI({ initialUsers }: { initialUsers: User[] }) {
     password: "",
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [formErrors, setFormErrors] = useState<FormErrors>({}); // ✨ 4. Estado para errores
+  const [formErrors, setFormErrors] = useState<FormErrors>({});
   const { isOpen, options, confirm, handleConfirm, handleCancel } =
     useConfirmation();
 
@@ -90,7 +89,7 @@ export function UsersClientUI({ initialUsers }: { initialUsers: User[] }) {
   const handleNewUser = useCallback(() => {
     setEditingUser(null);
     setFormData({ name: "", email: "", role: "CASHIER", password: "" });
-    setFormErrors({}); // Limpiar errores
+    setFormErrors({});
     setShowDialog(true);
   }, []);
 
@@ -102,7 +101,7 @@ export function UsersClientUI({ initialUsers }: { initialUsers: User[] }) {
       role: user.role,
       password: "",
     });
-    setFormErrors({}); // Limpiar errores
+    setFormErrors({});
     setShowDialog(true);
   }, []);
 
@@ -112,7 +111,6 @@ export function UsersClientUI({ initialUsers }: { initialUsers: User[] }) {
       setIsSubmitting(true);
       setFormErrors({});
 
-      // ✨ 5. Elegir el esquema correcto y validar
       const schema = editingUser ? updateUserSchema : createUserSchema;
       const validation = schema.safeParse(formData);
 
@@ -139,7 +137,6 @@ export function UsersClientUI({ initialUsers }: { initialUsers: User[] }) {
         const responseData = await res.json();
 
         if (!res.ok) {
-          // Si el backend devuelve errores de Zod (ej: email duplicado)
           if (res.status === 409 || res.status === 400) {
             setFormErrors(responseData);
           }
@@ -166,7 +163,6 @@ export function UsersClientUI({ initialUsers }: { initialUsers: User[] }) {
     [editingUser, formData]
   );
 
-  // (handleToggleStatus se mantiene igual)
   const handleToggleStatus = useCallback(
     (user: User) => {
       const is_active = user.is_active;
@@ -260,7 +256,19 @@ export function UsersClientUI({ initialUsers }: { initialUsers: User[] }) {
 
       {/* Users Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filteredUsers.length === 0 ? (
+        {filteredUsers.length === 0 && initialUsers.length > 0 ? (
+           <div className="col-span-full">
+             <Card className="glass">
+               <CardContent className="pt-6">
+                  <EmptyState
+                    icon={<Search className="h-12 w-12" />}
+                    title="No se encontraron usuarios"
+                    description="No hay usuarios que coincidan con tu búsqueda. Intenta con otros términos."
+                  />
+                </CardContent>
+              </Card>
+           </div>
+        ) : filteredUsers.length === 0 ? (
           <div className="col-span-full">
             <Card className="glass">
               <CardContent className="pt-6">
