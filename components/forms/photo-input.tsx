@@ -122,7 +122,6 @@ export function PhotoInput({
         ref={fileInputRef}
         type="file"
         accept={accept}
-        capture={capture ? "environment" : undefined}
         onChange={handleInputChange}
         className="hidden"
         disabled={disabled}
