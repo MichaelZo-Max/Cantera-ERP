@@ -68,7 +68,47 @@ export async function GET(_request: Request) {
 
     for (const row of deliveryRows) {
       const orderId = row.order_id;
+      const deliveryId = row.id;
+
+      const dispatchItemsQuery = `
+        SELECT
+          di.id,
+          di.dispatched_quantity,
+          di.pedido_item_id,
+          oi.product_id,
+          oi.quantity,        -- Añadido
+          oi.price_per_unit,  -- Añadido
+          oi.unit,            -- Añadido
+          oi.order_id,        -- Añadido
+          prod.name as product_name
+        FROM RIP.APP_DESPACHOS_ITEMS di
+        JOIN RIP.APP_PEDIDOS_ITEMS oi ON oi.id = di.pedido_item_id
+        JOIN RIP.VW_APP_PRODUCTOS prod ON prod.id = oi.product_id
+        WHERE di.despacho_id = @delivery_id;
+      `;
+      const dispatchItemRows = await executeQuery(dispatchItemsQuery, [{ name: "delivery_id", type: TYPES.Int, value: deliveryId }]);
       
+      // --- 👇 REEMPLAZA EL MAPEO CON ESTA ESTRUCTURA COMPLETA ---
+      const dispatchItems = dispatchItemRows.map((item: any) => ({
+        id: item.id,
+        despacho_id: deliveryId,
+        pedido_item_id: item.pedido_item_id,
+        dispatched_quantity: item.dispatched_quantity,
+        // Construimos el 'orderItem' anidado para que coincida con el tipo OrderItem
+        orderItem: {
+          id: item.pedido_item_id,
+          order_id: item.order_id,
+          product_id: item.product_id,
+          quantity: item.quantity,
+          price_per_unit: item.price_per_unit,
+          unit: item.unit,
+          product: {
+            id: item.product_id,
+            name: item.product_name,
+            unit: item.unit,
+          },
+        },
+      }));
       // Si aún no hemos buscado los items para esta orden, los buscamos ahora
       if (!orderItemsCache.has(orderId)) {
         const itemsQuery = `
@@ -120,7 +160,7 @@ export async function GET(_request: Request) {
           name: row.driver_name,
           phone: row.driver_phone ?? undefined,
         },
-        dispatchItems: [], // Esto se podría poblar con otra consulta si fuera necesario en esta vista
+        dispatchItems: dispatchItems, // <-- Reemplaza el array vacío con los datos reales
       });
     }
 
