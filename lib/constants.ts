@@ -24,6 +24,7 @@ export const PRODUCT_UNITS = {
   UNIDAD: "Unidad",
 } as const;
 
+// --- STATUS COLORS ---
 export const ORDER_STATUS_COLORS = {
   [ORDER_STATUS.PENDING]: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300",
   [ORDER_STATUS.IN_PROGRESS]: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300",
@@ -37,3 +38,30 @@ export const DELIVERY_STATUS_COLORS = {
   [DELIVERY_STATUS.LOADED]: "bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-300",
   [DELIVERY_STATUS.EXITED]: "bg-pink-100 text-pink-800 dark:bg-pink-900 dark:text-pink-300",
 } as const;
+
+// --- STATUS LABELS ---
+export const ORDER_STATUS_LABELS = {
+  [ORDER_STATUS.PENDING]: "Pendiente",
+  [ORDER_STATUS.IN_PROGRESS]: "En Progreso",
+  [ORDER_STATUS.LOADED]: "Cargado",
+  [ORDER_STATUS.COMPLETED]: "Completado",
+  [ORDER_STATUS.CANCELLED]: "Cancelado",
+};
+
+export const DELIVERY_STATUS_LABELS = {
+  [DELIVERY_STATUS.PENDING]: "Pendiente",
+  [DELIVERY_STATUS.LOADED]: "Cargado",
+  [DELIVERY_STATUS.EXITED]: "En Ruta",
+};
+
+
+// --- COMBINED EXPORTS ---
+export const STATUS_COLORS = {
+  ...ORDER_STATUS_COLORS,
+  ...DELIVERY_STATUS_COLORS,
+};
+
+export const STATUS_LABELS = {
+  ...ORDER_STATUS_LABELS,
+  ...DELIVERY_STATUS_LABELS,
+};
