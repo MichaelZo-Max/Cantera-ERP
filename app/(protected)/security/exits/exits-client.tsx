@@ -35,12 +35,12 @@ import {
   FileText, // <-- Icono de factura
   Eye,
   Box,
+  AlertTriangle, // <-- Importamos un nuevo icono para errores
 } from "lucide-react";
 import { toast } from "sonner";
-// ✅ Importamos el tipo Invoice si no está ya
 import type { Delivery, DeliveryItem, Invoice } from "@/lib/types";
 
-// --- SUB-COMPONENTES ---
+// --- SUB-COMPONENTES (Sin cambios) ---
 
 const LoadedDeliveryCard = React.memo(
   ({
@@ -73,8 +73,6 @@ const LoadedDeliveryCard = React.memo(
               {delivery.orderDetails?.client?.name}
             </span>
           </div>
-
-          {/* --- ✅ CAMBIO: Mostrar las facturas en la tarjeta --- */}
           {delivery.orderDetails.invoices &&
             delivery.orderDetails.invoices.length > 0 && (
               <div className="flex items-start gap-2">
@@ -92,7 +90,6 @@ const LoadedDeliveryCard = React.memo(
                 </div>
               </div>
             )}
-
           <div className="flex items-center gap-2">
             <Package className="h-4 w-4 text-muted-foreground" />
             <span>
@@ -109,7 +106,6 @@ const LoadedDeliveryCard = React.memo(
                 : "Sin items"}
             </span>
           </div>
-
           {delivery.loadedAt && (
             <div className="flex justify-between text-xs pt-1">
               <span className="text-muted-foreground">Cargado:</span>
@@ -158,6 +154,7 @@ const ExitedDeliveryCard = React.memo(
 );
 ExitedDeliveryCard.displayName = "ExitedDeliveryCard";
 
+
 // --- COMPONENTE PRINCIPAL ---
 export function SecurityExitsClientUI({
   initialDeliveries,
@@ -167,7 +164,6 @@ export function SecurityExitsClientUI({
   const { user } = useAuth();
   const [allDeliveries, setAllDeliveries] =
     useState<Delivery[]>(initialDeliveries);
-
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [selectedDelivery, setSelectedDelivery] = useState<Delivery | null>(
     null
@@ -178,6 +174,8 @@ export function SecurityExitsClientUI({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showImagePreview, setShowImagePreview] = useState(false);
   const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
+  // ✅ 1. Nuevo estado para manejar errores de carga de imagen
+  const [imageError, setImageError] = useState(false);
 
   const loadedDeliveries = useMemo(
     () => allDeliveries.filter((d) => d.estado === "CARGADA"),
@@ -199,7 +197,6 @@ export function SecurityExitsClientUI({
         (delivery.orderDetails?.client?.name || "")
           .toLowerCase()
           .includes(query) ||
-        // --- ✅ CAMBIO: Añadir búsqueda por factura ---
         delivery.orderDetails?.invoices?.some((invoice) =>
           invoice.invoice_full_number?.toLowerCase().includes(query)
         )
@@ -212,11 +209,22 @@ export function SecurityExitsClientUI({
       toast.warning("Este despacho no está listo para salir.");
       return;
     }
+    // ✅ 2. Resetear el estado de error cada vez que se abre el modal
+    setImageError(false);
     setSelectedDelivery(delivery);
     setExitPhoto(null);
     setExitNotes("");
     setShowExitModal(true);
   }, []);
+
+  // ✅ 3. Nueva función para manejar el error de la imagen
+  const handleImageError = useCallback(() => {
+    toast.warning("La foto del patio no se pudo cargar.", {
+      description: "Puede que no se haya subido correctamente o fue eliminada.",
+    });
+    setImageError(true);
+  }, []);
+
 
   const handleCloseModals = useCallback(() => {
     setShowExitModal(false);
@@ -233,7 +241,7 @@ export function SecurityExitsClientUI({
     }
 
     setIsSubmitting(true);
-
+    // ... (resto de la función sin cambios)
     try {
       const formData = new FormData();
       formData.append("status", "EXITED");
@@ -283,7 +291,8 @@ export function SecurityExitsClientUI({
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between">
+       {/* ... (JSX sin cambios hasta el modal) ... */}
+       <div className="flex flex-col md:flex-row md:items-center md:justify-between">
         <div>
           <h2 className="text-2xl font-bold text-foreground">
             Control de Salida
@@ -293,7 +302,6 @@ export function SecurityExitsClientUI({
           </p>
         </div>
       </div>
-
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -320,7 +328,6 @@ export function SecurityExitsClientUI({
           </div>
         </CardContent>
       </Card>
-
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -360,7 +367,6 @@ export function SecurityExitsClientUI({
           )}
         </CardContent>
       </Card>
-
       {exitedDeliveries.length > 0 && (
         <Card>
           <CardHeader>
@@ -395,7 +401,6 @@ export function SecurityExitsClientUI({
           </DialogHeader>
           {selectedDelivery && (
             <div className="space-y-4">
-              {/* --- ✅ CAMBIO: Mostrar facturas en el modal --- */}
               {selectedDelivery.orderDetails.invoices &&
                 selectedDelivery.orderDetails.invoices.length > 0 && (
                   <div>
@@ -459,13 +464,14 @@ export function SecurityExitsClientUI({
                     <Camera className="h-4 w-4" />
                     Foto del Patio
                   </h4>
-                  {selectedDelivery.loadPhoto ? (
+                  {selectedDelivery.loadPhoto && !imageError ? (
                     <div className="relative w-full h-48 rounded-lg overflow-hidden group border">
                       <Image
                         src={selectedDelivery.loadPhoto}
                         alt="Foto de carga del patio"
                         fill
                         style={{ objectFit: "cover" }}
+                        onError={handleImageError}
                       />
                       <Button
                         type="button"
@@ -480,10 +486,10 @@ export function SecurityExitsClientUI({
                       </Button>
                     </div>
                   ) : (
-                    <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg h-48 flex flex-col items-center justify-center">
-                      <Camera className="h-8 w-8 text-muted-foreground mb-2" />
-                      <p className="text-sm text-muted-foreground">
-                        Sin foto de patio
+                    <div className="border-2 border-dashed border-destructive/25 bg-destructive/5 rounded-lg h-48 flex flex-col items-center justify-center text-destructive">
+                      <AlertTriangle className="h-8 w-8 mb-2" />
+                      <p className="text-sm font-medium">
+                        {imageError ? "Error al cargar foto" : "Sin foto de patio"}
                       </p>
                     </div>
                   )}

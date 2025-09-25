@@ -13,7 +13,7 @@ import type {
   Order,
   Truck as TruckType,
   Driver,
-  Invoice, // <-- AÑADIDO: Importar el tipo Invoice
+  Invoice,
 } from "@/lib/types";
 
 // --- UI Components ---
@@ -59,19 +59,19 @@ import {
   Search,
   Package,
   Loader2,
+  AlertTriangle, // ✅ 1. Importar el icono de alerta
 } from "lucide-react";
 import { AnimatedCard } from "@/components/ui/animated-card";
 import { GradientButton } from "@/components/ui/gradient-button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { cn } from "@/lib/utils";
 
-// --- Zod Validation Schemas ---
+// --- Zod Schemas (Sin cambios) ---
 const createDeliverySchema = z.object({
   order_id: z.string().min(1, "Debes seleccionar un pedido."),
   truck_id: z.string().min(1, "Debes seleccionar un camión."),
   driver_id: z.string().min(1, "Debes seleccionar un conductor."),
 });
-
 const confirmLoadSchema = z.object({
   notes: z.string().optional(),
   loadPhoto: z.instanceof(File, {
@@ -93,20 +93,16 @@ const confirmLoadSchema = z.object({
     }),
 });
 
-// --- Type Definitions ---
+// --- Type Definitions (Sin cambios) ---
 type CreateDeliveryFormValues = z.infer<typeof createDeliverySchema>;
 type ConfirmLoadFormValues = z.infer<typeof confirmLoadSchema>;
-
-type Delivery = BaseDelivery & {
-  totalDispatched?: number;
-};
-
+type Delivery = BaseDelivery & { totalDispatched?: number };
 interface YardClientProps {
   initialDeliveries: Delivery[];
   initialActiveOrders: Order[];
 }
 
-// --- Reusable RHF Controlled Component ---
+// --- RHFSearchableSelect (Sin cambios) ---
 const RHFSearchableSelect = ({
   control,
   name,
@@ -116,16 +112,7 @@ const RHFSearchableSelect = ({
   disabled,
   className,
   loading,
-}: {
-  control: any;
-  name: string;
-  label: string;
-  options: SearchableSelectOption[];
-  placeholder: string;
-  disabled?: boolean;
-  className?: string;
-  loading?: boolean;
-}) => (
+}: any) => (
   <FormField
     control={control}
     name={name}
@@ -159,78 +146,89 @@ const DeliveryCard = React.memo(
   }: {
     delivery: Delivery;
     onSelect: (delivery: Delivery) => void;
-  }) => (
-    <AnimatedCard
-      className="cursor-pointer hover:border-primary transition-all"
-      onClick={() => onSelect(delivery)}
-    >
-      <CardHeader className="pb-3">
-        <div className="flex justify-between items-start">
-          <div>
-            <p className="font-bold text-lg flex items-center gap-2">
-              <TruckIcon className="h-5 w-5" /> {delivery.truck.placa}
-            </p>
-            <p className="text-sm text-muted-foreground">
-              Despacho ID: {delivery.id}
-            </p>
+  }) => {
+    const [imageError, setImageError] = useState(false);
+
+    return (
+      <AnimatedCard
+        className="cursor-pointer hover:border-primary transition-all"
+        onClick={() => onSelect(delivery)}
+      >
+        <CardHeader className="pb-3">
+          <div className="flex justify-between items-start">
+            <div>
+              <p className="font-bold text-lg flex items-center gap-2">
+                <TruckIcon className="h-5 w-5" /> {delivery.truck.placa}
+              </p>
+              <p className="text-sm text-muted-foreground">
+                Despacho ID: {delivery.id}
+              </p>
+            </div>
+            <Badge
+              variant={delivery.estado === "CARGADA" ? "default" : "secondary"}
+            >
+              Pedido #{delivery.orderDetails.order_number}
+            </Badge>
           </div>
-          <Badge
-            variant={delivery.estado === "CARGADA" ? "default" : "secondary"}
-          >
-            Pedido #{delivery.orderDetails.order_number}
-          </Badge>
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-3 text-sm">
-        <div className="flex items-center gap-2">
-          <User className="h-4 w-4 text-muted-foreground" />
-          <span className="font-medium">Conductor:</span>
-          <span className="truncate">{delivery.driver.name}</span>
-        </div>
-        {/* --- 👇 CAMBIO: Mapear y mostrar múltiples facturas --- */}
-        {delivery.orderDetails.invoices &&
-          delivery.orderDetails.invoices.length > 0 && (
-            <div className="flex items-start gap-2">
-              <FileText className="h-4 w-4 text-muted-foreground flex-shrink-0 mt-0.5" />
-              <div className="flex flex-col">
-                <span className="font-medium">Factura(s):</span>
-                <div className="flex flex-wrap gap-1 mt-1">
-                  {delivery.orderDetails.invoices.map((invoice: Invoice) => (
-                    <Badge
-                      key={invoice.invoice_full_number}
-                      variant="secondary"
-                      className="text-xs"
-                    >
-                      {invoice.invoice_full_number}
-                    </Badge>
-                  ))}
+        </CardHeader>
+        <CardContent className="space-y-3 text-sm">
+          <div className="flex items-center gap-2">
+            <User className="h-4 w-4 text-muted-foreground" />
+            <span className="font-medium">Conductor:</span>
+            <span className="truncate">{delivery.driver.name}</span>
+          </div>
+          {delivery.orderDetails.invoices &&
+            delivery.orderDetails.invoices.length > 0 && (
+              <div className="flex items-start gap-2">
+                <FileText className="h-4 w-4 text-muted-foreground flex-shrink-0 mt-0.5" />
+                <div className="flex flex-col">
+                  <span className="font-medium">Factura(s):</span>
+                  <div className="flex flex-wrap gap-1 mt-1">
+                    {delivery.orderDetails.invoices.map((invoice: Invoice) => (
+                      <Badge
+                        key={invoice.invoice_full_number}
+                        variant="secondary"
+                        className="text-xs"
+                      >
+                        {invoice.invoice_full_number}
+                      </Badge>
+                    ))}
+                  </div>
                 </div>
               </div>
-            </div>
-          )}
-        <div className="flex items-center gap-2">
-          <User className="h-4 w-4 text-muted-foreground" />
-          <span className="font-medium">Cliente:</span>
-          <span className="truncate">{delivery.orderDetails.client.name}</span>
-        </div>
-        {delivery.loadPhoto && (
-          <div className="relative h-40 w-full overflow-hidden rounded-md border group mt-2">
-            <Image
-              src={delivery.loadPhoto}
-              alt={`Foto de carga`}
-              fill
-              style={{ objectFit: "cover" }}
-              className="transition-transform duration-300 group-hover:scale-105"
-            />
+            )}
+          <div className="flex items-center gap-2">
+            <User className="h-4 w-4 text-muted-foreground" />
+            <span className="font-medium">Cliente:</span>
+            <span className="truncate">
+              {delivery.orderDetails.client.name}
+            </span>
           </div>
-        )}
-      </CardContent>
-    </AnimatedCard>
-  )
+          {delivery.loadPhoto &&
+            (imageError ? (
+              <div className="h-40 w-full rounded-md border border-dashed border-destructive/50 bg-destructive/5 flex flex-col items-center justify-center text-center text-destructive p-2">
+                <AlertTriangle className="h-6 w-6 mb-1" />
+                <p className="text-xs font-medium">Error al cargar la foto</p>
+              </div>
+            ) : (
+              <div className="relative h-40 w-full overflow-hidden rounded-md border group mt-2">
+                <Image
+                  src={delivery.loadPhoto}
+                  alt={`Foto de carga`}
+                  fill
+                  style={{ objectFit: "cover" }}
+                  className="transition-transform duration-300 group-hover:scale-105"
+                  onError={() => setImageError(true)}
+                />
+              </div>
+            ))}
+        </CardContent>
+      </AnimatedCard>
+    );
+  }
 );
 DeliveryCard.displayName = "DeliveryCard";
 
-// --- Main Client Component ---
 export function YardDeliveriesClientUI({
   initialDeliveries,
   initialActiveOrders,
@@ -313,10 +311,9 @@ export function YardDeliveriesClientUI({
         (d.driver.name?.toLowerCase() ?? "").includes(query) ||
         (d.orderDetails.client.name?.toLowerCase() ?? "").includes(query) ||
         (d.id.toString() ?? "").includes(query) ||
-        // --- 👇 CAMBIO: Lógica de búsqueda para múltiples facturas ---
-        (d.orderDetails.invoices?.some((invoice) =>
+        d.orderDetails.invoices?.some((invoice) =>
           invoice.invoice_full_number?.toLowerCase().includes(query)
-        ))
+        )
     );
   }, [searchQuery, deliveries]);
 
@@ -595,7 +592,6 @@ export function YardDeliveriesClientUI({
           </CardContent>
         </AnimatedCard>
       </div>
-
       {/* Modal de Confirmación de Carga */}
       <Dialog open={showModal} onOpenChange={setShowModal}>
         <DialogContent className="sm:max-w-xl max-h-[90vh] overflow-y-auto">
