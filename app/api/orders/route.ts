@@ -6,12 +6,12 @@ import { revalidateTag } from "next/cache";
 import { createOrderSchema } from "@/lib/validations";
 import { InvoiceProduct } from "@/lib/types";
 
+// La función GET no necesita cambios
 export async function GET() {
   try {
-    // 1. La vista ya nos trae el campo "invoices" como un JSON string
     const sql = `
       SELECT
-          p.*, -- Seleccionamos todas las columnas de la vista
+          p.*,
           (SELECT SUM(pi.quantity * pi.price_per_unit)
            FROM RIP.APP_PEDIDOS_ITEMS pi
            WHERE pi.order_id = p.id) AS total,
@@ -25,10 +25,8 @@ export async function GET() {
 
     const rawOrders = await executeQuery(sql);
 
-    // 2. Procesamos la respuesta para convertir el JSON de facturas en un array
     const orders = rawOrders.map((order: any) => ({
       ...order,
-      // Si `invoices` es un string, lo parseamos. Si no, devolvemos un array vacío.
       invoices:
         typeof order.invoices === "string" ? JSON.parse(order.invoices) : [],
       client: {
@@ -46,11 +44,7 @@ export async function GET() {
   }
 }
 
-/**
- * @route   POST /api/orders
- * @desc    Crear un nuevo pedido y asociar items, facturas, camiones y choferes.
- * @access  Private
- */
+
 export async function POST(req: Request) {
   try {
     const { user } = await getUser();
@@ -76,7 +70,7 @@ export async function POST(req: Request) {
     const {
       customer_id,
       destination_id,
-      items: itemsFromClient, // Renombramos los items del cliente
+      items: itemsFromClient,
       truck_ids,
       driver_ids,
       invoices,
@@ -85,15 +79,9 @@ export async function POST(req: Request) {
     let trustedItems: typeof itemsFromClient = [];
 
     if (invoices && invoices.length > 0) {
-      // Si hay facturas, IGNORAMOS los items del cliente y los obtenemos de la DB.
-
-      // 1. Preparamos los parámetros para la consulta (esto no cambia)
+      // --- LÓGICA EXISTENTE PARA ÓRDENES CON FACTURA (SIN CAMBIOS) ---
       const invoiceParams = invoices.flatMap((inv, index) => [
-        {
-          name: `series_${index}`,
-          type: TYPES.NVarChar,
-          value: inv.invoice_series,
-        },
+        { name: `series_${index}`, type: TYPES.NVarChar, value: inv.invoice_series },
         { name: `number_${index}`, type: TYPES.Int, value: inv.invoice_number },
         { name: `n_${index}`, type: TYPES.NVarChar, value: inv.invoice_n },
       ]);
@@ -105,27 +93,25 @@ export async function POST(req: Request) {
         )
         .join(" OR ");
 
-      // 3. Construimos la consulta final con la nueva cláusula WHERE
       const itemsQuery = `
-    SELECT
-        product_id AS id,
-        product_name AS name,
-        product_code AS code,
-        price_per_unit,
-        unit,
-        quantity_pending AS available_quantity
-    FROM 
-        RIP.VW_APP_FACTURA_ITEMS_PENDIENTES
-    WHERE 
-        ${conditions};
-`;
+        SELECT
+            product_id AS id,
+            product_name AS name,
+            product_code AS code,
+            price_per_unit,
+            unit,
+            quantity_pending AS available_quantity
+        FROM 
+            RIP.VW_APP_FACTURA_ITEMS_PENDIENTES
+        WHERE 
+            ${conditions};
+      `;
 
       const productsFromInvoices: InvoiceProduct[] = await executeQuery(
         itemsQuery,
         invoiceParams
       );
 
-      // Convertimos los productos seguros de la DB a la estructura de 'items' del pedido
       trustedItems = productsFromInvoices.map((p) => ({
         product_id: p.id,
         quantity: p.available_quantity,
@@ -133,8 +119,47 @@ export async function POST(req: Request) {
         unit: p.unit || "UNIDAD",
       }));
     } else {
-      // Si no hay facturas, confiamos en los items que el cliente construyó manualmente.
+      // --- ESTE ES EL CASO DE UNA ORDEN SIN FACTURA (MANUAL) ---
       trustedItems = itemsFromClient;
+
+      // --- NUEVA LÓGICA 👇: GUARDAR LA ORDEN DE CAJA PARA AUDITORÍA ---
+      if (trustedItems.length > 0) {
+        // Calculamos el total de la orden manual
+        const total_usd = trustedItems.reduce((acc, item) => acc + item.quantity * item.price_per_unit, 0);
+
+        // 1. Insertar la cabecera en la nueva tabla de auditoría
+        const cashierOrderHeaderSql = `
+          INSERT INTO RIP.APP_ORDENES_SIN_FACTURA_CAB (customer_id, total_usd, created_by)
+          OUTPUT INSERTED.id
+          VALUES (@customer_id, @total_usd, @created_by);
+        `;
+        const cashierHeaderResult = await executeQuery(cashierOrderHeaderSql, [
+          { name: "customer_id", type: TYPES.Int, value: customer_id },
+          { name: "total_usd", type: TYPES.Decimal, value: total_usd },
+          { name: "created_by", type: TYPES.Int, value: user.id },
+        ]);
+        const newCashierOrderId = cashierHeaderResult[0].id;
+
+        // 2. Insertar cada item en la nueva tabla de auditoría
+        for (const item of trustedItems) {
+            // Necesitamos obtener el nombre y la referencia del producto
+            const productInfo = await executeQuery('SELECT DESCRIPCION, REFPROVEEDOR FROM dbo.ARTICULOS WHERE CODARTICULO = @id', [{ name: 'id', type: TYPES.Int, value: item.product_id }]);
+
+            const cashierItemSql = `
+                INSERT INTO RIP.APP_ORDENES_SIN_FACTURA_ITEMS (order_cab_id, product_id, product_ref, product_name, quantity, price_per_unit_usd)
+                VALUES (@order_cab_id, @product_id, @product_ref, @product_name, @quantity, @price_per_unit_usd);
+            `;
+            await executeQuery(cashierItemSql, [
+                { name: "order_cab_id", type: TYPES.Int, value: newCashierOrderId },
+                { name: "product_id", type: TYPES.Int, value: item.product_id },
+                { name: "product_ref", type: TYPES.NVarChar, value: productInfo[0]?.REFPROVEEDOR || '' },
+                { name: "product_name", type: TYPES.NVarChar, value: productInfo[0]?.DESCRIPCION || 'N/A' },
+                { name: "quantity", type: TYPES.Decimal, value: item.quantity },
+                { name: "price_per_unit_usd", type: TYPES.Decimal, value: item.price_per_unit },
+            ]);
+        }
+      }
+      // --- FIN DE LA NUEVA LÓGICA ---
     }
 
     if (trustedItems.length === 0) {
@@ -143,8 +168,10 @@ export async function POST(req: Request) {
         { status: 400 }
       );
     }
-    // --- FIN DE LA LÓGICA DE SEGURIDAD ---
-
+    
+    // --- EL RESTO DEL CÓDIGO SIGUE EXACTAMENTE IGUAL ---
+    // Crea el pedido en RIP.APP_PEDIDOS, asocia items, camiones y choferes como siempre.
+    
     const orderHeaderSql = `
         INSERT INTO RIP.APP_PEDIDOS (customer_id, destination_id, status, created_by)
         OUTPUT INSERTED.id
@@ -165,7 +192,6 @@ export async function POST(req: Request) {
 
     const newOrderId = headerResult[0].id;
 
-    // --- 👇 Usamos la lista de items segura (trustedItems) ---
     for (const item of trustedItems) {
       const itemSql = `
           INSERT INTO RIP.APP_PEDIDOS_ITEMS (order_id, product_id, quantity, unit, price_per_unit)
@@ -184,7 +210,6 @@ export async function POST(req: Request) {
       ]);
     }
 
-    // Si hay facturas, las asociamos
     if (invoices && invoices.length > 0) {
       for (const invoice of invoices) {
         const invoiceSql = `
@@ -208,7 +233,6 @@ export async function POST(req: Request) {
       }
     }
 
-    // Asociar Camiones
     for (const camion_id of truck_ids) {
       const truckSql = `
         INSERT INTO RIP.APP_PEDIDOS_CAMIONES (pedido_id, camion_id)
@@ -220,7 +244,6 @@ export async function POST(req: Request) {
       ]);
     }
 
-    // Asociar Choferes
     for (const chofer_id of driver_ids) {
       const driverSql = `
         INSERT INTO RIP.APP_PEDIDOS_CHOFERES (pedido_id, chofer_id)

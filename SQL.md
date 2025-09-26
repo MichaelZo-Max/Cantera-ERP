@@ -669,3 +669,68 @@ GO
 
 PRINT '¡Índices de rendimiento creados correctamente!';
 GO
+-- =================================================================
+-- TABLAS PARA ÓRDENES DE CAJA SIN FACTURA PREVIA
+-- Propósito: Almacenar órdenes creadas directamente en caja que no están asociadas a una factura existente.
+-- =================================================================
+
+-- 5. CREACIÓN DE TABLAS PARA ÓRDENES DE CAJA
+
+-- Tabla de Cabecera de Órdenes de Caja
+IF OBJECT_ID('RIP.APP_ORDENES_SIN_FACTURA_CAB', 'U') IS NULL
+BEGIN
+    CREATE TABLE RIP.APP_ORDENES_SIN_FACTURA_CAB (
+        id INT IDENTITY(1,1) PRIMARY KEY,
+        -- Número de orden autogenerado para fácil referencia
+        order_number AS 'VTA-' + RIGHT('00000000' + CAST(id AS VARCHAR(8)), 8) PERSISTED,
+        
+        -- Datos del Cliente
+        customer_id INT NOT NULL,
+        customer_doc_id NVARCHAR(20) NULL, -- Cédula/RIF del cliente, guardado para referencia
+        
+        -- Datos Monetarios
+        total_usd DECIMAL(18, 2) NOT NULL,
+        exchange_rate DECIMAL(18, 4) NULL, -- Tasa de cambio utilizada al momento de la venta
+        
+        -- Estado y Auditoría
+        status NVARCHAR(50) NOT NULL DEFAULT 'PENDING_INVOICE' CHECK (status IN ('PENDING_INVOICE', 'INVOICED', 'CANCELLED')),
+        created_by INT NOT NULL,
+        created_at DATETIME NOT NULL DEFAULT GETDATE(),
+        updated_at DATETIME NOT NULL DEFAULT GETDATE(),
+        
+        -- Llaves Foráneas
+        FOREIGN KEY (customer_id) REFERENCES dbo.CLIENTES(CODCLIENTE),
+        FOREIGN KEY (created_by) REFERENCES RIP.APP_USUARIOS(id)
+    );
+    PRINT 'Tabla RIP.APP_ORDENES_SIN_FACTURA_CAB creada.';
+END
+GO
+
+-- Tabla de Líneas/Items de Órdenes de Caja
+IF OBJECT_ID('RIP.APP_ORDENES_SIN_FACTURA_ITEMS', 'U') IS NULL
+BEGIN
+    CREATE TABLE RIP.APP_ORDENES_SIN_FACTURA_ITEMS (
+        id INT IDENTITY(1,1) PRIMARY KEY,
+        order_cab_id INT NOT NULL,
+        
+        -- Datos del Producto
+        product_id INT NOT NULL,
+        product_ref NVARCHAR(50) NULL, -- Referencia del producto, guardado para referencia
+        product_name NVARCHAR(255) NOT NULL, -- Nombre del producto, guardado para referencia
+        
+        -- Datos de la línea
+        quantity DECIMAL(18, 2) NOT NULL,
+        price_per_unit_usd DECIMAL(18, 2) NOT NULL,
+        -- Subtotal calculado automáticamente
+        subtotal_usd AS (quantity * price_per_unit_usd),
+        
+        -- Llaves Foráneas
+        FOREIGN KEY (order_cab_id) REFERENCES RIP.APP_ORDENES_SIN_FACTURA_CAB(id) ON DELETE CASCADE,
+        FOREIGN KEY (product_id) REFERENCES dbo.ARTICULOS(CODARTICULO)
+    );
+    PRINT 'Tabla RIP.APP_ORDENES_SIN_FACTURA_ITEMS creada.';
+END
+GO
+
+PRINT '¡Tablas para órdenes de caja creadas exitosamente!';
+GO

@@ -22,6 +22,7 @@ import {
   FileText,
   MapPin,
   UserCheck,
+  ClipboardList,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -41,10 +42,17 @@ function Dashboard() {
           },
           {
             title: "Ver Pedidos",
-            description: "Consultar pedidos existentes",
+            description: "Consultar pedidos para despacho",
             icon: FileText,
             href: "/cashier/orders/list",
             color: "bg-primary",
+          },
+          {
+            title: "Ver Órdenes de Caja",
+            description: "Consultar ventas directas sin factura",
+            icon: ClipboardList,
+            href: "/cashier/cashier-orders",
+            color: "bg-primary", 
           },
           {
             title: "Seguimiento de Despachos",

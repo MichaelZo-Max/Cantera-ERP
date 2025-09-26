@@ -263,3 +263,40 @@ export interface TripSummary {
   loadedAt?: Date;
   exitedAt?: Date;
 }
+// Tipos para las nuevas Órdenes de Caja sin Factura
+export type CashierOrder = {
+  id: number;
+  order_number: string;
+  customer_id: number;
+  customer_doc_id?: string | null;
+  total_usd: number;
+  exchange_rate?: number | null;
+  status: 'PENDING_INVOICE' | 'INVOICED' | 'CANCELLED';
+  created_by: number;
+  created_at: string;
+  updated_at: string;
+  // Opcional: para incluir los items en la misma consulta
+  items?: CashierOrderItem[];
+  customer_name?: string;  // Campo que viene del JOIN con CLIENTES
+  created_by_name?: string; // Campo que viene del JOIN con APP_USUARIOS
+};
+
+export type CashierOrderItem = {
+  id: number;
+  order_cab_id: number;
+  product_id: number;
+  product_ref?: string | null;
+  product_name: string;
+  quantity: number;
+  price_per_unit_usd: number;
+  subtotal_usd: number;
+};
+
+// Tipo para crear una nueva orden de caja (lo que enviará el formulario)
+export type CreateCashierOrderDto = {
+  customer_id: number;
+  customer_doc_id?: string;
+  total_usd: number;
+  exchange_rate?: number;
+  items: Omit<CashierOrderItem, 'id' | 'order_cab_id' | 'subtotal_usd'>[];
+};
