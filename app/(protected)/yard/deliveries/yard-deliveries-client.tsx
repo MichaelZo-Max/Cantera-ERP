@@ -59,7 +59,7 @@ import {
   Search,
   Package,
   Loader2,
-  AlertTriangle, // ✅ 1. Importar el icono de alerta
+  AlertTriangle,
 } from "lucide-react";
 import { AnimatedCard } from "@/components/ui/animated-card";
 import { GradientButton } from "@/components/ui/gradient-button";
@@ -74,9 +74,7 @@ const createDeliverySchema = z.object({
 });
 const confirmLoadSchema = z.object({
   notes: z.string().optional(),
-  loadPhoto: z.instanceof(File, {
-    message: "La foto de carga es obligatoria.",
-  }),
+  loadPhoto: z.any().optional(),
   loadedItems: z
     .array(
       z.object({
@@ -204,9 +202,10 @@ const DeliveryCard = React.memo(
               {delivery.orderDetails.client.name}
             </span>
           </div>
-          {delivery.loadPhoto &&
-            (imageError ? (
-              <div className="h-40 w-full rounded-md border border-dashed border-destructive/50 bg-destructive/5 flex flex-col items-center justify-center text-center text-destructive p-2">
+
+          {delivery.loadPhoto ? (
+            imageError ? (
+              <div className="h-40 w-full rounded-md border border-dashed border-destructive/50 bg-destructive/5 flex flex-col items-center justify-center text-center text-destructive p-2 mt-2">
                 <AlertTriangle className="h-6 w-6 mb-1" />
                 <p className="text-xs font-medium">Error al cargar la foto</p>
               </div>
@@ -221,7 +220,13 @@ const DeliveryCard = React.memo(
                   onError={() => setImageError(true)}
                 />
               </div>
-            ))}
+            )
+          ) : delivery.estado === "CARGADA" ? (
+            <div className="h-40 w-full rounded-md border border-dashed bg-muted/20 flex flex-col items-center justify-center text-center text-muted-foreground p-2 mt-2">
+              <Package className="h-8 w-8" />
+              <p className="text-xs font-medium mt-2">Sin foto de carga</p>
+            </div>
+          ) : null}
         </CardContent>
       </AnimatedCard>
     );
@@ -367,7 +372,9 @@ export function YardDeliveriesClientUI({
       formData.append("notes", values.notes || "");
       formData.append("itemsJson", JSON.stringify(values.loadedItems));
       formData.append("userId", user.id.toString());
-      formData.append("photoFile", values.loadPhoto);
+      if (values.loadPhoto) {
+        formData.append("photoFile", values.loadPhoto);
+      }
 
       const res = await fetch(`/api/deliveries/${selectedDelivery.id}`, {
         method: "PATCH",
@@ -616,11 +623,11 @@ export function YardDeliveriesClientUI({
                     name="loadPhoto"
                     render={({ field: { onChange } }) => (
                       <FormItem>
-                        <FormLabel>Foto de Carga (Obligatoria)</FormLabel>
+                        <FormLabel>Foto de Carga (Opcional)</FormLabel>
                         <FormControl>
                           <PhotoInput
                             onSelect={onChange}
-                            required={true}
+                            required={false}
                             label="Tocar para tomar o seleccionar foto"
                             capture={true}
                           />

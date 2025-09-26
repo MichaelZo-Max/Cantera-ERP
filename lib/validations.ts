@@ -23,7 +23,7 @@ export const createOrderItemSchema = z.object({
     .string({
       required_error: "La unidad de medida es obligatoria.",
     })
-    .min(1, "La unidad no puede estar vacía."), // ✨ MEJORA: Evita strings vacíos.
+    .min(1, "La unidad no puede estar vacía."),
 });
 
 /**
@@ -82,7 +82,7 @@ export const createDeliverySchema = z.object({
  */
 export const confirmLoadSchema = z.object({
   notes: z.string().optional(),
-  loadPhoto: z.any().refine((file) => file, "La foto de carga es obligatoria."),
+  loadPhoto: z.any().optional(),
   loadedItems: z
     .array(
       z.object({
@@ -124,7 +124,7 @@ export const customerSchema = z.object({
   rif: z
     .string()
     .optional()
-    .transform((val) => (val === "" ? undefined : val)), // Transforma "" a undefined
+    .transform((val) => (val === "" ? undefined : val)),
   address: z
     .string()
     .optional()
@@ -183,7 +183,6 @@ export const driverSchema = z.object({
  * @description Esquema para la CREACIÓN y ACTUALIZACIÓN de un camión (truck).
  */
 export const truckSchema = z.object({
-  // Corregido: 'placa' en lugar de 'plate'
   placa: z
     .string({ required_error: "La placa es obligatoria." })
     .min(3, "La placa debe tener al menos 3 caracteres.")
@@ -241,5 +240,5 @@ export const updateUserSchema = userBaseSchema.extend({
       message: "La nueva contraseña debe tener al menos 6 caracteres.",
     })
     .optional()
-    .transform((val) => (val === "" ? undefined : val)), // Transforma "" a undefined para la API
+    .transform((val) => (val === "" ? undefined : val)),
 });
