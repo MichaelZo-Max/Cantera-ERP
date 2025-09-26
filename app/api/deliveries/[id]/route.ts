@@ -85,7 +85,9 @@ export async function GET(
     }
 
     const row = rows[0];
-    const invoices = row.order_invoices_json ? JSON.parse(row.order_invoices_json) : [];
+    const invoices = row.order_invoices_json
+      ? JSON.parse(row.order_invoices_json)
+      : [];
 
     const itemsQuery = `
         SELECT
@@ -96,8 +98,10 @@ export async function GET(
         WHERE oi.order_id = @order_id
         ORDER BY oi.id ASC;
     `;
-    const itemRows = await executeQuery(itemsQuery, [{ name: "order_id", type: TYPES.Int, value: row.order_id }]);
-    
+    const itemRows = await executeQuery(itemsQuery, [
+      { name: "order_id", type: TYPES.Int, value: row.order_id },
+    ]);
+
     const orderItems = itemRows.map((item: any) => ({
       id: item.id,
       order_id: row.order_id,
@@ -105,10 +109,14 @@ export async function GET(
       quantity: item.quantity,
       unit: item.unit,
       price_per_unit: item.price_per_unit,
-      product: { id: item.product_id, name: item.product_name, unit: item.unit },
+      product: {
+        id: item.product_id,
+        name: item.product_name,
+        unit: item.unit,
+      },
       dispatchItems: [],
     }));
-    
+
     const finalPayload: Delivery = {
       id: row.id,
       estado: mapDbStatusToUi(row.estado),
@@ -131,13 +139,17 @@ export async function GET(
         name: row.driver_name,
         phone: row.driver_phone ?? undefined,
       },
-      dispatchItems: [] // Populate if needed
+      dispatchItems: [], // Populate if needed
     };
 
     return NextResponse.json(finalPayload);
   } catch (e) {
-    console.error("[API_DELIVERIES_ID_GET_ERROR]", util.inspect(e, { depth: null }));
-    const errorMessage = e instanceof Error ? e.message : "Ocurrió un error inesperado.";
+    console.error(
+      "[API_DELIVERIES_ID_GET_ERROR]",
+      util.inspect(e, { depth: null })
+    );
+    const errorMessage =
+      e instanceof Error ? e.message : "Ocurrió un error inesperado.";
     return NextResponse.json(
       { error: "Error al obtener el despacho", details: errorMessage },
       { status: 500 }
@@ -145,7 +157,7 @@ export async function GET(
   }
 }
 
-// --- PATCH ---
+// --- PATCH (Función Corregida) ---
 export async function PATCH(
   request: Request,
   { params }: { params: { id: string } }
@@ -153,7 +165,10 @@ export async function PATCH(
   try {
     const despachoId = parseInt(params.id, 10);
     if (isNaN(despachoId)) {
-        return NextResponse.json({ error: "ID de despacho inválido" }, { status: 400 });
+      return NextResponse.json(
+        { error: "ID de despacho inválido" },
+        { status: 400 }
+      );
     }
 
     const formData = await request.formData();
@@ -164,33 +179,93 @@ export async function PATCH(
     const itemsJson = formData.get("itemsJson") as string | null;
 
     if (!status || !userId) {
-        return NextResponse.json({ error: "Faltan parámetros 'status' o 'userId'." }, { status: 400 });
+      return NextResponse.json(
+        { error: "Faltan parámetros 'status' o 'userId'." },
+        { status: 400 }
+      );
     }
 
+    // --- 👇 LÓGICA DE ACTUALIZACIÓN DE ESTADO DE LA ORDEN (LA PARTE NUEVA) ---
+    const updateOrderStatus = async (currentDespachoId: number) => {
+      // 1. Obtenemos el ID de la orden a la que pertenece este despacho
+      const getOrderIdSql =
+        "SELECT order_id FROM RIP.APP_DESPACHOS WHERE id = @despachoId;";
+      const orderResult = await executeQuery(getOrderIdSql, [
+        { name: "despachoId", type: TYPES.Int, value: currentDespachoId },
+      ]);
+      const orderId = orderResult[0]?.order_id;
+
+      if (!orderId) return; // Si no hay orden, no hacemos nada
+
+      // 2. Calculamos la cantidad total pedida en la orden
+      const totalQuantitySql =
+        "SELECT SUM(quantity) as total FROM RIP.APP_PEDIDOS_ITEMS WHERE order_id = @orderId;";
+      const totalResult = await executeQuery(totalQuantitySql, [
+        { name: "orderId", type: TYPES.Int, value: orderId },
+      ]);
+      const totalQuantity = totalResult[0]?.total ?? 0;
+
+      // 3. Calculamos la cantidad total ya despachada (solo de los viajes con salida 'EXITED')
+      const dispatchedQuantitySql = `
+            SELECT SUM(di.dispatched_quantity) as total
+            FROM RIP.APP_DESPACHOS d
+            JOIN RIP.APP_DESPACHOS_ITEMS di ON d.id = di.despacho_id
+            WHERE d.order_id = @orderId AND d.status = 'EXITED';
+        `;
+      const dispatchedResult = await executeQuery(dispatchedQuantitySql, [
+        { name: "orderId", type: TYPES.Int, value: orderId },
+      ]);
+      const dispatchedQuantity = dispatchedResult[0]?.total ?? 0;
+
+      // 4. Determinamos el nuevo estado de la orden
+      let newOrderStatus = "PAID"; // Por defecto
+      if (dispatchedQuantity >= totalQuantity) {
+        newOrderStatus = "DISPATCHED_COMPLETE";
+      } else if (dispatchedQuantity > 0) {
+        newOrderStatus = "PARTIALLY_DISPATCHED";
+      }
+
+      // 5. Actualizamos la orden en la base de datos
+      const updateOrderSql =
+        "UPDATE RIP.APP_PEDIDOS SET status = @status, updated_at = GETDATE() WHERE id = @orderId;";
+      await executeQuery(updateOrderSql, [
+        { name: "status", type: TYPES.NVarChar, value: newOrderStatus },
+        { name: "orderId", type: TYPES.Int, value: orderId },
+      ]);
+    };
+    // --- FIN DE LA LÓGICA DE ACTUALIZACIÓN ---
+
     if (status === "CARGADA") {
-        const parsedItems = itemsJson ? JSON.parse(itemsJson) : [];
-        const validation = confirmLoadSchema.safeParse({
-            notes: notes ?? undefined,
-            loadPhoto: photoFile,
-            loadedItems: parsedItems,
-        });
+      // (Tu lógica para el estado 'CARGADA' no cambia)
+      const parsedItems = itemsJson ? JSON.parse(itemsJson) : [];
+      const validation = confirmLoadSchema.safeParse({
+        notes: notes ?? undefined,
+        loadPhoto: photoFile,
+        loadedItems: parsedItems,
+      });
 
-        if (!validation.success) {
-            return NextResponse.json({ error: "Datos de confirmación de carga inválidos.", details: validation.error.flatten() }, { status: 400 });
-        }
+      if (!validation.success) {
+        return NextResponse.json(
+          {
+            error: "Datos de confirmación de carga inválidos.",
+            details: validation.error.flatten(),
+          },
+          { status: 400 }
+        );
+      }
 
-        const { loadedItems } = validation.data;
-        let photoUrl: string | null = null;
-        if (photoFile) {
-            const buffer = Buffer.from(await photoFile.arrayBuffer());
-            const filename = `${Date.now()}_${photoFile.name.replace(/\s/g, "_")}`;
-            const uploadDir = path.join(process.cwd(), "public/uploads");
-            await mkdir(uploadDir, { recursive: true });
-            await writeFile(path.join(uploadDir, filename), buffer);
-            photoUrl = `/uploads/${filename}`;
-        }
+      const { loadedItems } = validation.data;
+      let photoUrl: string | null = null;
+      if (photoFile) {
+        const buffer = Buffer.from(await photoFile.arrayBuffer());
+        const filename = `${Date.now()}_${photoFile.name.replace(/\s/g, "_")}`;
+        const uploadDir = path.join(process.cwd(), "public/uploads");
+        await mkdir(uploadDir, { recursive: true });
+        await writeFile(path.join(uploadDir, filename), buffer);
+        photoUrl = `/uploads/${filename}`;
+      }
 
-        const updateDespachoSql = `
+      const updateDespachoSql = `
             UPDATE RIP.APP_DESPACHOS
             SET 
                 status = 'CARGADA',
@@ -201,51 +276,72 @@ export async function PATCH(
                 updated_at = GETDATE()
             WHERE id = @despachoId;
         `;
-        await executeQuery(updateDespachoSql, [
-            { name: "despachoId", type: TYPES.Int, value: despachoId },
-            { name: "userId", type: TYPES.Int, value: parseInt(userId, 10) },
-            { name: "notes", type: TYPES.NVarChar, value: notes },
-            { name: "photoUrl", type: TYPES.NVarChar, value: photoUrl },
-        ]);
+      await executeQuery(updateDespachoSql, [
+        { name: "despachoId", type: TYPES.Int, value: despachoId },
+        { name: "userId", type: TYPES.Int, value: parseInt(userId, 10) },
+        { name: "notes", type: TYPES.NVarChar, value: notes },
+        { name: "photoUrl", type: TYPES.NVarChar, value: photoUrl },
+      ]);
 
-        const deleteItemsSql = "DELETE FROM RIP.APP_DESPACHOS_ITEMS WHERE despacho_id = @despachoId;";
-        await executeQuery(deleteItemsSql, [{ name: "despachoId", type: TYPES.Int, value: despachoId }]);
+      const deleteItemsSql =
+        "DELETE FROM RIP.APP_DESPACHOS_ITEMS WHERE despacho_id = @despachoId;";
+      await executeQuery(deleteItemsSql, [
+        { name: "despachoId", type: TYPES.Int, value: despachoId },
+      ]);
 
-        for (const item of loadedItems) {
-            if (item.dispatched_quantity > 0) {
-                const insertItemSql = `
+      for (const item of loadedItems) {
+        if (item.dispatched_quantity > 0) {
+          const insertItemSql = `
                     INSERT INTO RIP.APP_DESPACHOS_ITEMS (despacho_id, pedido_item_id, dispatched_quantity)
                     VALUES (@despachoId, @pedidoItemId, @quantity);
                 `;
-                await executeQuery(insertItemSql, [
-                    { name: "despachoId", type: TYPES.Int, value: despachoId },
-                    { name: "pedidoItemId", type: TYPES.Int, value: parseInt(item.pedido_item_id, 10) },
-                    { name: "quantity", type: TYPES.Decimal, value: item.dispatched_quantity },
-                ]);
-            }
+          await executeQuery(insertItemSql, [
+            { name: "despachoId", type: TYPES.Int, value: despachoId },
+            {
+              name: "pedidoItemId",
+              type: TYPES.Int,
+              value: parseInt(item.pedido_item_id, 10),
+            },
+            {
+              name: "quantity",
+              type: TYPES.Decimal,
+              value: item.dispatched_quantity,
+            },
+          ]);
         }
+      }
     } else if (status === "EXITED") {
-        const validation = confirmExitSchema.safeParse({
-            notes: notes ?? undefined,
-            exitPhoto: photoFile,
-        });
+      // (Tu lógica para 'EXITED' no cambia, solo se le añade la llamada a la nueva función)
+      const validation = confirmExitSchema.safeParse({
+        notes: notes ?? undefined,
+        exitPhoto: photoFile,
+      });
 
-        if (!validation.success) {
-            return NextResponse.json({ error: "Datos de confirmación de salida inválidos.", details: validation.error.flatten() }, { status: 400 });
-        }
-        
-        const { exitPhoto } = validation.data;
-        let photoUrl: string | null = null;
-        if (exitPhoto) {
-            const buffer = Buffer.from(await exitPhoto.arrayBuffer());
-            const filename = `${Date.now()}_exit_${exitPhoto.name.replace(/\s/g, "_")}`;
-            const uploadDir = path.join(process.cwd(), "public/uploads");
-            await mkdir(uploadDir, { recursive: true });
-            await writeFile(path.join(uploadDir, filename), buffer);
-            photoUrl = `/uploads/${filename}`;
-        }
-        
-        const updateDespachoSql = `
+      if (!validation.success) {
+        return NextResponse.json(
+          {
+            error: "Datos de confirmación de salida inválidos.",
+            details: validation.error.flatten(),
+          },
+          { status: 400 }
+        );
+      }
+
+      const { exitPhoto } = validation.data;
+      let photoUrl: string | null = null;
+      if (exitPhoto) {
+        const buffer = Buffer.from(await exitPhoto.arrayBuffer());
+        const filename = `${Date.now()}_exit_${exitPhoto.name.replace(
+          /\s/g,
+          "_"
+        )}`;
+        const uploadDir = path.join(process.cwd(), "public/uploads");
+        await mkdir(uploadDir, { recursive: true });
+        await writeFile(path.join(uploadDir, filename), buffer);
+        photoUrl = `/uploads/${filename}`;
+      }
+
+      const updateDespachoSql = `
             UPDATE RIP.APP_DESPACHOS
             SET
                 status = 'EXITED',
@@ -256,37 +352,43 @@ export async function PATCH(
                 updated_at = GETDATE()
             WHERE id = @despachoId;
         `;
-        await executeQuery(updateDespachoSql, [
-            { name: "despachoId", type: TYPES.Int, value: despachoId },
-            { name: "userId", type: TYPES.Int, value: parseInt(userId, 10) },
-            { name: "notes", type: TYPES.NVarChar, value: notes },
-            { name: "photoUrl", type: TYPES.NVarChar, value: photoUrl },
-        ]);
+      await executeQuery(updateDespachoSql, [
+        { name: "despachoId", type: TYPES.Int, value: despachoId },
+        { name: "userId", type: TYPES.Int, value: parseInt(userId, 10) },
+        { name: "notes", type: TYPES.NVarChar, value: notes },
+        { name: "photoUrl", type: TYPES.NVarChar, value: photoUrl },
+      ]);
+
+      // --- 👇 MEJORA: Llamamos a la función para actualizar el estado de la orden ---
+      await updateOrderStatus(despachoId);
     } else {
-        return NextResponse.json({ error: `Estado '${status}' no manejado.` }, { status: 400 });
+      return NextResponse.json(
+        { error: `Estado '${status}' no manejado.` },
+        { status: 400 }
+      );
     }
 
     revalidateTag("deliveries");
     revalidateTag("orders");
 
-    // Fetch the fully updated object to return to the client
-    const updatedRows = await executeQuery(getDeliveryByIdQuery, [
-        { name: "id", type: TYPES.Int, value: despachoId },
-    ]);
-    
-    if (updatedRows.length === 0) {
-        return NextResponse.json({ error: "No se encontró el despacho después de la actualización." }, { status: 404 });
-    }
-    
     const finalPayload = await GET(request, { params });
     return finalPayload;
-
   } catch (e) {
     if (e instanceof z.ZodError) {
-      return NextResponse.json({ error: "Error de validación.", details: e.flatten() }, { status: 400 });
+      return NextResponse.json(
+        { error: "Error de validación.", details: e.flatten() },
+        { status: 400 }
+      );
     }
-    console.error("[API_DELIVERIES_PATCH_ERROR]", util.inspect(e, { depth: null }));
-    const errorMessage = e instanceof Error ? e.message : "Ocurrió un error inesperado.";
-    return NextResponse.json({ error: "Error al actualizar el despacho", details: errorMessage }, { status: 500 });
+    console.error(
+      "[API_DELIVERIES_PATCH_ERROR]",
+      util.inspect(e, { depth: null })
+    );
+    const errorMessage =
+      e instanceof Error ? e.message : "Ocurrió un error inesperado.";
+    return NextResponse.json(
+      { error: "Error al actualizar el despacho", details: errorMessage },
+      { status: 500 }
+    );
   }
 }
