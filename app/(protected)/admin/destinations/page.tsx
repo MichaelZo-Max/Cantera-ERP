@@ -6,6 +6,14 @@ import { AppLayout } from "@/components/app-layout";
 import type { Destination, Client } from "@/lib/types";
 import { DestinationsClientUI } from "./destinations-client"; // Importamos el nuevo componente
 
+// Define el tipo de respuesta esperado de la API de clientes
+type ClientsApiResponse = {
+  data: Client[];
+  totalPages: number;
+  // Agrega aquí otras propiedades si existen
+};
+
+
 // Función para obtener los datos en el servidor
 async function getDestinationsAndClients(): Promise<{
   destinations: Destination[];
@@ -27,7 +35,10 @@ async function getDestinationsAndClients(): Promise<{
     if (!clientRes.ok) throw new Error("Error al cargar clientes");
 
     const destinations = await destRes.json();
-    const clients = await clientRes.json();
+    
+    // ✨ CORRECCIÓN CLAVE: Extraer el array 'data' de la respuesta de clientes.
+    const clientsResponse: ClientsApiResponse = await clientRes.json();
+    const clients = clientsResponse.data || []; // Aseguramos que 'clients' sea siempre un array.
 
     return { destinations, clients };
   } catch (error) {

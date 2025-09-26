@@ -8,14 +8,24 @@ import { destinationSchema } from "@/lib/validations";
 
 export const dynamic = "force-dynamic";
 
+// Para mayor claridad, definimos el tipo de dato que viene de la base de datos
+type DestinationFromDB = {
+  id: number;
+  name: string;
+  address: string | null;
+  is_active: boolean;
+  customer_id: number;
+  client_name: string | null;
+};
+
 // GET: OBTENER TODOS LOS DESTINOS
 export async function GET() {
   try {
     const query = `
-      SELECT 
+      SELECT
         d.id,
         d.name,
-        d.address as address, -- ✨ CORRECCIÓN: Se usa 'address' y se le asigna el alias 'address'
+        d.address,
         d.is_active,
         d.customer_id,
         c.NOMBRECLIENTE as client_name
@@ -23,7 +33,20 @@ export async function GET() {
       LEFT JOIN dbo.CLIENTES c ON c.CODCLIENTE = d.customer_id
       ORDER BY d.id DESC;
     `;
-    const destinations = await executeQuery(query, []);
+    const results = (await executeQuery(query, [])) as DestinationFromDB[];
+
+    // ✨ CORRECCIÓN: Transformamos el resultado para anidar los datos del cliente
+    const destinations = results.map((dest) => ({
+      id: dest.id,
+      name: dest.name,
+      address: dest.address,
+      is_active: dest.is_active,
+      customer_id: dest.customer_id,
+      client: { // Creamos el objeto anidado que el frontend espera
+        name: dest.client_name,
+      },
+    }));
+
     return NextResponse.json(destinations);
   } catch (error) {
     console.error("[API_DESTINATIONS_GET]", error);
@@ -41,36 +64,48 @@ export async function POST(request: Request) {
       return NextResponse.json(validation.error.errors, { status: 400 });
     }
 
-    // El frontend envía 'address', lo cual es correcto
     const { name, address, customer_id } = validation.data;
 
     const query = `
-      -- ✨ CORRECCIÓN: Se inserta en la columna 'address' de la base de datos
       INSERT INTO RIP.APP_DESTINOS (name, address, customer_id)
       VALUES (@name, @address, @customer_id);
     `;
 
     await executeQuery(query, [
       { name: "name", type: TYPES.NVarChar, value: name },
-      // ✨ CORRECCIÓN: Se mapea el valor de 'address' al parámetro '@address'
       { name: "address", type: TYPES.NVarChar, value: address },
       { name: "customer_id", type: TYPES.Int, value: customer_id },
     ]);
 
     revalidateTag("destinations");
 
-    // Se devuelve el nuevo destino para actualizar la UI
     const createdDestinationQuery = `
       SELECT TOP 1
-        d.id, d.name, d.address as address, d.is_active, d.customer_id,
-        c.NOMBRECLIENTE as "client.name"
+        d.id, d.name, d.address, d.is_active, d.customer_id,
+        c.NOMBRECLIENTE as client_name
       FROM RIP.APP_DESTINOS d
       LEFT JOIN dbo.CLIENTES c ON c.CODCLIENTE = d.customer_id
       ORDER BY d.id DESC;
     `;
-    const newDestination = await executeQuery(createdDestinationQuery, []);
+    const newDestinationResult = (await executeQuery(
+      createdDestinationQuery,
+      []
+    )) as DestinationFromDB[];
+    const newDest = newDestinationResult[0];
 
-    return NextResponse.json(newDestination[0], { status: 201 });
+    // ✨ CORRECCIÓN: Hacemos la misma transformación al crear un nuevo destino
+    const createdDestination = {
+      id: newDest.id,
+      name: newDest.name,
+      address: newDest.address,
+      is_active: newDest.is_active,
+      customer_id: newDest.customer_id,
+      client: {
+        name: newDest.client_name,
+      },
+    };
+
+    return NextResponse.json(createdDestination, { status: 201 });
   } catch (error) {
     console.error("[API_DESTINATIONS_POST]", error);
     if (error instanceof z.ZodError) {
