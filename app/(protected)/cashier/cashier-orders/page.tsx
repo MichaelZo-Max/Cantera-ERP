@@ -4,6 +4,7 @@ import { PageHeader } from "@/components/page-header";
 import { executeQuery } from "@/lib/db";
 import { CashierOrdersClient } from "./cashier-orders-client";
 import { CashierOrder } from "@/lib/types";
+import { AppLayout } from "@/components/app-layout";
 
 // Función para obtener los datos directamente de la BD
 async function getCashierOrders(): Promise<CashierOrder[]> {
@@ -30,12 +31,12 @@ export default async function CashierOrdersPage() {
   const orders = await getCashierOrders();
 
   return (
-    <>
-      <PageHeader
-        title="Órdenes de Caja"
-        description="Consulta el historial de ventas directas creadas sin factura previa."
-      />
-      <CashierOrdersClient data={orders} />
-    </>
+    <AppLayout title="Órdenes de Caja">
+        <PageHeader
+            title="Órdenes de Caja"
+            description="Consulta el historial de ventas directas creadas sin factura previa."
+        />
+        <CashierOrdersClient data={orders} />
+    </AppLayout>
   );
 }
