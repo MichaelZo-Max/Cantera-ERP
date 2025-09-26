@@ -11,7 +11,10 @@ export const dynamic = "force-dynamic";
  * @route   GET /api/drivers/[id]
  * @desc    Obtener un chófer específico y los clientes asociados.
  */
-export async function GET(request: Request, { params }: { params: { id: string } }) {
+export async function GET(
+  request: Request,
+  { params }: { params: { id: string } }
+) {
   try {
     const id = Number.parseInt(params.id, 10);
     if (isNaN(id)) {
@@ -20,12 +23,14 @@ export async function GET(request: Request, { params }: { params: { id: string }
 
     // Consulta para obtener los datos del chófer
     const driverQuery = `SELECT * FROM RIP.APP_CHOFERES WHERE id = @id;`;
-    const driverResult = await executeQuery(driverQuery, [{ name: "id", type: TYPES.Int, value: id }]);
+    const driverResult = await executeQuery(driverQuery, [
+      { name: "id", type: TYPES.Int, value: id },
+    ]);
 
     if (driverResult.length === 0) {
       return new NextResponse("Chófer no encontrado", { status: 404 });
     }
-    
+
     const driver = driverResult[0];
 
     // Consulta para obtener los clientes asociados desde la tabla de unión
@@ -35,16 +40,17 @@ export async function GET(request: Request, { params }: { params: { id: string }
         JOIN RIP.APP_CLIENTES_CHOFERES cc ON c.id = cc.cliente_id
         WHERE cc.chofer_id = @id;
     `;
-    const customersResult = await executeQuery(customersQuery, [{ name: "id", type: TYPES.Int, value: id }]);
+    const customersResult = await executeQuery(customersQuery, [
+      { name: "id", type: TYPES.Int, value: id },
+    ]);
 
     // Combinamos los resultados en un solo objeto
     const populatedDriver = {
-        ...driver,
-        customers: customersResult, // Añadimos el array de clientes
+      ...driver,
+      customers: customersResult, // Añadimos el array de clientes
     };
 
     return NextResponse.json(populatedDriver);
-
   } catch (error) {
     console.error(`[API_DRIVERS_ID_GET]`, error);
     return new NextResponse("Error interno del servidor", { status: 500 });
@@ -88,10 +94,12 @@ export async function PATCH(
 
     // Si no hay datos para actualizar (excepto `customer_ids`), no tiene sentido continuar.
     if (Object.keys(validation.data).length === 0) {
-        return new NextResponse(
-          JSON.stringify({ message: "No se proporcionaron datos para actualizar." }),
-          { status: 400, headers: { "Content-Type": "application/json" } }
-        );
+      return new NextResponse(
+        JSON.stringify({
+          message: "No se proporcionaron datos para actualizar.",
+        }),
+        { status: 400, headers: { "Content-Type": "application/json" } }
+      );
     }
 
     // Paso 4: Actualizar los datos principales del chofer en la DB.
@@ -132,14 +140,14 @@ export async function PATCH(
 
       // Insertar las nuevas asociaciones si el array no está vacío
       if (customer_ids.length > 0) {
-        for (const customerId of customer_ids) {
+        for (const customer_id of customer_ids) {
           const linkQuery = `
               INSERT INTO RIP.APP_CLIENTES_CHOFERES (chofer_id, cliente_id)
               VALUES (@chofer_id, @cliente_id);
           `;
           await executeQuery(linkQuery, [
             { name: "chofer_id", type: TYPES.Int, value: id },
-            { name: "cliente_id", type: TYPES.Int, value: customerId },
+            { name: "cliente_id", type: TYPES.Int, value: customer_id },
           ]);
         }
       }
@@ -160,7 +168,10 @@ export async function PATCH(
  * @route   DELETE /api/drivers/[id]
  * @desc    Desactivar un chofer (borrado lógico)
  */
-export async function DELETE(request: Request, { params }: { params: { id: string } }) {
+export async function DELETE(
+  request: Request,
+  { params }: { params: { id: string } }
+) {
   try {
     const id = parseInt(params.id, 10);
     if (isNaN(id)) {

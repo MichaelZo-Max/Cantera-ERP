@@ -1,6 +1,12 @@
 "use client";
 
-import React, { useState, useCallback, useMemo, useRef, useEffect } from "react";
+import React, {
+  useState,
+  useCallback,
+  useMemo,
+  useRef,
+  useEffect,
+} from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -102,7 +108,14 @@ export function DriversClientUI({
     }
   >(
     (
-      { initialCustomers, selectedIds, onChange, onLoadMore, totalPages, error },
+      {
+        initialCustomers,
+        selectedIds,
+        onChange,
+        onLoadMore,
+        totalPages,
+        error,
+      },
       ref
     ) => {
       const [open, setOpen] = useState(false);
@@ -144,17 +157,19 @@ export function DriversClientUI({
         }
       };
 
-      const handleSelect = (customerId: number) => {
-        const newSelectedIds = selectedIds.includes(customerId)
-          ? selectedIds.filter((id) => id !== customerId)
-          : [...selectedIds, customerId];
+      const handleSelect = (customer_id: number) => {
+        const newSelectedIds = selectedIds.includes(customer_id)
+          ? selectedIds.filter((id) => id !== customer_id)
+          : [...selectedIds, customer_id];
         onChange(newSelectedIds);
       };
 
       // Encuentra los clientes seleccionados entre los clientes ya cargados y los iniciales
       const selectedCustomers = useMemo(() => {
         const allAvailableCustomers = [...initialCustomers, ...customers];
-        const uniqueCustomers = Array.from(new Map(allAvailableCustomers.map(c => [c.id, c])).values());
+        const uniqueCustomers = Array.from(
+          new Map(allAvailableCustomers.map((c) => [c.id, c])).values()
+        );
         return uniqueCustomers.filter((c) => selectedIds.includes(c.id));
       }, [selectedIds, customers, initialCustomers]);
 
@@ -166,12 +181,19 @@ export function DriversClientUI({
               variant="outline"
               role="combobox"
               aria-expanded={open}
-              className={cn("w-full justify-between h-auto", error && "border-red-500")}
+              className={cn(
+                "w-full justify-between h-auto",
+                error && "border-red-500"
+              )}
             >
               <div className="flex flex-wrap gap-1">
                 {selectedCustomers.length > 0 ? (
                   selectedCustomers.map((customer) => (
-                    <Badge key={customer.id} variant="secondary" className="rounded-sm">
+                    <Badge
+                      key={customer.id}
+                      variant="secondary"
+                      className="rounded-sm"
+                    >
                       {customer.name}
                     </Badge>
                   ))
@@ -206,7 +228,9 @@ export function DriversClientUI({
                       <Check
                         className={cn(
                           "mr-2 h-4 w-4",
-                          selectedIds.includes(customer.id) ? "opacity-100" : "opacity-0"
+                          selectedIds.includes(customer.id)
+                            ? "opacity-100"
+                            : "opacity-0"
                         )}
                       />
                       {customer.name}
@@ -214,10 +238,10 @@ export function DriversClientUI({
                   ))}
                 </CommandGroup>
                 {isLoading && (
-                   <div className="flex items-center justify-center p-2 text-sm text-muted-foreground">
-                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                     Cargando...
-                   </div>
+                  <div className="flex items-center justify-center p-2 text-sm text-muted-foreground">
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Cargando...
+                  </div>
                 )}
               </CommandList>
             </Command>
@@ -247,14 +271,16 @@ export function DriversClientUI({
 
   const [formErrors, setFormErrors] = useState<FormErrors>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const { isOpen, options, confirm, handleConfirm, handleCancel } = useConfirmation();
+  const { isOpen, options, confirm, handleConfirm, handleCancel } =
+    useConfirmation();
 
   const filteredDrivers = useMemo(
     () =>
       drivers.filter(
         (driver) =>
           driver.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          (driver.docId && driver.docId.toLowerCase().includes(searchTerm.toLowerCase()))
+          (driver.docId &&
+            driver.docId.toLowerCase().includes(searchTerm.toLowerCase()))
       ),
     [drivers, searchTerm]
   );
@@ -322,7 +348,9 @@ export function DriversClientUI({
 
       const body = validation.data;
       const method = editingDriver ? "PATCH" : "POST";
-      const url = editingDriver ? `/api/drivers/${editingDriver.id}` : "/api/drivers";
+      const url = editingDriver
+        ? `/api/drivers/${editingDriver.id}`
+        : "/api/drivers";
 
       try {
         const res = await fetch(url, {
@@ -334,7 +362,9 @@ export function DriversClientUI({
         if (!res.ok) {
           try {
             const errorData = await res.json();
-            throw new Error(errorData.message || "Error al guardar. Verifica los datos.");
+            throw new Error(
+              errorData.message || "Error al guardar. Verifica los datos."
+            );
           } catch {
             const errorText = await res.text();
             throw new Error(errorText || "Ocurrió un error en el servidor.");
@@ -345,7 +375,9 @@ export function DriversClientUI({
         const updatedDrivers = await fetchResponse.json();
         setDrivers(updatedDrivers);
 
-        toast.success(`Chofer ${editingDriver ? "actualizado" : "creado"} exitosamente.`);
+        toast.success(
+          `Chofer ${editingDriver ? "actualizado" : "creado"} exitosamente.`
+        );
         setShowDialog(false);
       } catch (err: any) {
         setApiError(err.message);
@@ -432,7 +464,9 @@ export function DriversClientUI({
             >
               <CardHeader className="pb-3">
                 <div className="flex justify-between items-start">
-                  <CardTitle className="text-lg font-bold">{driver.name}</CardTitle>
+                  <CardTitle className="text-lg font-bold">
+                    {driver.name}
+                  </CardTitle>
                   <Badge variant={driver.is_active ? "default" : "destructive"}>
                     {driver.is_active ? "Activo" : "Inactivo"}
                   </Badge>
@@ -460,7 +494,11 @@ export function DriversClientUI({
                   <div className="flex flex-wrap gap-1">
                     {driver.clients && driver.clients.length > 0 ? (
                       driver.clients.map((client) => (
-                        <Badge key={client.id} variant="secondary" className="font-normal">
+                        <Badge
+                          key={client.id}
+                          variant="secondary"
+                          className="font-normal"
+                        >
                           {client.name}
                         </Badge>
                       ))
@@ -517,7 +555,9 @@ export function DriversClientUI({
       <Dialog open={showDialog} onOpenChange={setShowDialog}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>{editingDriver ? "Editar Chofer" : "Crear Nuevo Chofer"}</DialogTitle>
+            <DialogTitle>
+              {editingDriver ? "Editar Chofer" : "Crear Nuevo Chofer"}
+            </DialogTitle>
             <DialogDescription>
               {editingDriver
                 ? "Actualiza los datos del chofer."
@@ -527,62 +567,62 @@ export function DriversClientUI({
 
           <form onSubmit={handleSubmit} className="space-y-6 pt-4">
             {/* ... Campos de Nombre, Documento y Teléfono (se mantienen igual) ... */}
-             <div className="space-y-2">
-               <Label htmlFor="name" className="font-semibold">
-                 Nombre Completo <span className="text-red-500">*</span>
-               </Label>
-               <Input
-                 id="name"
-                 value={formData.name}
-                 onChange={(e) =>
-                   setFormData({ ...formData, name: e.target.value })
-                 }
-                 className={cn(formErrors.name && "border-red-500")}
-               />
-               {formErrors.name && (
-                 <p className="text-xs text-red-500 flex items-center gap-1 mt-1">
-                   <AlertCircle className="h-3 w-3" /> {formErrors.name[0]}
-                 </p>
-               )}
-             </div>
+            <div className="space-y-2">
+              <Label htmlFor="name" className="font-semibold">
+                Nombre Completo <span className="text-red-500">*</span>
+              </Label>
+              <Input
+                id="name"
+                value={formData.name}
+                onChange={(e) =>
+                  setFormData({ ...formData, name: e.target.value })
+                }
+                className={cn(formErrors.name && "border-red-500")}
+              />
+              {formErrors.name && (
+                <p className="text-xs text-red-500 flex items-center gap-1 mt-1">
+                  <AlertCircle className="h-3 w-3" /> {formErrors.name[0]}
+                </p>
+              )}
+            </div>
 
-             <div className="space-y-2">
-               <Label htmlFor="docId" className="font-semibold">
-                 Documento de Identidad
-               </Label>
-               <Input
-                 id="docId"
-                 value={formData.docId}
-                 onChange={(e) =>
-                   setFormData({ ...formData, docId: e.target.value })
-                 }
-                 className={cn(formErrors.docId && "border-red-500")}
-               />
-               {formErrors.docId && (
-                 <p className="text-xs text-red-500 flex items-center gap-1 mt-1">
-                   <AlertCircle className="h-3 w-3" /> {formErrors.docId[0]}
-                 </p>
-               )}
-             </div>
+            <div className="space-y-2">
+              <Label htmlFor="docId" className="font-semibold">
+                Documento de Identidad
+              </Label>
+              <Input
+                id="docId"
+                value={formData.docId}
+                onChange={(e) =>
+                  setFormData({ ...formData, docId: e.target.value })
+                }
+                className={cn(formErrors.docId && "border-red-500")}
+              />
+              {formErrors.docId && (
+                <p className="text-xs text-red-500 flex items-center gap-1 mt-1">
+                  <AlertCircle className="h-3 w-3" /> {formErrors.docId[0]}
+                </p>
+              )}
+            </div>
 
-             <div className="space-y-2">
-               <Label htmlFor="phone" className="font-semibold">
-                 Teléfono
-               </Label>
-               <Input
-                 id="phone"
-                 value={formData.phone}
-                 onChange={(e) =>
-                   setFormData({ ...formData, phone: e.target.value })
-                 }
-                 className={cn(formErrors.phone && "border-red-500")}
-               />
-               {formErrors.phone && (
-                 <p className="text-xs text-red-500 flex items-center gap-1 mt-1">
-                   <AlertCircle className="h-3 w-3" /> {formErrors.phone[0]}
-                 </p>
-               )}
-             </div>
+            <div className="space-y-2">
+              <Label htmlFor="phone" className="font-semibold">
+                Teléfono
+              </Label>
+              <Input
+                id="phone"
+                value={formData.phone}
+                onChange={(e) =>
+                  setFormData({ ...formData, phone: e.target.value })
+                }
+                className={cn(formErrors.phone && "border-red-500")}
+              />
+              {formErrors.phone && (
+                <p className="text-xs text-red-500 flex items-center gap-1 mt-1">
+                  <AlertCircle className="h-3 w-3" /> {formErrors.phone[0]}
+                </p>
+              )}
+            </div>
 
             {/* --- ✨ CAMPO CLIENTES CON PAGINACIÓN --- */}
             <div className="space-y-2">
@@ -592,14 +632,17 @@ export function DriversClientUI({
               <MultiSelectCustomers
                 initialCustomers={initialCustomers}
                 selectedIds={formData.customer_ids}
-                onChange={(ids) => setFormData({ ...formData, customer_ids: ids })}
+                onChange={(ids) =>
+                  setFormData({ ...formData, customer_ids: ids })
+                }
                 onLoadMore={fetchMoreCustomers}
                 totalPages={totalPages}
                 error={!!formErrors.customer_ids}
               />
               {formErrors.customer_ids && (
                 <p className="text-xs text-red-500 flex items-center gap-1 mt-1">
-                  <AlertCircle className="h-3 w-3" /> {formErrors.customer_ids[0]}
+                  <AlertCircle className="h-3 w-3" />{" "}
+                  {formErrors.customer_ids[0]}
                 </p>
               )}
             </div>

@@ -19,10 +19,11 @@ import {
   Calculator,
   CreditCard,
   ShoppingCart,
-  Truck,
+  Truck as TruckIcon, // Renombramos Truck para evitar colisión de nombres
   Package,
   FileText,
   AlertCircle,
+  PlusCircle, // Icono para los nuevos botones
 } from "lucide-react";
 import { toast } from "sonner";
 import type {
@@ -39,7 +40,14 @@ import { GradientButton } from "@/components/ui/gradient-button";
 import { useDebounce } from "@/hooks/use-debounce";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
-// --- Tipos extendidos ---
+// --- Importación de los nuevos modales ---
+import { CreateCustomerModal } from "@/components/modals/create-customer-modal";
+import { CreateDestinationModal } from "@/components/modals/create-destination-modal";
+import { CreateTruckModal } from "@/components/modals/create-truck-modal";
+import { CreateDriverModal } from "@/components/modals/create-driver-modal";
+
+
+// --- Tipos extendidos (sin cambios) ---
 interface ProductWithAvailableQuantity extends Product {
   available_quantity?: number;
 }
@@ -99,12 +107,24 @@ export function OrderForm({
   const [clientPage, setClientPage] = useState(1);
   const [clientTotalPages, setClientTotalPages] = useState(10);
   const [isClientsLoading, setIsClientsLoading] = useState(false);
+  
   const [products, setProducts] = useState<Product[]>(initialProducts);
   const [productSearch, setProductSearch] = useState("");
   const debouncedProductSearch = useDebounce(productSearch, 500);
   const [productPage, setProductPage] = useState(1);
   const [productTotalPages, setProductTotalPages] = useState(10);
   const [isProductsLoading, setIsProductsLoading] = useState(false);
+
+  // --- 👇 NUEVO: Estados para los Modales ---
+  const [isCustomerModalOpen, setIsCustomerModalOpen] = useState(false);
+  const [isDestinationModalOpen, setIsDestinationModalOpen] = useState(false);
+  const [isTruckModalOpen, setIsTruckModalOpen] = useState(false);
+  const [isDriverModalOpen, setIsDriverModalOpen] = useState(false);
+
+  // --- 👇 NUEVO: Estados para almacenar los catálogos dinámicamente ---
+  const [destinations, setDestinations] = useState<Destination[]>(initialDestinations);
+  const [trucks, setTrucks] = useState<TruckType[]>(initialTrucks);
+  const [drivers, setDrivers] = useState<Driver[]>(initialDrivers);
 
   // --- Estados para Facturas ---
   const [availableInvoices, setAvailableInvoices] = useState<Invoice[]>([]);
@@ -140,8 +160,8 @@ export function OrderForm({
   const selectedClient = useMemo(() => clients.find((c) => c.id.toString() === selectedcustomer_id), [clients, selectedcustomer_id]);
   const filteredDestinations = useMemo(() => {
     if (!selectedcustomer_id) return [];
-    return initialDestinations.filter((d) => d.customer_id.toString() === selectedcustomer_id);
-  }, [selectedcustomer_id, initialDestinations]);
+    return destinations.filter((d) => d.customer_id.toString() === selectedcustomer_id);
+  }, [selectedcustomer_id, destinations]);
   const total = useMemo(() => orderItems.reduce((sum, item) => sum + item.subtotal, 0), [orderItems]);
   const canSubmit = useMemo(() => !!selectedcustomer_id && orderItems.length > 0 && selectedTruckIds.length > 0 && selectedDriverIds.length > 0, [selectedcustomer_id, orderItems, selectedTruckIds, selectedDriverIds]);
 
@@ -250,6 +270,35 @@ export function OrderForm({
     setCurrentQuantity(product ? 1 : 0);
   }, [products]);
 
+  // --- 👇 NUEVO: Handlers para la creación exitosa desde modales ---
+  const handleCustomerCreated = (newCustomer: Client) => {
+    setClients(prev => [newCustomer, ...prev]);
+    setSelectedcustomer_id(newCustomer.id.toString());
+    setIsCustomerModalOpen(false);
+    toast.success(`Cliente "${newCustomer.name}" creado y seleccionado.`);
+  };
+
+  const handleDestinationCreated = (newDestination: Destination) => {
+    setDestinations(prev => [newDestination, ...prev]);
+    setSelectedDestinationId(newDestination.id.toString());
+    setIsDestinationModalOpen(false);
+    toast.success(`Destino "${newDestination.name}" creado y seleccionado.`);
+  };
+
+  const handleTruckCreated = (newTruck: TruckType) => {
+    setTrucks(prev => [newTruck, ...prev]);
+    setSelectedTruckIds(prev => [...prev, newTruck.id.toString()]);
+    setIsTruckModalOpen(false);
+    toast.success(`Camión con placa "${newTruck.placa}" agregado y seleccionado.`);
+  };
+  
+  const handleDriverCreated = (newDriver: Driver) => {
+    setDrivers(prev => [newDriver, ...prev]);
+    setSelectedDriverIds(prev => [...prev, newDriver.id.toString()]);
+    setIsDriverModalOpen(false);
+    toast.success(`Chofer "${newDriver.name}" agregado y seleccionado.`);
+  };
+
   const proceedSubmit = () => {
     const orderData = {
       customer_id: parseInt(selectedcustomer_id!, 10),
@@ -260,8 +309,6 @@ export function OrderForm({
         price_per_unit: item.pricePerUnit,
         unit: item.product.unit || "UNIDAD",
       })),
-      // --- **CORRECCIÓN**: La siguiente línea ha sido eliminada ---
-      // total: total,
       truck_ids: selectedTruckIds.map((id) => parseInt(id, 10)),
       driver_ids: selectedDriverIds.map((id) => parseInt(id, 10)),
       invoices: selectedInvoices.map((invStr) => {
@@ -287,108 +334,157 @@ export function OrderForm({
   };
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 items-start p-2">
-      {/* Columna Izquierda (Formularios) */}
-      <div className="lg:col-span-3 space-y-6">
-        <Card>
-          <CardHeader><CardTitle className="flex items-center gap-2"><ShoppingCart className="text-primary" />Datos Generales</CardTitle></CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Cliente *</Label>
-                <SearchableSelect value={selectedcustomer_id} onChange={(v) => { setSelectedcustomer_id(v); setSelectedDestinationId(undefined); setSelectedInvoices([]); }} placeholder="Selecciona un cliente..." options={clients.map((c) => ({ value: c.id.toString(), label: c.name }))} onSearch={setClientSearch} onLoadMore={() => { if (clientPage < clientTotalPages && !isClientsLoading) setClientPage(p => p + 1); }} hasNextPage={clientPage < clientTotalPages} isLoading={isClientsLoading} />
-              </div>
-              <div className="space-y-2">
-                <Label>Destino (Opcional)</Label>
-                <SearchableSelect value={selectedDestinationId} onChange={setSelectedDestinationId} placeholder="Selecciona un destino..." disabled={!selectedcustomer_id || filteredDestinations.length === 0} options={filteredDestinations.map((d) => ({ value: d.id.toString(), label: d.name }))} />
-              </div>
-            </div>
-            <div className="mt-4 space-y-2">
-              <Label className="flex items-center gap-2"><FileText size={16} />Vincular Factura(s) (Opcional)</Label>
-              <SearchableSelect isMulti value={selectedInvoices} onChange={setSelectedInvoices} placeholder={selectedClient ? "Selecciona una o más facturas..." : "Primero selecciona un cliente"} disabled={!selectedcustomer_id || isInvoicesLoading} isLoading={isInvoicesLoading} options={availableInvoices.map((inv) => ({ value: `${inv.invoice_series}|${inv.invoice_number}|${inv.invoice_n}`, label: `${inv.invoice_series}-${inv.invoice_number} ($${(inv.total_usd ?? 0).toFixed(2)})` }))} />
-            </div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader><CardTitle className="flex items-center gap-2"><Truck className="text-primary" />Transporte</CardTitle></CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Camiones *</Label>
-                <SearchableSelect isMulti value={selectedTruckIds} onChange={setSelectedTruckIds} placeholder="Selecciona camiones..." options={initialTrucks.map((t) => ({ value: t.id.toString(), label: `${t.placa} (${t.brand || "N/A"})` }))} />
-              </div>
-              <div className="space-y-2">
-                <Label>Choferes *</Label>
-                <SearchableSelect isMulti value={selectedDriverIds} onChange={setSelectedDriverIds} placeholder="Selecciona choferes..." options={initialDrivers.map((d) => ({ value: d.id.toString(), label: d.name }))} />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        
-        {selectedInvoices.length === 0 ? (
-          <Card>
-            <CardHeader><CardTitle className="flex items-center gap-2"><Package className="text-primary" />Constructor de Items</CardTitle></CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
-                <div className="space-y-2">
-                  <Label>Producto</Label>
-                  <SearchableSelect value={selectedProduct?.id.toString() || ""} onChange={handleProductSelect} placeholder={isProductsLoading ? "Cargando..." : "Seleccionar producto..."} options={products.map((p) => ({ value: p.id.toString(), label: `${p.name} ($${Number(p.price_per_unit).toFixed(2)})` }))} onSearch={setProductSearch} onLoadMore={() => { if (productPage < productTotalPages && !isProductsLoading) setProductPage(p => p + 1); }} hasNextPage={productPage < productTotalPages} isLoading={isProductsLoading} />
-                </div>
-                <div className="space-y-2"><QuantityInput value={currentQuantity} onChange={setCurrentQuantity} disabled={!selectedProduct} /></div>
-              </div>
-              <Button onClick={handleAddItem} disabled={!selectedProduct || currentQuantity <= 0} className="w-full"><Plus className="h-4 w-4 mr-2" />Agregar al Pedido</Button>
-            </CardContent>
-          </Card>
-        ) : (
-          <Alert>
-            <AlertCircle className="h-4 w-4" /><AlertTitle>Productos Cargados desde Factura</AlertTitle>
-            <AlertDescription>Los productos están definidos por las facturas. Para modificarlos, cambia la selección de facturas.</AlertDescription>
-          </Alert>
-        )}
-      </div>
+    <>
+      {/* --- 👇 NUEVO: Renderizado de Modales --- */}
+      <CreateCustomerModal 
+        isOpen={isCustomerModalOpen} 
+        onClose={() => setIsCustomerModalOpen(false)}
+        onSuccess={handleCustomerCreated}
+      />
+      {selectedcustomer_id && <CreateDestinationModal 
+        isOpen={isDestinationModalOpen} 
+        onClose={() => setIsDestinationModalOpen(false)}
+        onSuccess={handleDestinationCreated}
+        customer_id={selectedcustomer_id}
+      />}
+      <CreateTruckModal
+        isOpen={isTruckModalOpen}
+        onClose={() => setIsTruckModalOpen(false)}
+        onSuccess={handleTruckCreated}
+      />
+      <CreateDriverModal
+        isOpen={isDriverModalOpen}
+        onClose={() => setIsDriverModalOpen(false)}
+        onSuccess={handleDriverCreated}
+      />
 
-      {/* Columna Derecha (Resumen) */}
-      <div className="lg:col-span-2 space-y-6 lg:sticky top-6">
-        <Card>
-          <CardHeader><CardTitle className="flex items-center gap-2"><Calculator className="text-primary" />Resumen</CardTitle></CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex justify-between items-center font-bold text-2xl border-t pt-4">
-              <span>Total:</span>
-              <span className="text-primary">${total.toFixed(2)}</span>
-            </div>
-            <GradientButton onClick={handleFormSubmit} disabled={!canSubmit || isSubmitting || isInvoiceItemsLoading} size="lg" className="w-full">
-              <CreditCard className="h-5 w-5 mr-2" />
-              {isSubmitting || isInvoiceItemsLoading ? "Procesando..." : isEditing ? "Actualizar Pedido" : "Crear Pedido"}
-            </GradientButton>
-          </CardContent>
-        </Card>
-        
-        {orderItems.length > 0 && (
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 items-start p-2">
+        {/* Columna Izquierda (Formularios) */}
+        <div className="lg:col-span-3 space-y-6">
           <Card>
-            <CardHeader><CardTitle>Items del Pedido</CardTitle></CardHeader>
+            <CardHeader><CardTitle className="flex items-center gap-2"><ShoppingCart className="text-primary" />Datos Generales</CardTitle></CardHeader>
             <CardContent>
-              <Table>
-                <TableHeader><TableRow><TableHead>Producto</TableHead><TableHead className="text-right">Subtotal</TableHead><TableHead /></TableRow></TableHeader>
-                <TableBody>
-                  {orderItems.map((item) => (
-                    <TableRow key={item.id}>
-                      <TableCell>
-                        <div className="font-medium">{item.product.name}</div>
-                        <div className="text-xs text-muted-foreground">{item.quantity} {item.product.unit} x ${item.pricePerUnit.toFixed(2)}</div>
-                      </TableCell>
-                      <TableCell className="text-right font-medium">${item.subtotal.toFixed(2)}</TableCell>
-                      <TableCell className="text-right">
-                        {selectedInvoices.length === 0 && (<Button variant="ghost" size="icon" onClick={() => handleRemoveItem(item.id)} className="h-8 w-8"><Trash2 className="h-4 w-4 text-destructive" /></Button>)}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Cliente *</Label>
+                  {/* --- 👇 MODIFICADO: Añadido botón para abrir modal de cliente --- */}
+                  <div className="flex items-center gap-2">
+                    <div className="flex-grow">
+                      <SearchableSelect value={selectedcustomer_id} onChange={(v) => { setSelectedcustomer_id(v); setSelectedDestinationId(undefined); setSelectedInvoices([]); }} placeholder="Selecciona un cliente..." options={clients.map((c) => ({ value: c.id.toString(), label: c.name }))} onSearch={setClientSearch} onLoadMore={() => { if (clientPage < clientTotalPages && !isClientsLoading) setClientPage(p => p + 1); }} hasNextPage={clientPage < clientTotalPages} isLoading={isClientsLoading} />
+                    </div>
+                    <Button variant="outline" size="icon" onClick={() => setIsCustomerModalOpen(true)}><PlusCircle className="h-4 w-4" /></Button>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label>Destino (Opcional)</Label>
+                  {/* --- 👇 MODIFICADO: Añadido botón para abrir modal de destino --- */}
+                   <div className="flex items-center gap-2">
+                    <div className="flex-grow">
+                      <SearchableSelect value={selectedDestinationId} onChange={setSelectedDestinationId} placeholder="Selecciona un destino..." disabled={!selectedcustomer_id || filteredDestinations.length === 0} options={filteredDestinations.map((d) => ({ value: d.id.toString(), label: d.name }))} />
+                    </div>
+                     <Button variant="outline" size="icon" onClick={() => setIsDestinationModalOpen(true)} disabled={!selectedcustomer_id}><PlusCircle className="h-4 w-4" /></Button>
+                  </div>
+                </div>
+              </div>
+              <div className="mt-4 space-y-2">
+                <Label className="flex items-center gap-2"><FileText size={16} />Vincular Factura(s) (Opcional)</Label>
+                <SearchableSelect isMulti value={selectedInvoices} onChange={setSelectedInvoices} placeholder={selectedClient ? "Selecciona una o más facturas..." : "Primero selecciona un cliente"} disabled={!selectedcustomer_id || isInvoicesLoading} isLoading={isInvoicesLoading} options={availableInvoices.map((inv) => ({ value: `${inv.invoice_series}|${inv.invoice_number}|${inv.invoice_n}`, label: `${inv.invoice_series}-${inv.invoice_number} ($${(inv.total_usd ?? 0).toFixed(2)})` }))} />
+              </div>
             </CardContent>
           </Card>
-        )}
+          
+          <Card>
+            <CardHeader><CardTitle className="flex items-center gap-2"><TruckIcon className="text-primary" />Transporte</CardTitle></CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Camiones *</Label>
+                   {/* --- 👇 MODIFICADO: Añadido botón para abrir modal de camiones --- */}
+                  <div className="flex items-center gap-2">
+                    <div className="flex-grow">
+                      <SearchableSelect isMulti value={selectedTruckIds} onChange={setSelectedTruckIds} placeholder="Selecciona camiones..." options={trucks.map((t) => ({ value: t.id.toString(), label: `${t.placa} (${t.brand || "N/A"})` }))} />
+                    </div>
+                    <Button variant="outline" size="icon" onClick={() => setIsTruckModalOpen(true)}><PlusCircle className="h-4 w-4" /></Button>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label>Choferes *</Label>
+                  {/* --- 👇 MODIFICADO: Añadido botón para abrir modal de choferes --- */}
+                  <div className="flex items-center gap-2">
+                    <div className="flex-grow">
+                      <SearchableSelect isMulti value={selectedDriverIds} onChange={setSelectedDriverIds} placeholder="Selecciona choferes..." options={drivers.map((d) => ({ value: d.id.toString(), label: d.name }))} />
+                    </div>
+                    <Button variant="outline" size="icon" onClick={() => setIsDriverModalOpen(true)}><PlusCircle className="h-4 w-4" /></Button>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          
+          {selectedInvoices.length === 0 ? (
+            <Card>
+              <CardHeader><CardTitle className="flex items-center gap-2"><Package className="text-primary" />Constructor de Items</CardTitle></CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
+                  <div className="space-y-2">
+                    <Label>Producto</Label>
+                    <SearchableSelect value={selectedProduct?.id.toString() || ""} onChange={handleProductSelect} placeholder={isProductsLoading ? "Cargando..." : "Seleccionar producto..."} options={products.map((p) => ({ value: p.id.toString(), label: `${p.name} ($${Number(p.price_per_unit).toFixed(2)})` }))} onSearch={setProductSearch} onLoadMore={() => { if (productPage < productTotalPages && !isProductsLoading) setProductPage(p => p + 1); }} hasNextPage={productPage < productTotalPages} isLoading={isProductsLoading} />
+                  </div>
+                  <div className="space-y-2"><QuantityInput value={currentQuantity} onChange={setCurrentQuantity} disabled={!selectedProduct} /></div>
+                </div>
+                <Button onClick={handleAddItem} disabled={!selectedProduct || currentQuantity <= 0} className="w-full"><Plus className="h-4 w-4 mr-2" />Agregar al Pedido</Button>
+              </CardContent>
+            </Card>
+          ) : (
+            <Alert>
+              <AlertCircle className="h-4 w-4" /><AlertTitle>Productos Cargados desde Factura</AlertTitle>
+              <AlertDescription>Los productos están definidos por las facturas. Para modificarlos, cambia la selección de facturas.</AlertDescription>
+            </Alert>
+          )}
+        </div>
+
+        {/* Columna Derecha (Resumen) */}
+        <div className="lg:col-span-2 space-y-6 lg:sticky top-6">
+          <Card>
+            <CardHeader><CardTitle className="flex items-center gap-2"><Calculator className="text-primary" />Resumen</CardTitle></CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex justify-between items-center font-bold text-2xl border-t pt-4">
+                <span>Total:</span>
+                <span className="text-primary">${total.toFixed(2)}</span>
+              </div>
+              <GradientButton onClick={handleFormSubmit} disabled={!canSubmit || isSubmitting || isInvoiceItemsLoading} size="lg" className="w-full">
+                <CreditCard className="h-5 w-5 mr-2" />
+                {isSubmitting || isInvoiceItemsLoading ? "Procesando..." : isEditing ? "Actualizar Pedido" : "Crear Pedido"}
+              </GradientButton>
+            </CardContent>
+          </Card>
+          
+          {orderItems.length > 0 && (
+            <Card>
+              <CardHeader><CardTitle>Items del Pedido</CardTitle></CardHeader>
+              <CardContent>
+                <Table>
+                  <TableHeader><TableRow><TableHead>Producto</TableHead><TableHead className="text-right">Subtotal</TableHead><TableHead /></TableRow></TableHeader>
+                  <TableBody>
+                    {orderItems.map((item) => (
+                      <TableRow key={item.id}>
+                        <TableCell>
+                          <div className="font-medium">{item.product.name}</div>
+                          <div className="text-xs text-muted-foreground">{item.quantity} {item.product.unit} x ${item.pricePerUnit.toFixed(2)}</div>
+                        </TableCell>
+                        <TableCell className="text-right font-medium">${item.subtotal.toFixed(2)}</TableCell>
+                        <TableCell className="text-right">
+                          {selectedInvoices.length === 0 && (<Button variant="ghost" size="icon" onClick={() => handleRemoveItem(item.id)} className="h-8 w-8"><Trash2 className="h-4 w-4 text-destructive" /></Button>)}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          )}
+        </div>
       </div>
-    </div>
+    </>
   );
 }

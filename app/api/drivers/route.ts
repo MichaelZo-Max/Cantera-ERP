@@ -77,18 +77,18 @@ export async function POST(request: Request) {
       { name: "docId", type: TYPES.NVarChar, value: docId ?? null },
       { name: "phone", type: TYPES.NVarChar, value: phone ?? null },
     ]);
-    
+
     const driver_id = driverResult[0].id;
 
     if (customer_ids && customer_ids.length > 0) {
-      for (const customerId of customer_ids) {
+      for (const customer_id of customer_ids) {
         const linkQuery = `
             INSERT INTO RIP.APP_CLIENTES_CHOFERES (chofer_id, cliente_id)
             VALUES (@chofer_id, @cliente_id);
         `;
         await executeQuery(linkQuery, [
           { name: "chofer_id", type: TYPES.Int, value: driver_id },
-          { name: "cliente_id", type: TYPES.Int, value: customerId },
+          { name: "cliente_id", type: TYPES.Int, value: customer_id },
         ]);
       }
     }

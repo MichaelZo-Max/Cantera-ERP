@@ -24,7 +24,7 @@ interface CreateDestinationModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: (newDestination: Destination) => void;
-  customerId?: string | null; // El ID del cliente al que se asociará el destino
+  customer_id?: string | null; // El ID del cliente al que se asociará el destino
 }
 
 type FormErrors = {
@@ -33,24 +33,31 @@ type FormErrors = {
   customer_id?: string[];
 };
 
-export function CreateDestinationModal({ isOpen, onClose, onSuccess, customerId }: CreateDestinationModalProps) {
+export function CreateDestinationModal({
+  isOpen,
+  onClose,
+  onSuccess,
+  customer_id,
+}: CreateDestinationModalProps) {
   const [formData, setFormData] = useState({ name: "", direccion: "" });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formErrors, setFormErrors] = useState<FormErrors>({});
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!customerId) {
-        toast.error("Error", { description: "Se requiere un cliente para crear un destino." });
-        return;
+    if (!customer_id) {
+      toast.error("Error", {
+        description: "Se requiere un cliente para crear un destino.",
+      });
+      return;
     }
 
     setIsSubmitting(true);
     setFormErrors({});
-    
+
     const dataToValidate = {
-        ...formData,
-        customer_id: customerId,
+      ...formData,
+      customer_id: customer_id,
     };
 
     const validation = destinationSchema.safeParse(dataToValidate);
@@ -58,7 +65,9 @@ export function CreateDestinationModal({ isOpen, onClose, onSuccess, customerId 
       const errors = validation.error.flatten().fieldErrors;
       setFormErrors(errors as FormErrors);
       setIsSubmitting(false);
-      toast.error("Error de validación", { description: "Por favor, corrige los campos marcados." });
+      toast.error("Error de validación", {
+        description: "Por favor, corrige los campos marcados.",
+      });
       return;
     }
 
@@ -70,9 +79,9 @@ export function CreateDestinationModal({ isOpen, onClose, onSuccess, customerId 
       });
 
       if (!res.ok) {
-        throw new Error(await res.text() || "Error al crear el destino");
+        throw new Error((await res.text()) || "Error al crear el destino");
       }
-      
+
       const newDestination = await res.json();
       toast.success("¡Destino creado exitosamente!");
       onSuccess(newDestination);
@@ -83,7 +92,7 @@ export function CreateDestinationModal({ isOpen, onClose, onSuccess, customerId 
       setIsSubmitting(false);
     }
   };
-  
+
   // Limpiar formulario al cerrar
   const handleClose = () => {
     setFormData({ name: "", direccion: "" });
@@ -95,35 +104,65 @@ export function CreateDestinationModal({ isOpen, onClose, onSuccess, customerId 
     <Dialog open={isOpen} onOpenChange={handleClose}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2"><MapPin className="h-5 w-5 text-primary" />Nuevo Destino</DialogTitle>
-          <DialogDescription>Completa los datos del nuevo destino. Se asociará al cliente seleccionado.</DialogDescription>
+          <DialogTitle className="flex items-center gap-2">
+            <MapPin className="h-5 w-5 text-primary" />
+            Nuevo Destino
+          </DialogTitle>
+          <DialogDescription>
+            Completa los datos del nuevo destino. Se asociará al cliente
+            seleccionado.
+          </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4 pt-4">
           <div>
             <Label htmlFor="name">Nombre del Destino *</Label>
-            <Input 
-              id="name" 
-              placeholder="Ej: Obra principal" 
-              value={formData.name} 
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })} 
-              className={cn("mt-1.5", formErrors.name && "border-red-500")} 
+            <Input
+              id="name"
+              placeholder="Ej: Obra principal"
+              value={formData.name}
+              onChange={(e) =>
+                setFormData({ ...formData, name: e.target.value })
+              }
+              className={cn("mt-1.5", formErrors.name && "border-red-500")}
             />
-            {formErrors.name && <p className="text-red-500 text-sm mt-1 flex items-center gap-1"><AlertCircle size={14} />{formErrors.name[0]}</p>}
+            {formErrors.name && (
+              <p className="text-red-500 text-sm mt-1 flex items-center gap-1">
+                <AlertCircle size={14} />
+                {formErrors.name[0]}
+              </p>
+            )}
           </div>
           <div>
             <Label htmlFor="direccion">Dirección</Label>
-            <Input 
-              id="direccion" 
-              placeholder="Ej: Av. Principal, Edificio Central" 
-              value={formData.direccion} 
-              onChange={(e) => setFormData({ ...formData, direccion: e.target.value })} 
-              className={cn("mt-1.5", formErrors.direccion && "border-red-500")} 
+            <Input
+              id="direccion"
+              placeholder="Ej: Av. Principal, Edificio Central"
+              value={formData.direccion}
+              onChange={(e) =>
+                setFormData({ ...formData, direccion: e.target.value })
+              }
+              className={cn("mt-1.5", formErrors.direccion && "border-red-500")}
             />
-            {formErrors.direccion && <p className="text-red-500 text-sm mt-1 flex items-center gap-1"><AlertCircle size={14} />{formErrors.direccion[0]}</p>}
+            {formErrors.direccion && (
+              <p className="text-red-500 text-sm mt-1 flex items-center gap-1">
+                <AlertCircle size={14} />
+                {formErrors.direccion[0]}
+              </p>
+            )}
           </div>
           <DialogFooter className="pt-4">
-            <Button type="button" variant="outline" onClick={handleClose} disabled={isSubmitting}>Cancelar</Button>
-            <GradientButton type="submit" disabled={isSubmitting || !customerId}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleClose}
+              disabled={isSubmitting}
+            >
+              Cancelar
+            </Button>
+            <GradientButton
+              type="submit"
+              disabled={isSubmitting || !customer_id}
+            >
               <Save className="h-4 w-4 mr-2" />
               {isSubmitting ? "Creando..." : "Crear Destino"}
             </GradientButton>
