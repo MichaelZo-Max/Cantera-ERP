@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useMemo, useEffect } from "react";
+import { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -28,7 +28,6 @@ import { toast } from "sonner";
 import type {
   Client,
   Product,
-  UnitBase,
   Destination,
   Truck as TruckType,
   Driver,
@@ -40,22 +39,19 @@ import { GradientButton } from "@/components/ui/gradient-button";
 import { useDebounce } from "@/hooks/use-debounce";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
-// --- Tipo extendido para incluir la cantidad disponible desde la factura ---
+// --- Tipos extendidos ---
 interface ProductWithAvailableQuantity extends Product {
   available_quantity?: number;
 }
-
 interface PaginatedResponse<T> {
   data: T[];
   totalPages: number;
 }
-
 interface InvoicesApiResponse {
   invoices: Invoice[];
   totalPages: number;
   currentPage: number;
 }
-
 interface OrderItem {
   id: string;
   product: Product;
@@ -63,7 +59,6 @@ interface OrderItem {
   pricePerUnit: number;
   subtotal: number;
 }
-
 interface OrderFormProps {
   initialClients: Client[];
   initialProducts: Product[];
@@ -88,25 +83,22 @@ export function OrderForm({
   isSubmitting,
 }: OrderFormProps) {
   // --- Estados del Formulario ---
-  const [selectedcustomer_id, setSelectedcustomer_id] = useState<string | undefined>(initialOrderData?.customer_id?.toString());
-  const [selectedDestinationId, setSelectedDestinationId] = useState<string | undefined>(initialOrderData?.destination_id?.toString());
-  const [selectedTruckIds, setSelectedTruckIds] = useState<string[]>(initialOrderData?.trucks?.map((t) => t.id.toString()) ?? []);
-  const [selectedDriverIds, setSelectedDriverIds] = useState<string[]>(initialOrderData?.drivers?.map((d) => d.id.toString()) ?? []);
+  const [selectedcustomer_id, setSelectedcustomer_id] = useState<string | undefined>(undefined);
+  const [selectedDestinationId, setSelectedDestinationId] = useState<string | undefined>(undefined);
+  const [selectedTruckIds, setSelectedTruckIds] = useState<string[]>([]);
+  const [selectedDriverIds, setSelectedDriverIds] = useState<string[]>([]);
   const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [currentQuantity, setCurrentQuantity] = useState<number>(0);
   const [selectedInvoices, setSelectedInvoices] = useState<string[]>([]);
 
-  // --- Estados para Clientes Paginados ---
+  // --- Estados para Paginación y Búsqueda ---
   const [clients, setClients] = useState<Client[]>(initialClients);
   const [clientSearch, setClientSearch] = useState("");
   const debouncedClientSearch = useDebounce(clientSearch, 500);
   const [clientPage, setClientPage] = useState(1);
   const [clientTotalPages, setClientTotalPages] = useState(10);
   const [isClientsLoading, setIsClientsLoading] = useState(false);
-  const selectedClient = useMemo(() => clients.find((c) => c.id.toString() === selectedcustomer_id), [clients, selectedcustomer_id]);
-
-  // --- Estados para Productos Paginados ---
   const [products, setProducts] = useState<Product[]>(initialProducts);
   const [productSearch, setProductSearch] = useState("");
   const debouncedProductSearch = useDebounce(productSearch, 500);
@@ -114,11 +106,12 @@ export function OrderForm({
   const [productTotalPages, setProductTotalPages] = useState(10);
   const [isProductsLoading, setIsProductsLoading] = useState(false);
 
-  // --- Estados para Facturas Dinámicas ---
+  // --- Estados para Facturas ---
   const [availableInvoices, setAvailableInvoices] = useState<Invoice[]>([]);
   const [isInvoicesLoading, setIsInvoicesLoading] = useState(false);
   const [isInvoiceItemsLoading, setIsInvoiceItemsLoading] = useState(false);
 
+  const prevInvoicesRef = useRef<string[]>();
 
   useEffect(() => {
     if (isEditing && initialOrderData) {
@@ -126,6 +119,7 @@ export function OrderForm({
       setSelectedDestinationId(initialOrderData.destination_id?.toString());
       setSelectedTruckIds(initialOrderData.trucks?.map((t: TruckType) => t.id.toString()) ?? []);
       setSelectedDriverIds(initialOrderData.drivers?.map((d: Driver) => d.id.toString()) ?? []);
+      
       if (initialOrderData.items) {
         setOrderItems(initialOrderData.items.map((item) => ({
           id: crypto.randomUUID(),
@@ -135,6 +129,7 @@ export function OrderForm({
           subtotal: Number(item.quantity) * Number(item.price_per_unit),
         })));
       }
+      
       if (initialOrderData.invoices && initialOrderData.invoices.length > 0) {
         const invoiceValues = initialOrderData.invoices.map((inv) => `${inv.invoice_series}|${inv.invoice_number}|${inv.invoice_n}`);
         setSelectedInvoices(invoiceValues);
@@ -142,7 +137,14 @@ export function OrderForm({
     }
   }, [isEditing, initialOrderData]);
 
-  // --- Efecto para cargar facturas al seleccionar un cliente ---
+  const selectedClient = useMemo(() => clients.find((c) => c.id.toString() === selectedcustomer_id), [clients, selectedcustomer_id]);
+  const filteredDestinations = useMemo(() => {
+    if (!selectedcustomer_id) return [];
+    return initialDestinations.filter((d) => d.customer_id.toString() === selectedcustomer_id);
+  }, [selectedcustomer_id, initialDestinations]);
+  const total = useMemo(() => orderItems.reduce((sum, item) => sum + item.subtotal, 0), [orderItems]);
+  const canSubmit = useMemo(() => !!selectedcustomer_id && orderItems.length > 0 && selectedTruckIds.length > 0 && selectedDriverIds.length > 0, [selectedcustomer_id, orderItems, selectedTruckIds, selectedDriverIds]);
+
   useEffect(() => {
     const fetchInvoicesForClient = async () => {
       if (!selectedClient) {
@@ -158,7 +160,6 @@ export function OrderForm({
         setAvailableInvoices(result.invoices || []);
       } catch (error) {
         toast.error("Error al cargar las facturas del cliente.");
-        setAvailableInvoices([]);
       } finally {
         setIsInvoicesLoading(false);
       }
@@ -166,21 +167,24 @@ export function OrderForm({
     fetchInvoicesForClient();
   }, [selectedClient]);
 
-  // --- NUEVO: Efecto para cargar productos de facturas y agregarlos automáticamente al pedido ---
   useEffect(() => {
     const fetchAndSetInvoiceItems = async () => {
-      // Si no hay facturas seleccionadas, limpiamos los items y terminamos
-      if (selectedInvoices.length === 0) {
+      const prevInvoices = prevInvoicesRef.current;
+      prevInvoicesRef.current = selectedInvoices;
+
+      if (JSON.stringify(prevInvoices) === JSON.stringify(selectedInvoices)) return;
+      if ((prevInvoices?.length ?? 0) > 0 && selectedInvoices.length === 0) {
         setOrderItems([]);
         return;
       }
+      if (selectedInvoices.length === 0) return;
       
       setIsInvoiceItemsLoading(true);
       toast.info("Cargando productos de las facturas...");
       
       try {
-        const invoicesData = selectedInvoices.map((invoiceString) => {
-          const [series, number, n] = invoiceString.split("|");
+        const invoicesData = selectedInvoices.map((invStr) => {
+          const [series, number, n] = invStr.split("|");
           return { invoice_series: series, invoice_number: parseInt(number, 10), invoice_n: n };
         });
         
@@ -190,26 +194,20 @@ export function OrderForm({
           body: JSON.stringify(invoicesData),
         });
 
-        if (!res.ok) throw new Error("No se pudieron cargar los productos de las facturas");
+        if (!res.ok) throw new Error("Error al cargar productos de facturas");
         
         const productsFromInvoices: ProductWithAvailableQuantity[] = await res.json();
-
-        // Convertir los productos de la factura en OrderItems
-        const newOrderItems = productsFromInvoices.map((product) => ({
+        const newOrderItems = productsFromInvoices.map((p) => ({
           id: crypto.randomUUID(),
-          product: product,
-          quantity: product.available_quantity ?? 0, // Usamos la cantidad disponible de la factura
-          pricePerUnit: Number(product.price_per_unit),
-          subtotal: (product.available_quantity ?? 0) * Number(product.price_per_unit),
+          product: p,
+          quantity: p.available_quantity ?? 0,
+          pricePerUnit: Number(p.price_per_unit),
+          subtotal: (p.available_quantity ?? 0) * Number(p.price_per_unit),
         }));
 
         setOrderItems(newOrderItems);
-        
-        if (newOrderItems.length > 0) {
-          toast.success("Se han cargado todos los productos de las facturas seleccionadas.");
-        } else {
-          toast.warning("Las facturas seleccionadas no tienen productos para despachar.");
-        }
+        if (newOrderItems.length > 0) toast.success("Productos cargados desde facturas.");
+        else toast.warning("Las facturas no tienen productos para despachar.");
 
       } catch (error) {
         toast.error("Error al cargar los productos de las facturas.");
@@ -221,66 +219,6 @@ export function OrderForm({
 
     fetchAndSetInvoiceItems();
   }, [selectedInvoices]);
-  
-  // Lógica de paginación
-  useEffect(() => {
-    if (selectedInvoices.length > 0) return;
-
-    const fetchProducts = async () => {
-      setIsProductsLoading(true);
-      const params = new URLSearchParams({ page: String(productPage), limit: "20", q: debouncedProductSearch });
-      try {
-        const res = await fetch(`/api/products?${params.toString()}`);
-        if (!res.ok) throw new Error("No se pudieron cargar los productos");
-        const result: PaginatedResponse<Product> = await res.json();
-        setProducts((prev) => {
-          const existingIds = new Set(prev.map((p) => p.id));
-          const newProducts = result.data.filter((p) => !existingIds.has(p.id));
-          return productPage === 1 ? result.data : [...prev, ...newProducts];
-        });
-        setProductTotalPages(result.totalPages);
-      } catch (error) {
-        toast.error("Error al cargar productos.");
-      } finally {
-        setIsProductsLoading(false);
-      }
-    };
-    fetchProducts();
-  }, [productPage, debouncedProductSearch, selectedInvoices.length]);
-
-  useEffect(() => {
-    const fetchClients = async () => {
-      setIsClientsLoading(true);
-      const params = new URLSearchParams({ page: String(clientPage), limit: "20", q: debouncedClientSearch });
-      try {
-        const res = await fetch(`/api/customers?${params.toString()}`);
-        if (!res.ok) throw new Error("No se pudieron cargar los clientes");
-        const result: PaginatedResponse<Client> = await res.json();
-        setClients((prev) => {
-          const existingIds = new Set(prev.map((c) => c.id));
-          const newClients = result.data.filter((c) => !existingIds.has(c.id));
-          return clientPage === 1 ? result.data : [...prev, ...newClients];
-        });
-        setClientTotalPages(result.totalPages);
-      } catch (error) {
-        toast.error("Error al cargar clientes.");
-      } finally {
-        setIsClientsLoading(false);
-      }
-    };
-    fetchClients();
-  }, [clientPage, debouncedClientSearch]);
-
-
-  useEffect(() => setClientPage(1), [debouncedClientSearch]);
-  useEffect(() => setProductPage(1), [debouncedProductSearch]);
-
-  const filteredDestinations = useMemo(() => {
-    if (!selectedcustomer_id) return [];
-    return initialDestinations.filter((d) => d.customer_id.toString() === selectedcustomer_id);
-  }, [selectedcustomer_id, initialDestinations]);
-
-  const total = useMemo(() => orderItems.reduce((sum, item) => sum + item.subtotal, 0), [orderItems]);
 
   const handleAddItem = useCallback(() => {
     if (!selectedProduct || currentQuantity <= 0) {
@@ -294,15 +232,15 @@ export function OrderForm({
       pricePerUnit: Number(selectedProduct.price_per_unit),
       subtotal: currentQuantity * Number(selectedProduct.price_per_unit),
     };
-    setOrderItems((prevItems) => [...prevItems, newItem]);
+    setOrderItems((prev) => [...prev, newItem]);
     setSelectedProduct(null);
     setCurrentQuantity(0);
     setProductSearch("");
-    toast.success(`${newItem.product.name} ha sido agregado al pedido.`);
+    toast.success(`${newItem.product.name} agregado al pedido.`);
   }, [selectedProduct, currentQuantity]);
 
   const handleRemoveItem = useCallback((itemId: string) => {
-    setOrderItems((prevItems) => prevItems.filter((item) => item.id !== itemId));
+    setOrderItems((prev) => prev.filter((item) => item.id !== itemId));
     toast.success("Producto eliminado del pedido.");
   }, []);
 
@@ -312,29 +250,7 @@ export function OrderForm({
     setCurrentQuantity(product ? 1 : 0);
   }, [products]);
 
-  const handleFormSubmit = () => {
-    if (!selectedcustomer_id || orderItems.length === 0 || selectedTruckIds.length === 0 || selectedDriverIds.length === 0) {
-      toast.error("Completa todos los campos requeridos: Cliente, al menos un producto, un camión y un chofer.");
-      return;
-    }
-    if (selectedInvoices.length === 0) {
-      toast.warning("Estás creando un pedido sin facturas asociadas. ¿Deseas continuar?", {
-        action: {
-          label: "Continuar",
-          onClick: () => proceedSubmit(),
-        },
-      });
-    } else {
-      proceedSubmit();
-    }
-  };
-
   const proceedSubmit = () => {
-    const invoicesData = selectedInvoices.map((invoiceString) => {
-      const [series, number, n] = invoiceString.split("|");
-      return { invoice_series: series, invoice_number: parseInt(number, 10), invoice_n: n };
-    });
-
     const orderData = {
       customer_id: parseInt(selectedcustomer_id!, 10),
       destination_id: selectedDestinationId ? parseInt(selectedDestinationId, 10) : null,
@@ -344,227 +260,126 @@ export function OrderForm({
         price_per_unit: item.pricePerUnit,
         unit: item.product.unit || "UNIDAD",
       })),
-      total: total,
+      // --- **CORRECCIÓN**: La siguiente línea ha sido eliminada ---
+      // total: total,
       truck_ids: selectedTruckIds.map((id) => parseInt(id, 10)),
       driver_ids: selectedDriverIds.map((id) => parseInt(id, 10)),
-      invoices: invoicesData,
+      invoices: selectedInvoices.map((invStr) => {
+        const [series, number, n] = invStr.split("|");
+        return { invoice_series: series, invoice_number: parseInt(number, 10), invoice_n: n };
+      }),
     };
     onSubmit(orderData);
-  }
+  };
 
-  const canSubmit = useMemo(() => !!selectedcustomer_id && orderItems.length > 0 && selectedTruckIds.length > 0 && selectedDriverIds.length > 0, [selectedcustomer_id, orderItems, selectedTruckIds, selectedDriverIds]);
-
+  const handleFormSubmit = () => {
+    if (!canSubmit) {
+      toast.error("Completa todos los campos requeridos: Cliente, al menos un producto, un camión y un chofer.");
+      return;
+    }
+    if (selectedInvoices.length === 0) {
+      toast.warning("Estás creando un pedido sin facturas. ¿Deseas continuar?", {
+        action: { label: "Continuar", onClick: proceedSubmit },
+      });
+    } else {
+      proceedSubmit();
+    }
+  };
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 items-start p-2">
-      {/* --- Columna Izquierda (Formularios) --- */}
+      {/* Columna Izquierda (Formularios) */}
       <div className="lg:col-span-3 space-y-6">
         <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <ShoppingCart className="text-primary" />
-              Datos Generales
-            </CardTitle>
-          </CardHeader>
+          <CardHeader><CardTitle className="flex items-center gap-2"><ShoppingCart className="text-primary" />Datos Generales</CardTitle></CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Cliente *</Label>
-                <SearchableSelect
-                  value={selectedcustomer_id}
-                  onChange={(value) => {
-                    setSelectedcustomer_id(value);
-                    setSelectedDestinationId(undefined);
-                    setSelectedInvoices([]);
-                  }}
-                  placeholder="Selecciona un cliente..."
-                  options={clients.map((client) => ({ value: client.id.toString(), label: client.name }))}
-                  onSearch={setClientSearch}
-                  onLoadMore={() => { if (clientPage < clientTotalPages && !isClientsLoading) setClientPage((p) => p + 1); }}
-                  hasNextPage={clientPage < clientTotalPages}
-                  isLoading={isClientsLoading}
-                />
+                <SearchableSelect value={selectedcustomer_id} onChange={(v) => { setSelectedcustomer_id(v); setSelectedDestinationId(undefined); setSelectedInvoices([]); }} placeholder="Selecciona un cliente..." options={clients.map((c) => ({ value: c.id.toString(), label: c.name }))} onSearch={setClientSearch} onLoadMore={() => { if (clientPage < clientTotalPages && !isClientsLoading) setClientPage(p => p + 1); }} hasNextPage={clientPage < clientTotalPages} isLoading={isClientsLoading} />
               </div>
               <div className="space-y-2">
                 <Label>Destino (Opcional)</Label>
-                <SearchableSelect
-                  value={selectedDestinationId}
-                  onChange={setSelectedDestinationId}
-                  placeholder="Selecciona un destino..."
-                  disabled={!selectedcustomer_id || filteredDestinations.length === 0}
-                  options={filteredDestinations.map((dest) => ({ value: dest.id.toString(), label: dest.name }))}
-                />
+                <SearchableSelect value={selectedDestinationId} onChange={setSelectedDestinationId} placeholder="Selecciona un destino..." disabled={!selectedcustomer_id || filteredDestinations.length === 0} options={filteredDestinations.map((d) => ({ value: d.id.toString(), label: d.name }))} />
               </div>
             </div>
             <div className="mt-4 space-y-2">
-              <Label className="flex items-center gap-2">
-                <FileText size={16} /> Vincular Factura(s) (Opcional)
-              </Label>
-              <SearchableSelect
-                isMulti
-                value={selectedInvoices}
-                onChange={setSelectedInvoices}
-                placeholder={selectedClient ? "Selecciona una o más facturas..." : "Primero selecciona un cliente"}
-                disabled={!selectedcustomer_id || isInvoicesLoading}
-                isLoading={isInvoicesLoading}
-                options={availableInvoices.map((inv) => ({
-                  value: `${inv.invoice_series}|${inv.invoice_number}|${inv.invoice_n}`,
-                  label: `${inv.invoice_series}-${inv.invoice_number} ($${(inv.total_usd ?? 0).toFixed(2)})`,
-                }))}
-              />
+              <Label className="flex items-center gap-2"><FileText size={16} />Vincular Factura(s) (Opcional)</Label>
+              <SearchableSelect isMulti value={selectedInvoices} onChange={setSelectedInvoices} placeholder={selectedClient ? "Selecciona una o más facturas..." : "Primero selecciona un cliente"} disabled={!selectedcustomer_id || isInvoicesLoading} isLoading={isInvoicesLoading} options={availableInvoices.map((inv) => ({ value: `${inv.invoice_series}|${inv.invoice_number}|${inv.invoice_n}`, label: `${inv.invoice_series}-${inv.invoice_number} ($${(inv.total_usd ?? 0).toFixed(2)})` }))} />
             </div>
           </CardContent>
         </Card>
         
         <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Truck className="text-primary" />
-              Transporte
-            </CardTitle>
-          </CardHeader>
+          <CardHeader><CardTitle className="flex items-center gap-2"><Truck className="text-primary" />Transporte</CardTitle></CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Camiones *</Label>
-                <SearchableSelect isMulti value={selectedTruckIds} onChange={setSelectedTruckIds} placeholder="Selecciona camiones..."
-                  options={initialTrucks.map((truck) => ({ value: truck.id.toString(), label: `${truck.placa} (${truck.brand || "N/A"})` }))}
-                />
+                <SearchableSelect isMulti value={selectedTruckIds} onChange={setSelectedTruckIds} placeholder="Selecciona camiones..." options={initialTrucks.map((t) => ({ value: t.id.toString(), label: `${t.placa} (${t.brand || "N/A"})` }))} />
               </div>
               <div className="space-y-2">
                 <Label>Choferes *</Label>
-                <SearchableSelect isMulti value={selectedDriverIds} onChange={setSelectedDriverIds} placeholder="Selecciona choferes..."
-                  options={initialDrivers.map((driver) => ({ value: driver.id.toString(), label: driver.name }))}
-                />
+                <SearchableSelect isMulti value={selectedDriverIds} onChange={setSelectedDriverIds} placeholder="Selecciona choferes..." options={initialDrivers.map((d) => ({ value: d.id.toString(), label: d.name }))} />
               </div>
             </div>
           </CardContent>
         </Card>
         
-        {/* --- MODIFICADO: El constructor de items solo aparece si NO hay facturas seleccionadas --- */}
         {selectedInvoices.length === 0 ? (
           <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Package className="text-primary" /> Constructor de Items
-              </CardTitle>
-            </CardHeader>
+            <CardHeader><CardTitle className="flex items-center gap-2"><Package className="text-primary" />Constructor de Items</CardTitle></CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
                 <div className="space-y-2">
                   <Label>Producto</Label>
-                  <SearchableSelect
-                    value={selectedProduct?.id.toString() || ""}
-                    onChange={handleProductSelect}
-                    placeholder={isProductsLoading ? "Cargando productos..." : "Seleccionar producto..."}
-                    options={products.map((product) => ({
-                      value: product.id.toString(),
-                      label: `${product.name} ($${Number(product.price_per_unit).toFixed(2)})`,
-                    }))}
-                    onSearch={setProductSearch}
-                    onLoadMore={() => { if (productPage < productTotalPages && !isProductsLoading) setProductPage((p) => p + 1) }}
-                    hasNextPage={productPage < productTotalPages}
-                    isLoading={isProductsLoading}
-                  />
+                  <SearchableSelect value={selectedProduct?.id.toString() || ""} onChange={handleProductSelect} placeholder={isProductsLoading ? "Cargando..." : "Seleccionar producto..."} options={products.map((p) => ({ value: p.id.toString(), label: `${p.name} ($${Number(p.price_per_unit).toFixed(2)})` }))} onSearch={setProductSearch} onLoadMore={() => { if (productPage < productTotalPages && !isProductsLoading) setProductPage(p => p + 1); }} hasNextPage={productPage < productTotalPages} isLoading={isProductsLoading} />
                 </div>
-                <div className="space-y-2">
-                  <QuantityInput
-                    value={currentQuantity}
-                    onChange={setCurrentQuantity}
-                    disabled={!selectedProduct}
-                  />
-                </div>
+                <div className="space-y-2"><QuantityInput value={currentQuantity} onChange={setCurrentQuantity} disabled={!selectedProduct} /></div>
               </div>
-              <Button
-                onClick={handleAddItem}
-                disabled={!selectedProduct || currentQuantity <= 0}
-                className="w-full"
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Agregar al Pedido
-              </Button>
+              <Button onClick={handleAddItem} disabled={!selectedProduct || currentQuantity <= 0} className="w-full"><Plus className="h-4 w-4 mr-2" />Agregar al Pedido</Button>
             </CardContent>
           </Card>
         ) : (
           <Alert>
-            <AlertCircle className="h-4 w-4" />
-            <AlertTitle>Productos Cargados desde Factura</AlertTitle>
-            <AlertDescription>
-              Los productos del pedido están definidos por las facturas seleccionadas. Para modificarlos, cambia la selección de facturas.
-            </AlertDescription>
+            <AlertCircle className="h-4 w-4" /><AlertTitle>Productos Cargados desde Factura</AlertTitle>
+            <AlertDescription>Los productos están definidos por las facturas. Para modificarlos, cambia la selección de facturas.</AlertDescription>
           </Alert>
         )}
       </div>
 
-      {/* --- Columna Derecha (Resumen) --- */}
+      {/* Columna Derecha (Resumen) */}
       <div className="lg:col-span-2 space-y-6 lg:sticky top-6">
         <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Calculator className="text-primary" />
-              Resumen
-            </CardTitle>
-          </CardHeader>
+          <CardHeader><CardTitle className="flex items-center gap-2"><Calculator className="text-primary" />Resumen</CardTitle></CardHeader>
           <CardContent className="space-y-4">
             <div className="flex justify-between items-center font-bold text-2xl border-t pt-4">
               <span>Total:</span>
               <span className="text-primary">${total.toFixed(2)}</span>
             </div>
-            <GradientButton
-              onClick={handleFormSubmit}
-              disabled={!canSubmit || isSubmitting || isInvoiceItemsLoading}
-              size="lg"
-              className="w-full"
-            >
+            <GradientButton onClick={handleFormSubmit} disabled={!canSubmit || isSubmitting || isInvoiceItemsLoading} size="lg" className="w-full">
               <CreditCard className="h-5 w-5 mr-2" />
-              {isSubmitting || isInvoiceItemsLoading
-                ? "Procesando..."
-                : isEditing
-                ? "Actualizar Pedido"
-                : "Crear Pedido"}
+              {isSubmitting || isInvoiceItemsLoading ? "Procesando..." : isEditing ? "Actualizar Pedido" : "Crear Pedido"}
             </GradientButton>
           </CardContent>
         </Card>
         
         {orderItems.length > 0 && (
           <Card>
-            <CardHeader>
-              <CardTitle>Items del Pedido</CardTitle>
-            </CardHeader>
+            <CardHeader><CardTitle>Items del Pedido</CardTitle></CardHeader>
             <CardContent>
               <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Producto</TableHead>
-                    <TableHead className="text-right">Subtotal</TableHead>
-                    <TableHead />
-                  </TableRow>
-                </TableHeader>
+                <TableHeader><TableRow><TableHead>Producto</TableHead><TableHead className="text-right">Subtotal</TableHead><TableHead /></TableRow></TableHeader>
                 <TableBody>
                   {orderItems.map((item) => (
                     <TableRow key={item.id}>
                       <TableCell>
                         <div className="font-medium">{item.product.name}</div>
-                        <div className="text-xs text-muted-foreground">
-                          {item.quantity} {item.product.unit} x $
-                          {item.pricePerUnit.toFixed(2)}
-                        </div>
+                        <div className="text-xs text-muted-foreground">{item.quantity} {item.product.unit} x ${item.pricePerUnit.toFixed(2)}</div>
                       </TableCell>
-                      <TableCell className="text-right font-medium">
-                        ${item.subtotal.toFixed(2)}
-                      </TableCell>
+                      <TableCell className="text-right font-medium">${item.subtotal.toFixed(2)}</TableCell>
                       <TableCell className="text-right">
-                        {/* --- MODIFICADO: El botón de eliminar solo aparece si no hay facturas --- */}
-                        {selectedInvoices.length === 0 && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleRemoveItem(item.id)}
-                            className="h-8 w-8"
-                          >
-                            <Trash2 className="h-4 w-4 text-destructive" />
-                          </Button>
-                        )}
+                        {selectedInvoices.length === 0 && (<Button variant="ghost" size="icon" onClick={() => handleRemoveItem(item.id)} className="h-8 w-8"><Trash2 className="h-4 w-4 text-destructive" /></Button>)}
                       </TableCell>
                     </TableRow>
                   ))}
