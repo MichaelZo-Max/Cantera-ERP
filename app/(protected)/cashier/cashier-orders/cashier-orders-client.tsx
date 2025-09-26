@@ -26,11 +26,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
+import { Separator } from "@/components/ui/separator";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { AnimatedCard } from "@/components/ui/animated-card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 
-import { Search, DollarSign, User, Calendar, ClipboardList, Clock, CheckCircle, XCircle } from "lucide-react";
+import { Search, DollarSign, User, Calendar, ClipboardList, Clock, CheckCircle, XCircle, Package } from "lucide-react";
 import type { CashierOrder, Invoice } from "@/lib/types";
 
 
@@ -66,12 +68,16 @@ function OrderStatusBadge({ status }: { status: string }) {
   );
 }
 
+// --- ✨ Componente para formatear moneda ---
+function formatCurrency(amount: number) {
+    return new Intl.NumberFormat("en-US", { style: 'currency', currency: 'USD' }).format(amount);
+}
+
 /* --------------------------------- Componente Principal -------------------------------- */
 export function CashierOrdersClient({ data }: { data: CashierOrder[] }) {
   const router = useRouter();
   const [searchTerm, setSearchTerm] = useState("");
   
-  // --- Estados para el Modal ---
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<CashierOrder | null>(null);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
@@ -95,7 +101,6 @@ export function CashierOrdersClient({ data }: { data: CashierOrder[] }) {
     });
   }, [data, searchTerm]);
   
-  // --- Efecto para buscar facturas cuando se abre el modal ---
   useEffect(() => {
     if (selectedOrder) {
       const fetchInvoices = async () => {
@@ -105,17 +110,12 @@ export function CashierOrdersClient({ data }: { data: CashierOrder[] }) {
           if (!response.ok) throw new Error("Error al cargar facturas");
           
           const responseData = await response.json();
-          
-          // --- ✨ SOLUCIÓN AL PROBLEMA ---
-          // Se asegura de que lo que se guarda en el estado sea siempre un array.
-          // Si la API devuelve { data: [...] }, tomará `responseData.data`.
-          // Si la API devuelve [...], tomará `responseData`.
           const invoicesArray = Array.isArray(responseData) ? responseData : responseData.data || [];
           setInvoices(invoicesArray);
 
         } catch (error) {
           toast.error("No se pudieron cargar las facturas del cliente.");
-          setInvoices([]); // Asegurarse de limpiar en caso de error
+          setInvoices([]);
           console.error(error);
         } finally {
           setIsLoading(false);
@@ -138,7 +138,6 @@ export function CashierOrdersClient({ data }: { data: CashierOrder[] }) {
     setSelectedInvoiceId("");
   };
   
-  // --- Manejador para facturar la orden ---
   const handleInvoiceOrder = async () => {
     if (!selectedOrder || !selectedInvoiceId) return;
     
@@ -156,7 +155,7 @@ export function CashierOrdersClient({ data }: { data: CashierOrder[] }) {
       }
       
       toast.success("¡Orden facturada exitosamente!");
-      router.refresh(); // Refresca los datos de la página
+      router.refresh();
       handleCloseModal();
 
     } catch (error: any) {
@@ -170,7 +169,6 @@ export function CashierOrdersClient({ data }: { data: CashierOrder[] }) {
 
   return (
     <div className="space-y-4 motion-safe:animate-fade-in">
-      {/* Search Bar */}
       <Card>
         <CardContent className="pt-6">
           <div className="relative">
@@ -185,7 +183,6 @@ export function CashierOrdersClient({ data }: { data: CashierOrder[] }) {
         </CardContent>
       </Card>
 
-      {/* Listado de Tarjetas */}
       <section>
         {filteredOrders.length > 0 ? (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
@@ -213,7 +210,7 @@ export function CashierOrdersClient({ data }: { data: CashierOrder[] }) {
                         <div className="flex items-center">
                             <DollarSign className="mr-2 h-4 w-4" />
                             <span className="font-semibold text-foreground">
-                                {new Intl.NumberFormat("en-US", { style: 'currency', currency: 'USD' }).format(order.total_usd)}
+                                {formatCurrency(order.total_usd)}
                             </span>
                         </div>
                         <div className="flex items-center">
@@ -243,44 +240,89 @@ export function CashierOrdersClient({ data }: { data: CashierOrder[] }) {
         )}
       </section>
       
-      {/* --- Modal para Facturar --- */}
+      {/* --- ✨ MODAL ACTUALIZADO --- */}
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-        <DialogContent onInteractOutside={(e) => e.preventDefault()} onEscapeKeyDown={handleCloseModal}>
+        <DialogContent className="sm:max-w-2xl" onInteractOutside={(e) => e.preventDefault()} onEscapeKeyDown={handleCloseModal}>
           <DialogHeader>
             <DialogTitle>Asociar Factura a la Orden</DialogTitle>
             <DialogDescription>
-              Selecciona una factura existente para marcar la orden <strong>{selectedOrder?.order_number}</strong> como facturada.
+              Revisa los detalles de la orden <strong>{selectedOrder?.order_number}</strong> y selecciona una factura para asociar.
             </DialogDescription>
           </DialogHeader>
           
-          <div className="py-4 space-y-4">
-            {isLoading && !invoices.length ? (
-                <div className="flex items-center justify-center h-24">
-                    <LoadingSpinner />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 py-4">
+            {/* Columna de Detalles de la Orden */}
+            <div className="space-y-4">
+                <h4 className="font-semibold text-lg">Detalles de la Orden</h4>
+                <div className="rounded-lg border bg-card text-card-foreground shadow-sm p-4 space-y-3">
+                    <div className="flex justify-between">
+                        <span className="text-muted-foreground">Cliente:</span>
+                        <span className="font-medium text-right">{selectedOrder?.customer_name}</span>
+                    </div>
+                    <div className="flex justify-between">
+                        <span className="text-muted-foreground">Creado por:</span>
+                        <span className="font-medium">{selectedOrder?.created_by_name}</span>
+                    </div>
+                    <div className="flex justify-between">
+                        <span className="text-muted-foreground">Fecha:</span>
+                        <span className="font-medium">{selectedOrder ? format(new Date(selectedOrder.created_at), "PP", { locale: es }) : ''}</span>
+                    </div>
+                    <Separator />
+                    <ScrollArea className="h-[150px] pr-3">
+                        <div className="space-y-2">
+                           {selectedOrder?.details?.map(item => (
+                               <div key={item.id} className="flex items-center justify-between text-sm">
+                                   <div className="flex items-center">
+                                       <Package className="h-4 w-4 mr-2 text-muted-foreground" />
+                                       <div>
+                                           <p className="font-medium">{item.product_name}</p>
+                                           <p className="text-muted-foreground">
+                                               {item.quantity} x {formatCurrency(item.price_usd)}
+                                           </p>
+                                       </div>
+                                   </div>
+                                   <p className="font-semibold">{formatCurrency(item.total_usd)}</p>
+                               </div>
+                           ))}
+                        </div>
+                    </ScrollArea>
+                    <Separator />
+                     <div className="flex justify-between font-bold text-lg">
+                        <span>Total:</span>
+                        <span>{selectedOrder ? formatCurrency(selectedOrder.total_usd) : ''}</span>
+                    </div>
                 </div>
-            ) : (
-                <div className="space-y-2">
-                    <Label htmlFor="invoice-select">Facturas del Cliente</Label>
-                    <Select
-                        value={selectedInvoiceId}
-                        onValueChange={setSelectedInvoiceId}
-                        disabled={isLoading || invoices.length === 0}
-                    >
-                        <SelectTrigger id="invoice-select">
-                            <SelectValue placeholder={invoices.length > 0 ? "Selecciona una factura..." : "No hay facturas para este cliente"} />
-                        </SelectTrigger>
-                        <SelectContent>
-                            {/* --- ✨ SOLUCIÓN AL PROBLEMA (2a parte) --- */}
-                            {/* Ahora nos aseguramos que invoices es un array antes de mapear */}
-                            {Array.isArray(invoices) && invoices.map((invoice) => (
-                                <SelectItem key={invoice.invoice_n} value={invoice.invoice_n}>
-                                    {invoice.invoice_full_number || invoice.invoice_n} - {new Intl.NumberFormat("en-US", { style: 'currency', currency: 'USD' }).format(invoice.total_usd)}
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-                </div>
-            )}
+            </div>
+
+            {/* Columna para Seleccionar Factura */}
+            <div className="space-y-4">
+                <h4 className="font-semibold text-lg">Asociar Factura</h4>
+                {isLoading && !invoices.length ? (
+                    <div className="flex items-center justify-center h-24">
+                        <LoadingSpinner />
+                    </div>
+                ) : (
+                    <div className="space-y-2">
+                        <Label htmlFor="invoice-select">Facturas del Cliente</Label>
+                        <Select
+                            value={selectedInvoiceId}
+                            onValueChange={setSelectedInvoiceId}
+                            disabled={isLoading || invoices.length === 0}
+                        >
+                            <SelectTrigger id="invoice-select">
+                                <SelectValue placeholder={invoices.length > 0 ? "Selecciona una factura..." : "No hay facturas para este cliente"} />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {Array.isArray(invoices) && invoices.map((invoice) => (
+                                    <SelectItem key={invoice.invoice_n} value={invoice.invoice_n}>
+                                        {invoice.invoice_full_number || invoice.invoice_n} - {formatCurrency(invoice.total_usd)}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
+                )}
+            </div>
           </div>
 
           <DialogFooter>

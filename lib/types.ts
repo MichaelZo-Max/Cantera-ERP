@@ -28,6 +28,15 @@ export interface User {
   image?: string | null;
 }
 
+export interface CashierOrderDetail {
+  id: number;
+  product_id: string;
+  product_name: string;
+  quantity: number;
+  price_usd: number;
+  total_usd: number;
+}
+
 export interface Client {
   id: number;
   name: string;
@@ -279,6 +288,7 @@ export type CashierOrder = {
   items?: CashierOrderItem[];
   customer_name?: string;  // Campo que viene del JOIN con CLIENTES
   created_by_name?: string; // Campo que viene del JOIN con APP_USUARIOS
+  details: CashierOrderDetail[];
 };
 
 export type CashierOrderItem = {
