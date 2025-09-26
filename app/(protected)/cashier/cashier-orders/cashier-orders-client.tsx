@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Search, Hash, DollarSign, User, Calendar, ClipboardList, Clock, CheckCircle, XCircle } from "lucide-react";
+import { Search, DollarSign, User, Calendar, ClipboardList, Clock, CheckCircle, XCircle } from "lucide-react";
 import type { CashierOrder } from "@/lib/types";
 import { AnimatedCard } from "@/components/ui/animated-card";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -32,7 +32,6 @@ const STATUS_CONFIG = {
 
 type StatusKey = keyof typeof STATUS_CONFIG;
 
-// Componente para el badge de estado, adaptado a esta vista
 function OrderStatusBadge({ status }: { status: string }) {
   const conf = STATUS_CONFIG[status as StatusKey] ?? STATUS_CONFIG.PENDING_INVOICE;
   const Icon = conf.icon;
@@ -48,7 +47,6 @@ function OrderStatusBadge({ status }: { status: string }) {
 export function CashierOrdersClient({ data }: { data: CashierOrder[] }) {
   const [searchTerm, setSearchTerm] = useState("");
 
-  // Filtrado por búsqueda (número de orden, cliente o ID)
   const filteredOrders = useMemo(() => {
     const q = searchTerm.trim().toLowerCase();
     if (!q) return data;
@@ -66,9 +64,10 @@ export function CashierOrdersClient({ data }: { data: CashierOrder[] }) {
   }, [data, searchTerm]);
 
   return (
-    <div className="space-y-6 sm:space-y-8 motion-safe:animate-fade-in">
+    // Espaciado ajustado para mayor consistencia con el layout principal (gap-4)
+    <div className="space-y-4 motion-safe:animate-fade-in">
       {/* Search Bar */}
-      <AnimatedCard hoverEffect="lift">
+      <Card>
         <CardContent className="pt-6">
           <div className="relative">
             <label htmlFor="search-orders" className="sr-only">
@@ -83,13 +82,14 @@ export function CashierOrdersClient({ data }: { data: CashierOrder[] }) {
               placeholder="Buscar por cliente, número de orden o ID..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="h-12 pl-12 text-base sm:text-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+              // Usamos la clase `focus-ring` definida en globals.css para consistencia
+              className="h-12 pl-12 text-base sm:text-lg focus-ring"
               inputMode="search"
               autoComplete="off"
             />
           </div>
         </CardContent>
-      </AnimatedCard>
+      </Card>
 
       {/* Listado de Tarjetas */}
       <section>

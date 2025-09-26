@@ -30,12 +30,12 @@ export default async function CashierOrdersPage() {
   const orders = await getCashierOrders();
 
   return (
-    <div className="container mx-auto py-8">
+    <>
       <PageHeader
         title="Órdenes de Caja"
         description="Consulta el historial de ventas directas creadas sin factura previa."
       />
       <CashierOrdersClient data={orders} />
-    </div>
+    </>
   );
 }
