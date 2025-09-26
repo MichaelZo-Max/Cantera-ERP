@@ -111,6 +111,25 @@ export async function PUT(
       return new NextResponse("ID de pedido inválido", { status: 400 });
     }
 
+    // --- INICIO DE LA NUEVA LÓGICA DE VALIDACIÓN ---
+    // Verificamos si la orden ya tiene despachos antes de hacer cualquier otra cosa.
+    const checkDispatchesQuery = `
+      SELECT COUNT(*) as dispatchCount 
+      FROM RIP.APP_DESPACHOS 
+      WHERE order_id = @id;
+    `;
+    const result = await executeQuery(checkDispatchesQuery, [
+      { name: "id", type: TYPES.Int, value: id }
+    ]);
+
+    if (result && result[0]?.dispatchCount > 0) {
+      return new NextResponse(
+        "Este pedido no se puede editar porque ya tiene despachos asociados.",
+        { status: 403 } // 403 Forbidden es el código adecuado
+      );
+    }
+    // --- FIN DE LA NUEVA LÓGICA DE VALIDACIÓN ---
+
     const body = await request.json();
     const validation = orderUpdateSchema.safeParse(body);
     if (!validation.success) {
@@ -118,7 +137,7 @@ export async function PUT(
     }
 
     const {
-      items: itemsFromClient, // Renombramos para claridad
+      items: itemsFromClient,
       truck_ids,
       driver_ids,
       invoices,
@@ -129,7 +148,6 @@ export async function PUT(
     let trustedItems: typeof itemsFromClient = [];
 
     if (invoices && invoices.length > 0) {
-      // Si hay facturas, IGNORAMOS los items del cliente y los obtenemos de la DB.
       const invoiceParams = invoices.flatMap((inv, index) => [
         { name: `series_${index}`, type: TYPES.NVarChar, value: inv.invoice_series },
         { name: `number_${index}`, type: TYPES.Int, value: inv.invoice_number },
@@ -137,8 +155,8 @@ export async function PUT(
       ]);
 
       const conditions = invoices.map((_, index) =>
-          `(invoice_series = @series_${index} AND invoice_number = @number_${index} AND invoice_n = @n_${index})`
-        ).join(" OR ");
+        `(invoice_series = @series_${index} AND invoice_number = @number_${index} AND invoice_n = @n_${index})`
+      ).join(" OR ");
 
       const itemsQuery = `
         SELECT
@@ -156,28 +174,22 @@ export async function PUT(
       
       const productsFromInvoices = await executeQuery(itemsQuery, invoiceParams);
 
-      // Convertimos los productos seguros de la DB a la estructura de 'items' del pedido
       trustedItems = productsFromInvoices.map((p: any) => ({
         product_id: p.id,
         quantity: p.available_quantity,
         price_per_unit: p.price_per_unit ?? 0,
         unit: p.unit || 'UNIDAD'
       }));
-
     } else {
-      // Si no hay facturas, es un pedido manual y confiamos en los items del cliente.
       trustedItems = itemsFromClient;
     }
 
     if (trustedItems.length === 0) {
-        return NextResponse.json({ error: "El pedido debe tener al menos un producto." }, { status: 400 });
+      return NextResponse.json({ error: "El pedido debe tener al menos un producto." }, { status: 400 });
     }
     // --- FIN DE LA LÓGICA DE SEGURIDAD ---
 
-
     // ===== INICIO DE LA TRANSACCIÓN EN LA BASE DE DATOS =====
-    // (Opcional pero recomendado: envolver todo esto en una transacción)
-
     const updateOrderQuery = `
       UPDATE RIP.APP_PEDIDOS
       SET customer_id = @customer_id, 
@@ -191,12 +203,12 @@ export async function PUT(
       { name: "destination_id", type: TYPES.Int, value: orderData.destination_id },
     ]);
 
-    // 1. Actualizar Items (usando la lista segura "trustedItems")
+    // 1. Actualizar Items
     await executeQuery(
       `DELETE FROM RIP.APP_PEDIDOS_ITEMS WHERE order_id = @id`,
       [{ name: "id", type: TYPES.Int, value: id }]
     );
-    for (const item of trustedItems) { // <-- ❗️ Usamos la lista segura
+    for (const item of trustedItems) {
       const insertItemQuery = `
         INSERT INTO RIP.APP_PEDIDOS_ITEMS (order_id, product_id, quantity, price_per_unit, unit)
         VALUES (@order_id, @product_id, @quantity, @price_per_unit, @unit);

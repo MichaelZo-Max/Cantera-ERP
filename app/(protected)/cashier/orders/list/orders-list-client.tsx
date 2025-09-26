@@ -12,6 +12,14 @@ import { PageHeader } from "@/components/page-header";
 import { AnimatedCard } from "@/components/ui/animated-card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Progress } from "@/components/ui/progress";
+// --- 👇 MEJORA: Importaciones necesarias para el Tooltip ---
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+
 
 // --- (Función getStatusConfig sin cambios) ---
 const getStatusConfig = (status: string) => {
@@ -54,6 +62,7 @@ const getStatusConfig = (status: string) => {
   }
 };
 
+// --- (Función calculateOrderProgress sin cambios) ---
 const calculateOrderProgress = (order: Order): OrderProgress => {
   const totalItems =
     order.items?.reduce(
@@ -78,6 +87,7 @@ const calculateOrderProgress = (order: Order): OrderProgress => {
   return { order_id: String(order.id), totalItems, dispatchedItems, pendingItems: totalItems - dispatchedItems, completedTrips, totalTrips, status: order.status };
 };
 
+
 export function OrdersListClientUI({ initialOrders }: { initialOrders: Order[] }) {
   const [searchTerm, setSearchTerm] = useState("");
 
@@ -87,7 +97,6 @@ export function OrdersListClientUI({ initialOrders }: { initialOrders: Order[] }
     return initialOrders.filter(order =>
       (order.order_number?.toLowerCase() ?? "").includes(q) ||
       (order.client?.name?.toLowerCase() ?? "").includes(q) ||
-      // --- 👇 CAMBIO: Lógica de búsqueda para múltiples facturas ---
       (order.invoices?.some(invoice => 
         invoice.invoice_full_number?.toLowerCase().includes(q)
       ))
@@ -135,6 +144,11 @@ export function OrdersListClientUI({ initialOrders }: { initialOrders: Order[] }
             const statusConfig = getStatusConfig(order.status);
             const progress = calculateOrderProgress(order);
             const progressPercentage = progress.totalItems > 0 ? (progress.dispatchedItems / progress.totalItems) * 100 : 0;
+            
+            // --- 👇 LÓGICA: Determina si el botón de edición debe estar deshabilitado ---
+            const isEditingDisabled =
+              order.status === "PARTIALLY_DISPATCHED" ||
+              order.status === "DISPATCHED_COMPLETE";
 
             return (
               <AnimatedCard key={order.id} hoverEffect="lift" animateIn delay={index * 50} className="flex flex-col">
@@ -147,7 +161,6 @@ export function OrdersListClientUI({ initialOrders }: { initialOrders: Order[] }
                 <CardContent className="space-y-3 flex-grow">
                   <div className="flex items-center space-x-2"><User className="h-4 w-4 text-muted-foreground" /> <span className="font-medium">{order.client?.name}</span></div>
                   
-                  {/* --- 👇 CAMBIO: Mapear y mostrar todas las facturas como badges --- */}
                   {order.invoices && order.invoices.length > 0 && (
                     <div className="flex items-center space-x-2 text-sm text-muted-foreground">
                       <FileText className="h-4 w-4 flex-shrink-0" /> 
@@ -179,12 +192,34 @@ export function OrdersListClientUI({ initialOrders }: { initialOrders: Order[] }
                 </CardContent>
                 <CardFooter className="pt-4 border-t flex justify-between items-center">
                   <p className="text-xl font-bold">${Number(order.total ?? 0).toFixed(2)}</p>
-                  <Button asChild variant="outline" size="sm">
-                    <Link href={`/cashier/orders/${order.id}`}>
-                      <Pencil className="h-4 w-4 mr-2" />
-                      Editar
-                    </Link>
-                  </Button>
+                  
+                  {/* --- 👇 MEJORA: Botón de editar con Tooltip y lógica de deshabilitación --- */}
+                  <TooltipProvider delayDuration={100}>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        {/* Envolvemos el Link en un div para que el tooltip funcione incluso si el botón está deshabilitado */}
+                        <div className="relative">
+                          <Link 
+                            href={`/cashier/orders/${order.id}`}
+                            // Deshabilitamos el clic en el enlace con CSS si está deshabilitado
+                            className={isEditingDisabled ? 'pointer-events-none' : ''}
+                            tabIndex={isEditingDisabled ? -1 : undefined}
+                          >
+                            <Button variant="outline" size="sm" disabled={isEditingDisabled}>
+                              <Pencil className="h-4 w-4 mr-2" />
+                              Editar
+                            </Button>
+                          </Link>
+                        </div>
+                      </TooltipTrigger>
+                      {isEditingDisabled && (
+                        <TooltipContent>
+                          <p>No se puede editar una orden con despachos iniciados.</p>
+                        </TooltipContent>
+                      )}
+                    </Tooltip>
+                  </TooltipProvider>
+
                 </CardFooter>
               </AnimatedCard>
             );
