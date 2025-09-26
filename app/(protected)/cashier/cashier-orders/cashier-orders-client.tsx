@@ -102,7 +102,7 @@ export function CashierOrdersClient({ data }: { data: CashierOrder[] }) {
                 animateIn
                 delay={index * 50}
               >
-                <Card className="flex h-full flex-col">
+                <Card className="flex h-full flex-col bg-transparent border-0 shadow-none">
                   <CardHeader>
                     <div className="flex items-start justify-between">
                         <div>
