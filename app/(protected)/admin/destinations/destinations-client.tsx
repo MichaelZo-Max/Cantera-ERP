@@ -145,16 +145,20 @@ export function DestinationsClientUI({
         }
 
         const savedDestination = await res.json();
-        
+
         // La API ahora devuelve el objeto completo, por lo que podemos usarlo directamente
         setDestinations((prev) =>
           editingDestination
-            ? prev.map((d) => (d.id === savedDestination.id ? savedDestination : d))
+            ? prev.map((d) =>
+                d.id === savedDestination.id ? savedDestination : d
+              )
             : [...prev, savedDestination]
         );
-        
+
         toast.success(
-          `Destino ${editingDestination ? "actualizado" : "creado"} exitosamente.`
+          `Destino ${
+            editingDestination ? "actualizado" : "creado"
+          } exitosamente.`
         );
 
         setShowDialog(false);
@@ -224,39 +228,39 @@ export function DestinationsClientUI({
       {/* Header y Search Bar (sin cambios) */}
       <div className="flex justify-between items-center">
         <div className="space-y-2">
-            <div className="flex items-center space-x-3">
-                <div className="p-2 bg-gradient-primary rounded-lg">
-                    <MapPin className="h-6 w-6 text-white" />
-                </div>
-                <div>
-                    <h2 className="text-3xl font-bold bg-gradient-to-r from-foreground to-muted-foreground bg-clip-text text-transparent">
-                        Destinos
-                    </h2>
-                    <p className="text-muted-foreground">
-                        Administra las ubicaciones de entrega de los clientes
-                    </p>
-                </div>
+          <div className="flex items-center space-x-3">
+            <div className="p-2 bg-gradient-primary rounded-lg">
+              <MapPin className="h-6 w-6 text-white" />
             </div>
+            <div>
+              <h2 className="text-3xl font-bold bg-gradient-to-r from-foreground to-muted-foreground bg-clip-text text-transparent">
+                Destinos
+              </h2>
+              <p className="text-muted-foreground">
+                Administra las ubicaciones de entrega de los clientes
+              </p>
+            </div>
+          </div>
         </div>
         <GradientButton
-            onClick={handleNewDestination}
-            className="flex items-center space-x-2 animate-pulse-glow"
+          onClick={handleNewDestination}
+          className="flex items-center space-x-2 animate-pulse-glow"
         >
-            <Plus className="h-4 w-4" />
-            <span>Nuevo Destino</span>
+          <Plus className="h-4 w-4" />
+          <span>Nuevo Destino</span>
         </GradientButton>
       </div>
       <AnimatedCard hoverEffect="lift" className="glass">
         <CardContent className="pt-6">
-            <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-5 w-5" />
-                <Input
-                    placeholder="Buscar por nombre, dirección o cliente..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-12 h-12 text-lg focus-ring"
-                />
-            </div>
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-5 w-5" />
+            <Input
+              placeholder="Buscar por nombre, dirección o cliente..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-12 h-12 text-lg focus-ring"
+            />
+          </div>
         </CardContent>
       </AnimatedCard>
 
@@ -364,25 +368,30 @@ export function DestinationsClientUI({
           </DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-6 pt-4">
             <div className="space-y-2">
-              <Label htmlFor="customer_id" className="font-semibold">
-                Cliente *
-              </Label>
+              <Label htmlFor="customer_id">Cliente Asociado</Label>
               <SearchableSelect
                 value={formData.customer_id}
                 onChange={(value) =>
                   setFormData({ ...formData, customer_id: value })
                 }
                 placeholder="Seleccionar cliente..."
-                options={clients.map((client) => ({
-                  value: client.id.toString(),
-                  label: client.name,
-                }))}
-                className={formErrors.customer_id ? "border-red-500" : ""}
+                options={
+                  Array.isArray(clients)
+                    ? clients.map((client) => ({
+                        value: client.id.toString(),
+                        label: client.name,
+                      }))
+                    : []
+                }
+                disabled={isSubmitting}
+                className={`w-full focus-ring ${
+                  formErrors.customer_id ? "border-red-500" : ""
+                }`}
               />
               {formErrors.customer_id && (
-                  <p className="text-xs text-red-500 flex items-center gap-1">
-                      <AlertCircle className="h-3 w-3" /> {formErrors.customer_id}
-                  </p>
+                <p className="text-xs text-red-500 flex items-center gap-1">
+                  <AlertCircle className="h-3 w-3" /> {formErrors.customer_id}
+                </p>
               )}
             </div>
             <div className="space-y-2">
@@ -396,12 +405,14 @@ export function DestinationsClientUI({
                   setFormData({ ...formData, name: e.target.value })
                 }
                 placeholder="Ej: Obra principal, Sucursal Centro"
-                className={`focus-ring ${formErrors.name ? "border-red-500" : ""}`}
+                className={`focus-ring ${
+                  formErrors.name ? "border-red-500" : ""
+                }`}
               />
               {formErrors.name && (
-                  <p className="text-xs text-red-500 flex items-center gap-1">
-                      <AlertCircle className="h-3 w-3" /> {formErrors.name}
-                  </p>
+                <p className="text-xs text-red-500 flex items-center gap-1">
+                  <AlertCircle className="h-3 w-3" /> {formErrors.name}
+                </p>
               )}
             </div>
             <div className="space-y-2">
@@ -415,12 +426,14 @@ export function DestinationsClientUI({
                   setFormData({ ...formData, direccion: e.target.value })
                 }
                 placeholder="Dirección completa del lugar"
-                className={`focus-ring ${formErrors.direccion ? "border-red-500" : ""}`}
+                className={`focus-ring ${
+                  formErrors.direccion ? "border-red-500" : ""
+                }`}
               />
-               {formErrors.direccion && (
-                  <p className="text-xs text-red-500 flex items-center gap-1">
-                      <AlertCircle className="h-3 w-3" /> {formErrors.direccion}
-                  </p>
+              {formErrors.direccion && (
+                <p className="text-xs text-red-500 flex items-center gap-1">
+                  <AlertCircle className="h-3 w-3" /> {formErrors.direccion}
+                </p>
               )}
             </div>
             <DialogFooter className="pt-4">
@@ -431,10 +444,7 @@ export function DestinationsClientUI({
               >
                 Cancelar
               </Button>
-              <GradientButton
-                type="submit"
-                disabled={isSubmitting}
-              >
+              <GradientButton type="submit" disabled={isSubmitting}>
                 {isSubmitting ? (
                   <>
                     <LoadingSkeleton className="w-4 h-4 mr-2" />
@@ -454,4 +464,3 @@ export function DestinationsClientUI({
     </div>
   );
 }
-
