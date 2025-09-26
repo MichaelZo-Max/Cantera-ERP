@@ -94,12 +94,11 @@ const confirmLoadSchema = z.object({
 // --- Type Definitions (Sin cambios) ---
 type CreateDeliveryFormValues = z.infer<typeof createDeliverySchema>;
 type ConfirmLoadFormValues = z.infer<typeof confirmLoadSchema>;
-type Delivery = BaseDelivery & { totalDispatched?: number };
+type Delivery = BaseDelivery; 
 interface YardClientProps {
   initialDeliveries: Delivery[];
   initialActiveOrders: Order[];
 }
-
 // --- RHFSearchableSelect (Sin cambios) ---
 const RHFSearchableSelect = ({
   control,
@@ -658,8 +657,8 @@ export function YardDeliveriesClientUI({
                         if (!item) return null;
 
                         const totalOrdered = item.quantity;
-                        const totalDispatchedPreviously =
-                          selectedDelivery.totalDispatched ?? 0;
+                        const totalDispatchedPreviously = item.totalDispatched ?? 0;
+
                         const pendingQuantity = Math.max(
                           0,
                           totalOrdered - totalDispatchedPreviously

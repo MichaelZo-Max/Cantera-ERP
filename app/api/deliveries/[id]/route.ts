@@ -5,7 +5,7 @@ import { executeQuery, TYPES } from "@/lib/db";
 import path from "path";
 import { writeFile, mkdir } from "fs/promises";
 import { revalidateTag } from "next/cache";
-import { Delivery } from "@/lib/types";
+import { Delivery, OrderItem } from "@/lib/types";
 import util from "util";
 import { confirmExitSchema, confirmLoadSchema } from "@/lib/validations";
 import { z } from "zod";
@@ -24,28 +24,14 @@ function mapDbStatusToUi(status: string): "PENDING" | "CARGADA" | "EXITED" {
 
 const getDeliveryByIdQuery = `
     SELECT
-        d.id,
-        d.status AS estado,
-        d.notes,
-        d.load_photo_url AS loadPhoto,
-        d.exit_photo_url AS exitPhoto,
-        p.id AS order_id,
-        p.order_number,
-        p.customer_id,
-        p.status AS order_status,
-        p.created_at AS order_created_at,
-        c.id AS client_id,
-        c.name AS client_name,
-        t.id AS truck_id,
-        t.placa,
-        dr.id AS driver_id,
-        dr.name AS driver_name,
-        dr.phone AS driver_phone,
+        d.id, d.status AS estado, d.notes, d.load_photo_url AS loadPhoto, d.exit_photo_url AS exitPhoto,
+        p.id AS order_id, p.order_number, p.customer_id, p.status AS order_status, p.created_at AS order_created_at,
+        c.id AS client_id, c.name AS client_name,
+        t.id AS truck_id, t.placa,
+        dr.id AS driver_id, dr.name AS driver_name, dr.phone AS driver_phone,
         (
             SELECT 
-                pf.invoice_series,
-                pf.invoice_number,
-                pf.invoice_n,
+                pf.invoice_series, pf.invoice_number, pf.invoice_n,
                 ISNULL(pf.invoice_series + '-' + CAST(pf.invoice_number AS VARCHAR) + pf.invoice_n COLLATE DATABASE_DEFAULT, '') AS invoice_full_number
             FROM RIP.APP_PEDIDOS_FACTURAS pf
             WHERE pf.pedido_id = p.id
@@ -59,7 +45,7 @@ const getDeliveryByIdQuery = `
     WHERE d.id = @id;
 `;
 
-// --- GET ---
+// --- GET (MODIFICADO) ---
 export async function GET(
   request: Request,
   { params }: { params: { id: string } }
@@ -85,9 +71,32 @@ export async function GET(
     }
 
     const row = rows[0];
+    const orderId = row.order_id;
     const invoices = row.order_invoices_json
       ? JSON.parse(row.order_invoices_json)
       : [];
+
+    // ✅ PASO 1: Obtener las cantidades ya despachadas para esta orden
+    // Sumamos todo lo de otros despachos que ya estén 'CARGADA' o 'EXITED'
+    const dispatchedQuantitiesQuery = `
+      SELECT
+        di.pedido_item_id,
+        SUM(di.dispatched_quantity) as total_dispatched
+      FROM RIP.APP_DESPACHOS_ITEMS di
+      JOIN RIP.APP_DESPACHOS d ON d.id = di.despacho_id
+      WHERE d.order_id = @order_id AND d.id != @current_despacho_id AND d.status IN ('CARGADA', 'SALIDA', 'EXITED')
+      GROUP BY di.pedido_item_id;
+    `;
+    const dispatchedRows = await executeQuery(dispatchedQuantitiesQuery, [
+        { name: "order_id", type: TYPES.Int, value: orderId },
+        { name: "current_despacho_id", type: TYPES.Int, value: despachoId }
+    ]);
+
+    // ✅ PASO 2: Mapear los resultados para fácil acceso
+    const dispatchedMap = new Map<number, number>();
+    for (const dispatchedItem of dispatchedRows) {
+        dispatchedMap.set(dispatchedItem.pedido_item_id, dispatchedItem.total_dispatched);
+    }
 
     const itemsQuery = `
         SELECT
@@ -99,12 +108,13 @@ export async function GET(
         ORDER BY oi.id ASC;
     `;
     const itemRows = await executeQuery(itemsQuery, [
-      { name: "order_id", type: TYPES.Int, value: row.order_id },
+      { name: "order_id", type: TYPES.Int, value: orderId },
     ]);
 
-    const orderItems = itemRows.map((item: any) => ({
+    // ✅ PASO 3: Añadir el total despachado a cada item del pedido
+    const orderItems: OrderItem[] = itemRows.map((item: any) => ({
       id: item.id,
-      order_id: row.order_id,
+      order_id: orderId,
       product_id: item.product_id,
       quantity: item.quantity,
       unit: item.unit,
@@ -114,6 +124,8 @@ export async function GET(
         name: item.product_name,
         unit: item.unit,
       },
+      // Aquí está la magia:
+      totalDispatched: dispatchedMap.get(item.id) || 0, // Usamos el mapa
       dispatchItems: [],
     }));
 
@@ -124,7 +136,7 @@ export async function GET(
       loadPhoto: row.loadPhoto ?? undefined,
       exitPhoto: row.exitPhoto ?? undefined,
       orderDetails: {
-        id: row.order_id,
+        id: orderId,
         order_number: row.order_number,
         customer_id: row.customer_id,
         status: row.order_status,
@@ -139,7 +151,7 @@ export async function GET(
         name: row.driver_name,
         phone: row.driver_phone ?? undefined,
       },
-      dispatchItems: [], // Populate if needed
+      dispatchItems: [],
     };
 
     return NextResponse.json(finalPayload);
