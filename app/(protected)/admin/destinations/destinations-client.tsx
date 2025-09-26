@@ -1,7 +1,7 @@
 "use client";
 
 import type React from "react";
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -27,16 +27,16 @@ import {
   Trash2,
   CheckCircle,
   Save,
-  AlertCircle, // ✨ Importar icono de alerta
+  AlertCircle,
 } from "lucide-react";
 import { toast } from "sonner";
 import { LoadingSkeleton } from "../../../../components/ui/loading-skeleton";
 import { ConfirmationDialog } from "../../../../components/ui/confirmation-dialog";
 import { useConfirmation } from "../../../../hooks/use-confirmation";
 import { EmptyState } from "../../../../components/ui/empty-state";
-import { destinationSchema } from "../../../../lib/validations"; // ✨ 1. Importar el esquema de validación
+import { destinationSchema } from "../../../../lib/validations";
+import { useDebounce } from "@/hooks/use-debounce"; // ✨ 1. Importar useDebounce
 
-// ✨ 2. Definir un tipo para los errores del formulario
 type FormErrors = {
   name?: string;
   direccion?: string;
@@ -52,7 +52,7 @@ export function DestinationsClientUI({
 }) {
   const [destinations, setDestinations] =
     useState<Destination[]>(initialDestinations);
-  const [clients] = useState<Client[]>(initialClients);
+  const [clients, setClients] = useState<Client[]>(initialClients); // ✨ Convertir a state para poder actualizarlo
   const [searchTerm, setSearchTerm] = useState("");
   const [showDialog, setShowDialog] = useState(false);
   const [editingDestination, setEditingDestination] =
@@ -63,9 +63,40 @@ export function DestinationsClientUI({
     customer_id: "",
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [formErrors, setFormErrors] = useState<FormErrors>({}); // ✨ 3. Estado para gestionar los errores
+  const [formErrors, setFormErrors] = useState<FormErrors>({});
   const { isOpen, options, confirm, handleConfirm, handleCancel } =
     useConfirmation();
+
+  // --- ✨ Lógica para búsqueda de clientes ---
+  const [clientSearch, setClientSearch] = useState("");
+  const debouncedClientSearch = useDebounce(clientSearch, 500);
+  const [clientPage, setClientPage] = useState(1);
+  const [clientTotalPages, setClientTotalPages] = useState(1);
+  const [isClientsLoading, setIsClientsLoading] = useState(false);
+
+  useEffect(() => {
+    const fetchClients = async () => {
+      setIsClientsLoading(true);
+      try {
+        const params = new URLSearchParams({
+          page: clientPage.toString(),
+          pageSize: "20",
+          name: debouncedClientSearch,
+        });
+        const res = await fetch(`/api/customers?${params.toString()}`);
+        if (!res.ok) throw new Error("No se pudieron cargar los clientes");
+        const { data, totalPages } = await res.json();
+        setClients((prev) => (clientPage === 1 ? data : [...prev, ...data]));
+        setClientTotalPages(totalPages);
+      } catch (error) {
+        toast.error("Error al cargar clientes.");
+      } finally {
+        setIsClientsLoading(false);
+      }
+    };
+    fetchClients();
+  }, [debouncedClientSearch, clientPage]);
+  // --- Fin de la lógica para búsqueda de clientes ---
 
   const filteredDestinations = useMemo(
     () =>
@@ -87,7 +118,7 @@ export function DestinationsClientUI({
   const handleNewDestination = useCallback(() => {
     setEditingDestination(null);
     setFormData({ name: "", direccion: "", customer_id: "" });
-    setFormErrors({}); // Limpiar errores al abrir
+    setFormErrors({});
     setShowDialog(true);
   }, []);
 
@@ -98,7 +129,7 @@ export function DestinationsClientUI({
       direccion: destination.direccion || "",
       customer_id: destination.customer_id.toString(),
     });
-    setFormErrors({}); // Limpiar errores al abrir
+    setFormErrors({});
     setShowDialog(true);
   }, []);
 
@@ -108,7 +139,6 @@ export function DestinationsClientUI({
       setIsSubmitting(true);
       setFormErrors({});
 
-      // ✨ 4. Validar en el frontend antes de enviar
       const validation = destinationSchema.safeParse(formData);
 
       if (!validation.success) {
@@ -121,10 +151,9 @@ export function DestinationsClientUI({
         toast.error("Error de validación", {
           description: "Por favor, corrige los campos marcados.",
         });
-        return; // Detener el envío
+        return;
       }
 
-      // ✨ 5. Usar los datos validados y limpios por Zod
       const validatedData = validation.data;
 
       const method = editingDestination ? "PATCH" : "POST";
@@ -136,7 +165,7 @@ export function DestinationsClientUI({
         const res = await fetch(url, {
           method,
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(validatedData), // Enviar datos validados
+          body: JSON.stringify(validatedData),
         });
 
         if (!res.ok) {
@@ -146,7 +175,6 @@ export function DestinationsClientUI({
 
         const savedDestination = await res.json();
 
-        // La API ahora devuelve el objeto completo, por lo que podemos usarlo directamente
         setDestinations((prev) =>
           editingDestination
             ? prev.map((d) =>
@@ -168,9 +196,9 @@ export function DestinationsClientUI({
         setIsSubmitting(false);
       }
     },
-    [editingDestination, formData, clients]
+    [editingDestination, formData]
   );
-
+  
   const handleToggleStatus = useCallback(
     (destination: Destination) => {
       const is_active = destination.is_active;
@@ -210,9 +238,9 @@ export function DestinationsClientUI({
         }
       );
     },
-    [confirm, clients]
+    [confirm]
   );
-
+  
   return (
     <div className="space-y-8 animate-fade-in">
       <ConfirmationDialog
@@ -225,7 +253,6 @@ export function DestinationsClientUI({
         cancelText={options?.cancelText}
         variant={options?.variant}
       />
-      {/* Header y Search Bar (sin cambios) */}
       <div className="flex justify-between items-center">
         <div className="space-y-2">
           <div className="flex items-center space-x-3">
@@ -264,7 +291,6 @@ export function DestinationsClientUI({
         </CardContent>
       </AnimatedCard>
 
-      {/* Grid de Destinos (sin cambios) */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {filteredDestinations.length === 0 ? (
           <div className="col-span-full">
@@ -351,8 +377,7 @@ export function DestinationsClientUI({
           ))
         )}
       </div>
-
-      {/* Create/Edit Dialog con feedback de validación */}
+      
       <Dialog open={showDialog} onOpenChange={setShowDialog}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
@@ -369,20 +394,28 @@ export function DestinationsClientUI({
           <form onSubmit={handleSubmit} className="space-y-6 pt-4">
             <div className="space-y-2">
               <Label htmlFor="customer_id">Cliente Asociado</Label>
+              {/* ✨ Componente SearchableSelect actualizado */}
               <SearchableSelect
                 value={formData.customer_id}
                 onChange={(value) =>
                   setFormData({ ...formData, customer_id: value })
                 }
                 placeholder="Seleccionar cliente..."
-                options={
-                  Array.isArray(clients)
-                    ? clients.map((client) => ({
-                        value: client.id.toString(),
-                        label: client.name,
-                      }))
-                    : []
-                }
+                options={clients.map((client) => ({
+                  value: client.id.toString(),
+                  label: client.name,
+                }))}
+                onSearch={(query) => {
+                  setClientPage(1);
+                  setClientSearch(query);
+                }}
+                onLoadMore={() => {
+                  if (clientPage < clientTotalPages && !isClientsLoading) {
+                    setClientPage((p) => p + 1);
+                  }
+                }}
+                hasNextPage={clientPage < clientTotalPages}
+                isLoading={isClientsLoading}
                 disabled={isSubmitting}
                 className={`w-full focus-ring ${
                   formErrors.customer_id ? "border-red-500" : ""
