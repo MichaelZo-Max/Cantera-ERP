@@ -15,7 +15,7 @@ export async function GET() {
       SELECT 
         d.id,
         d.name,
-        d.address as direccion, -- ✨ CORRECCIÓN: Se usa 'address' y se le asigna el alias 'direccion'
+        d.address as address, -- ✨ CORRECCIÓN: Se usa 'address' y se le asigna el alias 'address'
         d.is_active,
         d.customer_id,
         c.NOMBRECLIENTE as client_name
@@ -41,19 +41,19 @@ export async function POST(request: Request) {
       return NextResponse.json(validation.error.errors, { status: 400 });
     }
 
-    // El frontend envía 'direccion', lo cual es correcto
-    const { name, direccion, customer_id } = validation.data;
+    // El frontend envía 'address', lo cual es correcto
+    const { name, address, customer_id } = validation.data;
 
     const query = `
       -- ✨ CORRECCIÓN: Se inserta en la columna 'address' de la base de datos
       INSERT INTO RIP.APP_DESTINOS (name, address, customer_id)
       VALUES (@name, @address, @customer_id);
     `;
-    
+
     await executeQuery(query, [
       { name: "name", type: TYPES.NVarChar, value: name },
-      // ✨ CORRECCIÓN: Se mapea el valor de 'direccion' al parámetro '@address'
-      { name: "address", type: TYPES.NVarChar, value: direccion }, 
+      // ✨ CORRECCIÓN: Se mapea el valor de 'address' al parámetro '@address'
+      { name: "address", type: TYPES.NVarChar, value: address },
       { name: "customer_id", type: TYPES.Int, value: customer_id },
     ]);
 
@@ -62,7 +62,7 @@ export async function POST(request: Request) {
     // Se devuelve el nuevo destino para actualizar la UI
     const createdDestinationQuery = `
       SELECT TOP 1
-        d.id, d.name, d.address as direccion, d.is_active, d.customer_id,
+        d.id, d.name, d.address as address, d.is_active, d.customer_id,
         c.NOMBRECLIENTE as "client.name"
       FROM RIP.APP_DESTINOS d
       LEFT JOIN dbo.CLIENTES c ON c.CODCLIENTE = d.customer_id
@@ -71,11 +71,10 @@ export async function POST(request: Request) {
     const newDestination = await executeQuery(createdDestinationQuery, []);
 
     return NextResponse.json(newDestination[0], { status: 201 });
-
   } catch (error) {
     console.error("[API_DESTINATIONS_POST]", error);
     if (error instanceof z.ZodError) {
-        return new NextResponse(JSON.stringify(error.errors), { status: 400 });
+      return new NextResponse(JSON.stringify(error.errors), { status: 400 });
     }
     return new NextResponse("Error al crear el destino", { status: 500 });
   }

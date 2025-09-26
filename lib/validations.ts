@@ -132,7 +132,7 @@ export const customerSchema = z.object({
   email: z
     .string()
     .email("El formato del email no es válido.")
-    .or(z.literal(''))
+    .or(z.literal(""))
     .optional()
     .transform((val) => (val === "" ? undefined : val)),
   phone: z
@@ -148,7 +148,7 @@ export const destinationSchema = z.object({
     .string({ required_error: "El nombre del destino es obligatorio." })
     .min(3, "El nombre debe tener al menos 3 caracteres.")
     .trim(),
-  direccion: z
+  address: z
     .string()
     .optional()
     .transform((val) => (val === "" ? undefined : val)), // Transforma "" a undefined

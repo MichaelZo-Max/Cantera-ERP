@@ -61,7 +61,7 @@ export async function PATCH(
     }
 
     // ✨ 5. Usar los datos ya validados y limpios en tu lógica original.
-    const { name, direccion, customer_id, is_active } = validation.data;
+    const { name, address, customer_id, is_active } = validation.data;
 
     const updates: string[] = [];
     const queryParams: any[] = [{ name: "id", type: TYPES.Int, value: id }];
@@ -75,21 +75,21 @@ export async function PATCH(
         value: name,
       });
     }
-    if (direccion !== undefined) {
+    if (address !== undefined) {
       updates.push("address = @address");
       queryParams.push({
         name: "address",
         type: TYPES.NVarChar,
-        value: direccion,
+        value: address,
       });
     }
     if (customer_id !== undefined) {
-        updates.push("customer_id = @customer_id");
-        queryParams.push({
-            name: "customer_id",
-            type: TYPES.Int,
-            value: customer_id
-        });
+      updates.push("customer_id = @customer_id");
+      queryParams.push({
+        name: "customer_id",
+        type: TYPES.Int,
+        value: customer_id,
+      });
     }
     if (is_active !== undefined) {
       updates.push("is_active = @is_active");
@@ -126,14 +126,18 @@ export async function PATCH(
     const updatedDestinationData = result[0];
     const clientQuery = `SELECT name as name FROM RIP.VW_APP_CLIENTES WHERE id = @customer_id`;
     const clientResult = await executeQuery(clientQuery, [
-        { name: "customer_id", type: TYPES.Int, value: updatedDestinationData.customer_id },
+      {
+        name: "customer_id",
+        type: TYPES.Int,
+        value: updatedDestinationData.customer_id,
+      },
     ]);
 
     const finalResponse = {
-        ...updatedDestinationData,
-        client: {
-            name: clientResult[0]?.name || null,
-        }
+      ...updatedDestinationData,
+      client: {
+        name: clientResult[0]?.name || null,
+      },
     };
 
     return NextResponse.json(finalResponse);
@@ -142,7 +146,6 @@ export async function PATCH(
     return new NextResponse("Error al actualizar el destino", { status: 500 });
   }
 }
-
 
 /**
  * @route DELETE /api/destinations/[id]

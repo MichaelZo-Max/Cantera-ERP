@@ -47,7 +47,7 @@ export interface Destination {
     name: string | null;
   };
   name: string;
-  direccion?: string;
+  address?: string;
   is_active: boolean;
   createdAt: Date;
   updatedAt: Date;
