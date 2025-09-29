@@ -146,10 +146,16 @@ export function CashierOrdersClient({ data }: { data: CashierOrder[] }) {
     
     setIsLoading(true);
     try {
+      // SOLUCIÓN: Añade 'relatedOrderId' al cuerpo de la solicitud
+      const bodyPayload = {
+        invoiceIds: selectedInvoiceIds,
+        relatedOrderId: selectedOrder.related_order_id, // Asegúrate que este campo exista en tu tipo CashierOrder
+      };
+
       const response = await fetch(`/api/cashier-orders/${selectedOrder.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ invoiceIds: selectedInvoiceIds }),
+        body: JSON.stringify(bodyPayload),
       });
       
       if (!response.ok) {

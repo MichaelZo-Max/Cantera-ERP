@@ -288,6 +288,7 @@ export type CashierOrder = {
   items?: CashierOrderItem[];
   customer_name?: string; // Campo que viene del JOIN con CLIENTES
   created_by_name?: string; // Campo que viene del JOIN con APP_USUARIOS
+  related_order_id?: number;
   details: CashierOrderDetail[];
 };
 

@@ -691,7 +691,7 @@ GO
 PRINT 'Vista RIP.VW_APP_FACTURA_ITEMS_PENDIENTES corregida y actualizada.';
 GO
 
--- 5. CREACIÓN DE PROCEDIMIMIENTOS ALMACENADOS
+-- Reemplazar el procedimiento almacenado existente
 IF OBJECT_ID('RIP.SP_InvoiceCashierOrder', 'P') IS NOT NULL
 BEGIN
     DROP PROCEDURE RIP.SP_InvoiceCashierOrder;
@@ -701,6 +701,7 @@ GO
 
 CREATE PROCEDURE RIP.SP_InvoiceCashierOrder
     @CashierOrderId INT,
+    @RelatedOrderId INT, -- <-- NUEVO PARÁMETRO para el ID del pedido relacionado (el ORD-)
     @InvoiceIdsJson NVARCHAR(MAX)
 AS
 BEGIN
@@ -709,72 +710,76 @@ BEGIN
     BEGIN TRANSACTION;
     BEGIN TRY
 
+        -- Primero, validamos que el Pedido relacionado que nos pasaron realmente existe
+        IF NOT EXISTS (SELECT 1 FROM RIP.APP_PEDIDOS WHERE id = @RelatedOrderId)
+        BEGIN
+            -- Si no existe, cancelamos todo y devolvemos un error claro.
+            ;THROW 50001, 'El ID del pedido relacionado (RelatedOrderId) no existe en la tabla APP_PEDIDOS.', 1;
+        END
+
+        -- Parseamos los identificadores de las facturas desde el JSON
         DECLARE @ParsedInvoices TABLE (
             series NVARCHAR(10),
             number INT,
             n NCHAR(1)
         );
-
-        -- --- 👇 CORRECCIÓN DE SINTAXIS AQUÍ ---
         INSERT INTO @ParsedInvoices (series, number, n)
         SELECT
             PARSENAME(REPLACE(value, '|', '.'), 3),
             CAST(PARSENAME(REPLACE(value, '|', '.'), 2) AS INT),
             PARSENAME(REPLACE(value, '|', '.'), 1)
         FROM OPENJSON(@InvoiceIdsJson)
-        WHERE value LIKE '%|%|%'; -- El WHERE ahora es parte del SELECT y el ; está al final
+        WHERE value LIKE '%|%|%';
 
-        -- VALIDACIÓN 1: Comprobar que los productos y cantidades coincidan
-        DECLARE @orderItemCount INT, @invoiceItemCount INT;
-        
-        SELECT @orderItemCount = COUNT(DISTINCT product_id) 
-        FROM RIP.APP_ORDENES_SIN_FACTURA_ITEMS 
-        WHERE order_cab_id = @CashierOrderId;
-
-        SELECT @invoiceItemCount = COUNT(DISTINCT avl.CODARTICULO)
-        FROM dbo.FACTURASVENTA FV
-        JOIN @ParsedInvoices pi 
-            ON FV.NUMSERIE COLLATE DATABASE_DEFAULT = pi.series COLLATE DATABASE_DEFAULT 
-            AND FV.NUMFACTURA = pi.number 
-            AND FV.N COLLATE DATABASE_DEFAULT = pi.n COLLATE DATABASE_DEFAULT
-        JOIN dbo.ALBVENTACAB avc 
-            ON FV.NUMSERIE = avc.NUMSERIEFAC 
-            AND FV.NUMFACTURA = avc.NUMFAC 
-            AND FV.N = avc.N
-        JOIN dbo.ALBVENTALIN avl 
-            ON avc.NUMSERIE = avl.NUMSERIE 
-            AND avc.NUMALBARAN = avl.NUMALBARAN 
-            AND avc.N = avl.N;
-
-        IF @orderItemCount <> @invoiceItemCount
+        -- Validamos que se haya proporcionado al menos una factura
+        IF NOT EXISTS (SELECT 1 FROM @ParsedInvoices)
         BEGIN
-            ;THROW 50001, 'Validación fallida: El número de productos distintos no coincide.', 1;
+            ;THROW 50002, 'No se proporcionaron IDs de factura válidos en el JSON.', 1;
         END
 
-        -- EJECUCIÓN: Si la validación pasa, realizar las operaciones
-        INSERT INTO RIP.APP_ORDENES_SIN_FACTURA_FACTURAS (orden_id, invoice_series, invoice_number, invoice_n)
-        SELECT @CashierOrderId, series, number, n FROM @ParsedInvoices;
+        -- =================================================================
+        -- PASO 1: VINCULAR LAS FACTURAS AL PEDIDO PRINCIPAL (ORD-)
+        -- =================================================================
+        INSERT INTO RIP.APP_PEDIDOS_FACTURAS (pedido_id, invoice_series, invoice_number, invoice_n)
+        SELECT @RelatedOrderId, series, number, n FROM @ParsedInvoices;
 
+        -- =================================================================
+        -- PASO 2: ACTUALIZAR EL ESTADO DEL PEDIDO PRINCIPAL (ORD-)
+        -- =================================================================
+        UPDATE RIP.APP_PEDIDOS
+        SET status = 'INVOICED' -- Marcamos el pedido como facturado
+        WHERE id = @RelatedOrderId;
+
+        -- =================================================================
+        -- PASO 3: ACTUALIZAR LA ORDEN DE CAJA ORIGINAL (VTA-)
+        -- =================================================================
         UPDATE RIP.APP_ORDENES_SIN_FACTURA_CAB
-        SET status = 'INVOICED'
+        SET status = 'INVOICED' -- Marcamos también la orden de caja como facturada
         WHERE id = @CashierOrderId;
         
         IF @@ROWCOUNT = 0
         BEGIN
-            ;THROW 50002, 'No se encontró la orden de caja para actualizar.', 1;
+            ;THROW 50003, 'No se encontró la orden de caja para actualizar.', 1;
         END
+        
+        -- Mantenemos también la relación en la tabla de la orden de caja por consistencia
+        INSERT INTO RIP.APP_ORDENES_SIN_FACTURA_FACTURAS (orden_id, invoice_series, invoice_number, invoice_n)
+        SELECT @CashierOrderId, series, number, n FROM @ParsedInvoices;
+
 
         COMMIT TRANSACTION;
+        PRINT 'Operación completada exitosamente.';
 
     END TRY
     BEGIN CATCH
         IF @@TRANCOUNT > 0
             ROLLBACK TRANSACTION;
+        -- Re-lanzamos el error para que la aplicación que llamó al SP lo reciba
         ;THROW;
     END CATCH
 END
 GO
-PRINT 'Procedimiento almacenado RIP.SP_InvoiceCashierOrder corregido y creado exitosamente.';
+PRINT 'Procedimiento almacenado RIP.SP_InvoiceCashierOrder actualizado para modificar pedidos existentes.';
 GO
 
 -- 6. CREACIÓN DE ÍNDICES DE RENDIMIENTO
@@ -851,4 +856,20 @@ GO
 PRINT '====================================================================================';
 PRINT '¡Despliegue completado! El script corregido se ha ejecutado.';
 PRINT '====================================================================================';
+GO
+
+-- PASO 1: AÑADIR COLUMNA PARA VINCULAR LA ORDEN DE CAJA CON EL PEDIDO PRINCIPAL
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE Name = N'related_order_id' AND Object_ID = Object_ID(N'RIP.APP_ORDENES_SIN_FACTURA_CAB'))
+BEGIN
+    ALTER TABLE RIP.APP_ORDENES_SIN_FACTURA_CAB
+    ADD related_order_id INT NULL;
+
+    PRINT 'Columna "related_order_id" añadida a RIP.APP_ORDENES_SIN_FACTURA_CAB.';
+    
+    -- Opcional: Crear una referencia (foreign key) para mantener la integridad
+    ALTER TABLE RIP.APP_ORDENES_SIN_FACTURA_CAB
+    ADD CONSTRAINT FK_ORDEN_CAJA_PEDIDO FOREIGN KEY (related_order_id) REFERENCES RIP.APP_PEDIDOS(id);
+    
+    PRINT 'Se añadió la llave foránea para related_order_id.';
+END
 GO

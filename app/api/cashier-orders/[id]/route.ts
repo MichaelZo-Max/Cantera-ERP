@@ -54,26 +54,30 @@ export async function PATCH(
   const cashierOrderId = parseInt(params.id, 10);
 
   try {
-    const { invoiceIds } = await req.json();
-    console.log(`Paso 1: Recibido cashierOrderId: ${cashierOrderId}, invoiceIds:`, invoiceIds);
+    const { invoiceIds, relatedOrderId } = await req.json();
+    console.log(`Paso 1: Recibido cashierOrderId: ${cashierOrderId}, relatedOrderId: ${relatedOrderId}, invoiceIds:`, invoiceIds);
 
     if (!invoiceIds || !Array.isArray(invoiceIds) || invoiceIds.length === 0) {
       return NextResponse.json({ message: "Se requiere un array con al menos un ID de factura." }, { status: 400 });
     }
 
-    // Convertimos el array de JS a un string en formato JSON para SQL Server
+    if (!relatedOrderId) {
+        return NextResponse.json({ message: "El ID del pedido relacionado (relatedOrderId) es requerido." }, { status: 400 });
+    }
+
     const invoiceIdsJson = JSON.stringify(invoiceIds);
 
-    // Definimos la consulta para ejecutar el Stored Procedure
+    // El resto del código no cambia
     const query = `
       EXEC RIP.SP_InvoiceCashierOrder 
         @CashierOrderId = @OrderId, 
+        @RelatedOrderId = @RelatedId,
         @InvoiceIdsJson = @JsonPayload;
     `;
 
-    // Ejecutamos el procedimiento
     await executeQuery(query, [
       { name: "OrderId", type: TYPES.Int, value: cashierOrderId },
+      { name: "RelatedId", type: TYPES.Int, value: relatedOrderId },
       { name: "JsonPayload", type: TYPES.NVarChar, value: invoiceIdsJson },
     ]);
 
@@ -86,14 +90,11 @@ export async function PATCH(
   } catch (error: any) {
     console.error("--- ERROR AL EJECUTAR EL STORED PROCEDURE ---", error);
 
-    // Los errores de validación lanzados con THROW en SQL llegarán aquí
-    // en la propiedad `error.message`.
     return NextResponse.json(
       {
         message: error.message || "Error interno del servidor",
       },
-      // Si el error viene de nuestra validación, es un Bad Request (400)
-      { status: error.message.includes("Validación fallida") ? 400 : 500 }
+      { status: 500 } // Devolvemos 500 porque el error viene de la DB
     );
   }
 }
