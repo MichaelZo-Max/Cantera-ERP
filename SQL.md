@@ -900,3 +900,5 @@ BEGIN
     PRINT 'La tabla RIP.EventLog ya existe.';
 END
 GO
+ALTER TABLE RIP.APP_DESPACHOS
+ADD exit_notes NVARCHAR(MAX) NULL;
