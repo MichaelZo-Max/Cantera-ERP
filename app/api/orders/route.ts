@@ -77,6 +77,8 @@ export async function POST(req: Request) {
 
     let trustedItems: typeof itemsFromClient = [];
 
+    let newCashierOrderId: number | null = null;
+
     const orderStatus =
       invoices && invoices.length > 0 ? "INVOICED" : "PENDING_INVOICE";
 
@@ -146,7 +148,8 @@ export async function POST(req: Request) {
           { name: "total_usd", type: TYPES.Decimal, value: total_usd },
           { name: "created_by", type: TYPES.Int, value: user.id },
         ]);
-        const newCashierOrderId = cashierHeaderResult[0].id;
+        
+        newCashierOrderId = cashierHeaderResult[0].id;
 
         // 2. Insertar cada item en la nueva tabla de auditoría
         for (const item of trustedItems) {
@@ -193,17 +196,19 @@ export async function POST(req: Request) {
     // Crea el pedido en RIP.APP_PEDIDOS, asocia items, camiones y choferes como siempre.
 
     const orderHeaderSql = `
-        INSERT INTO RIP.APP_PEDIDOS (customer_id, destination_id, status, created_by)
-        OUTPUT INSERTED.id, INSERTED.order_number
-        VALUES (@customer_id, @destination_id, @status, @created_by);
-    `;
+      INSERT INTO RIP.APP_PEDIDOS (customer_id, destination_id, status, created_by, cashier_order_id) -- 1. Añadir columna
+      OUTPUT INSERTED.id, INSERTED.order_number
+      VALUES (@customer_id, @destination_id, @status, @created_by, @cashier_order_id); -- 2. Añadir valor
+`;
+
 
     const headerResult = await executeQuery(orderHeaderSql, [
-      { name: "customer_id", type: TYPES.Int, value: customer_id },
-      { name: "destination_id", type: TYPES.Int, value: destination_id },
-      { name: "status", type: TYPES.NVarChar, value: orderStatus }, // Se usa la variable
-      { name: "created_by", type: TYPES.Int, value: user.id },
-    ]);
+    { name: "customer_id", type: TYPES.Int, value: customer_id },
+    { name: "destination_id", type: TYPES.Int, value: destination_id },
+    { name: "status", type: TYPES.NVarChar, value: orderStatus },
+    { name: "created_by", type: TYPES.Int, value: user.id },
+    { name: "cashier_order_id", type: TYPES.Int, value: newCashierOrderId },
+]);
 
     if (!headerResult || headerResult.length === 0 || !headerResult[0].id) {
       throw new Error(

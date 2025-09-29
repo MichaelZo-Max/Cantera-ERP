@@ -27,6 +27,8 @@ BEGIN
         is_active BIT NOT NULL DEFAULT 1,
         created_at DATETIME NOT NULL DEFAULT GETDATE(),
         updated_at DATETIME NOT NULL DEFAULT GETDATE(),
+        cashier_order_id INT NULL, -- Columna para vincular con la orden de caja
+        FOREIGN KEY (cashier_order_id) REFERENCES RIP.APP_ORDENES_SIN_FACTURA_CAB(id),
         CODVENDEDOR INT NULL,
         FOREIGN KEY (CODVENDEDOR) REFERENCES dbo.VENDEDORES(CODVENDEDOR)
     );
