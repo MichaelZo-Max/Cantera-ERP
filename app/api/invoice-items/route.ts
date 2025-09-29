@@ -25,14 +25,13 @@ export async function POST(req: NextRequest) {
       params.push({ name: `n${index}`, type: TYPES.NChar, value: inv.invoice_n });
     });
 
-    // Esta consulta ahora funciona perfectamente con la vista simplificada
     const sql = `
       SELECT
         id,
         codigo,
         name,
         sell_format,
-        AVG(price_per_unit) as price_per_unit, -- Mantenemos el nombre que espera el front
+        AVG(price_per_unit_usd) as price_per_unit, -- Se usa el nombre correcto y se renombra para el frontend
         unit,
         is_active,
         SUM(quantity) as available_quantity

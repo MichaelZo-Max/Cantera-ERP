@@ -3,83 +3,97 @@
 import { executeQuery, TYPES } from "@/lib/db";
 import { NextResponse } from "next/server";
 
+// --- Interfaces y funciones de ayuda (sin cambios) ---
+interface GroupedProduct {
+  product_id: number;
+  total_quantity: number;
+}
+
+const compareOrderAndInvoiceItems = (
+  orderItems: GroupedProduct[],
+  invoiceItems: GroupedProduct[]
+): boolean => {
+  if (orderItems.length !== invoiceItems.length) {
+    console.error("Error de validación: El número de líneas de producto no coincide.");
+    return false;
+  }
+  const orderItemsMap = new Map(orderItems.map((item) => [item.product_id, item.total_quantity]));
+  for (const invoiceItem of invoiceItems) {
+    const orderQuantity = orderItemsMap.get(invoiceItem.product_id);
+    if (orderQuantity === undefined) {
+      console.error(`Error de validación: El producto con ID ${invoiceItem.product_id} existe en la factura pero no en la orden.`);
+      return false;
+    }
+    if (Math.abs(orderQuantity - invoiceItem.total_quantity) > 0.001) {
+      console.error(`Error de validación: La cantidad para el producto ID ${invoiceItem.product_id} no coincide (Orden: ${orderQuantity}, Factura: ${invoiceItem.total_quantity}).`);
+      return false;
+    }
+  }
+  return true;
+};
+
+const parseInvoiceId = (id: string) => {
+    const lastDashIndex = id.lastIndexOf('-');
+    if (lastDashIndex === -1) return null;
+    const series = id.substring(0, lastDashIndex);
+    const numberAndN = id.substring(lastDashIndex + 1);
+    const match = numberAndN.match(/^(\d+)([a-zA-Z]?)$/);
+    if (!match) return null;
+    const number = parseInt(match[1], 10);
+    const n = match[2] || ' ';
+    if (isNaN(number)) return null;
+    return { series, number, n };
+};
+
+
 export async function PATCH(
   req: Request,
   { params }: { params: { id: string } }
 ) {
-  console.log("--- INICIANDO PROCESO DE FACTURACIÓN DE ORDEN DE CAJA ---");
+  console.log("--- INICIANDO PROCESO DE FACTURACIÓN (VÍA STORED PROCEDURE) ---");
+  const cashierOrderId = parseInt(params.id, 10);
+
   try {
-    const { invoiceId } = await req.json();
-    const cashierOrderId = params.id;
+    const { invoiceIds } = await req.json();
+    console.log(`Paso 1: Recibido cashierOrderId: ${cashierOrderId}, invoiceIds:`, invoiceIds);
 
-    console.log(`Paso 1: Recibido cashierOrderId: ${cashierOrderId} y invoiceId: ${invoiceId}`);
-
-    if (!invoiceId) {
-      console.error("Error: El ID de la factura es requerido.");
-      return NextResponse.json(
-        { message: "El ID de la factura es requerido" },
-        { status: 400 }
-      );
+    if (!invoiceIds || !Array.isArray(invoiceIds) || invoiceIds.length === 0) {
+      return NextResponse.json({ message: "Se requiere un array con al menos un ID de factura." }, { status: 400 });
     }
 
-    // --- PRIMERA ACTUALIZACIÓN: Marcar la orden de caja como facturada ---
-    const updateCashierOrderQuery = `
-      UPDATE RIP.APP_ORDENES_SIN_FACTURA_CAB
-      SET
-        status = 'INVOICED',
-        related_invoice_n = @invoiceId
-      OUTPUT INSERTED.id
-      WHERE id = @cashierOrderId
+    // Convertimos el array de JS a un string en formato JSON para SQL Server
+    const invoiceIdsJson = JSON.stringify(invoiceIds);
+
+    // Definimos la consulta para ejecutar el Stored Procedure
+    const query = `
+      EXEC RIP.SP_InvoiceCashierOrder 
+        @CashierOrderId = @OrderId, 
+        @InvoiceIdsJson = @JsonPayload;
     `;
 
-    const cashierUpdateResult = await executeQuery(
-      updateCashierOrderQuery,
-      [
-        { name: "invoiceId", type: TYPES.NVarChar, value: invoiceId },
-        { name: "cashierOrderId", type: TYPES.Int, value: parseInt(cashierOrderId) },
-      ]
-    );
-
-    if (cashierUpdateResult.length > 0) {
-        console.log(`Paso 2: Éxito. La orden de caja con id=${cashierUpdateResult[0].id} fue actualizada a 'INVOICED'.`);
-    } else {
-        console.warn(`Paso 2: Advertencia. No se encontró o no se pudo actualizar la orden de caja con id=${cashierOrderId}.`);
-    }
-
-
-    // --- SEGUNDA ACTUALIZACIÓN: Marcar el pedido principal como facturado ---
-    console.log(`Paso 3: Intentando actualizar el pedido principal donde cashier_order_id = ${cashierOrderId} y status = 'PENDING_INVOICE'.`);
-
-    const updateMainOrderQuery = `
-        UPDATE RIP.APP_PEDIDOS 
-        SET status = 'INVOICED'
-        OUTPUT INSERTED.id
-        WHERE cashier_order_id = @cashierOrderId
-        AND status = 'PENDING_INVOICE'
-    `;
-
-    const mainOrderUpdateResult = await executeQuery(updateMainOrderQuery, [
-      { name: "cashierOrderId", type: TYPES.Int, value: parseInt(cashierOrderId) },
+    // Ejecutamos el procedimiento
+    await executeQuery(query, [
+      { name: "OrderId", type: TYPES.Int, value: cashierOrderId },
+      { name: "JsonPayload", type: TYPES.NVarChar, value: invoiceIdsJson },
     ]);
 
-    if (mainOrderUpdateResult.length > 0) {
-        console.log(`Paso 4: ÉXITO DEFINITIVO. El pedido principal con id=${mainOrderUpdateResult[0].id} fue actualizado a 'INVOICED'.`);
-    } else {
-        console.error("Paso 4: FALLO CRÍTICO. La consulta para actualizar el pedido principal no afectó a ninguna fila. Verifique los datos y la consulta.");
-    }
-
-    console.log("--- PROCESO FINALIZADO ---");
+    console.log("--- STORED PROCEDURE EJECUTADO EXITOSAMENTE ---");
+    
     return NextResponse.json({
-      message: "Proceso de actualización completado.",
+      message: "Proceso de facturación completado exitosamente.",
     });
-  } catch (error) {
-    console.error("--- ERROR INESPERADO EN EL PROCESO ---", error);
+
+  } catch (error: any) {
+    console.error("--- ERROR AL EJECUTAR EL STORED PROCEDURE ---", error);
+
+    // Los errores de validación lanzados con THROW en SQL llegarán aquí
+    // en la propiedad `error.message`.
     return NextResponse.json(
       {
-        message: "Error interno del servidor",
-        error: (error as Error).message,
+        message: error.message || "Error interno del servidor",
       },
-      { status: 500 }
+      // Si el error viene de nuestra validación, es un Bad Request (400)
+      { status: error.message.includes("Validación fallida") ? 400 : 500 }
     );
   }
 }

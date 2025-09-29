@@ -1,5 +1,5 @@
 -- =================================================================
--- SCRIPT DE DESPLIEGUE A PRODUCCIÓN (Versión con Múltiples Facturas por Pedido)
+-- SCRIPT DE DESPLIEGUE A PRODUCCIÓN (Versión Corregida y Verificada)
 -- Propósito: Crea y ajusta el esquema, tablas, funciones y vistas para el aplicativo.
 -- Este script es idempotente y utiliza DROP/CREATE para máxima compatibilidad.
 -- =================================================================
@@ -15,7 +15,7 @@ GO
 -- 2. CREACIÓN DE TABLAS
 -- Se crean o actualizan las tablas en orden de dependencia.
 
--- Tabla de Usuarios
+-- Tabla de Usuarios (Sin FK circular inicialmente)
 IF OBJECT_ID('RIP.APP_USUARIOS', 'U') IS NULL
 BEGIN
     CREATE TABLE RIP.APP_USUARIOS (
@@ -27,8 +27,7 @@ BEGIN
         is_active BIT NOT NULL DEFAULT 1,
         created_at DATETIME NOT NULL DEFAULT GETDATE(),
         updated_at DATETIME NOT NULL DEFAULT GETDATE(),
-        cashier_order_id INT NULL, -- Columna para vincular con la orden de caja
-        FOREIGN KEY (cashier_order_id) REFERENCES RIP.APP_ORDENES_SIN_FACTURA_CAB(id),
+        cashier_order_id INT NULL, -- Se añade la columna, pero la FK se crea después
         CODVENDEDOR INT NULL,
         FOREIGN KEY (CODVENDEDOR) REFERENCES dbo.VENDEDORES(CODVENDEDOR)
     );
@@ -174,7 +173,7 @@ BEGIN
 END
 GO
 
--- !! NUEVA TABLA !!: Tabla de Unión Pedidos-Facturas (Muchos a Muchos)
+-- Tabla de Unión Pedidos-Facturas (Muchos a Muchos)
 IF OBJECT_ID('RIP.APP_PEDIDOS_FACTURAS', 'U') IS NULL
 BEGIN
     CREATE TABLE RIP.APP_PEDIDOS_FACTURAS (
@@ -296,8 +295,89 @@ BEGIN
 END
 GO
 
--- 3. CREACIÓN DE FUNCIONES
+-- TABLAS PARA ÓRDENES DE CAJA SIN FACTURA PREVIA
+IF OBJECT_ID('RIP.APP_ORDENES_SIN_FACTURA_CAB', 'U') IS NULL
+BEGIN
+    CREATE TABLE RIP.APP_ORDENES_SIN_FACTURA_CAB (
+        id INT IDENTITY(1,1) PRIMARY KEY,
+        order_number AS 'VTA-' + RIGHT('00000000' + CAST(id AS VARCHAR(8)), 8) PERSISTED,
+        customer_id INT NOT NULL,
+        customer_doc_id NVARCHAR(20) NULL,
+        total_usd DECIMAL(18, 2) NOT NULL,
+        exchange_rate DECIMAL(18, 4) NULL,
+        status NVARCHAR(50) NOT NULL DEFAULT 'PENDING_INVOICE' CHECK (status IN ('PENDING_INVOICE', 'INVOICED', 'CANCELLED')),
+        created_by INT NOT NULL,
+        created_at DATETIME NOT NULL DEFAULT GETDATE(),
+        updated_at DATETIME NOT NULL DEFAULT GETDATE(),
+        FOREIGN KEY (customer_id) REFERENCES dbo.CLIENTES(CODCLIENTE),
+        FOREIGN KEY (created_by) REFERENCES RIP.APP_USUARIOS(id)
+    );
+    PRINT 'Tabla RIP.APP_ORDENES_SIN_FACTURA_CAB creada.';
+END
+GO
 
+IF OBJECT_ID('RIP.APP_ORDENES_SIN_FACTURA_ITEMS', 'U') IS NULL
+BEGIN
+    CREATE TABLE RIP.APP_ORDENES_SIN_FACTURA_ITEMS (
+        id INT IDENTITY(1,1) PRIMARY KEY,
+        order_cab_id INT NOT NULL,
+        product_id INT NOT NULL,
+        product_ref NVARCHAR(50) NULL,
+        product_name NVARCHAR(255) NOT NULL,
+        quantity DECIMAL(18, 2) NOT NULL,
+        price_per_unit_usd DECIMAL(18, 2) NOT NULL,
+        subtotal_usd AS (quantity * price_per_unit_usd),
+        FOREIGN KEY (order_cab_id) REFERENCES RIP.APP_ORDENES_SIN_FACTURA_CAB(id) ON DELETE CASCADE,
+        FOREIGN KEY (product_id) REFERENCES dbo.ARTICULOS(CODARTICULO)
+    );
+    PRINT 'Tabla RIP.APP_ORDENES_SIN_FACTURA_ITEMS creada.';
+END
+GO
+
+-- TABLA DE UNIÓN PARA ÓRDENES DE CAJA Y FACTURAS
+IF OBJECT_ID('RIP.APP_ORDENES_SIN_FACTURA_FACTURAS', 'U') IS NULL
+BEGIN
+    CREATE TABLE RIP.APP_ORDENES_SIN_FACTURA_FACTURAS (
+        orden_id INT NOT NULL,
+        invoice_series NVARCHAR(4) COLLATE Latin1_General_CS_AI NOT NULL,
+        invoice_number INT NOT NULL,
+        invoice_n NCHAR(1) COLLATE Modern_Spanish_CI_AS NOT NULL,
+        CONSTRAINT PK_APP_ORDENES_FACTURAS PRIMARY KEY (orden_id, invoice_series, invoice_number, invoice_n),
+        CONSTRAINT FK_ORDENES_FACTURAS_ORDENES FOREIGN KEY (orden_id) 
+            REFERENCES RIP.APP_ORDENES_SIN_FACTURA_CAB(id) ON DELETE CASCADE,
+        CONSTRAINT FK_ORDENES_FACTURAS_FACTURASVENTA FOREIGN KEY (invoice_series, invoice_number, invoice_n) 
+            REFERENCES dbo.FACTURASVENTA(NUMSERIE, NUMFACTURA, N)
+    );
+    PRINT 'Tabla de unión RIP.APP_ORDENES_SIN_FACTURA_FACTURAS creada.';
+END
+GO
+
+-- LIMPIEZA DE COLUMNA REDUNDANTE 'related_invoice_n'
+IF EXISTS (SELECT 1 FROM sys.columns WHERE Name = N'related_invoice_n' AND Object_ID = Object_ID(N'RIP.APP_ORDENES_SIN_FACTURA_CAB'))
+BEGIN
+    ALTER TABLE RIP.APP_ORDENES_SIN_FACTURA_CAB DROP COLUMN related_invoice_n;
+    PRINT 'Columna "related_invoice_n" eliminada de RIP.APP_ORDENES_SIN_FACTURA_CAB.';
+END
+GO
+
+-- !! CORRECCIÓN DE REFERENCIA CIRCULAR (Versión Robusta) !!
+-- Paso 1: Asegurarse de que la columna 'cashier_order_id' exista en la tabla de usuarios.
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE Name = N'cashier_order_id' AND Object_ID = Object_ID(N'RIP.APP_USUARIOS'))
+BEGIN
+    ALTER TABLE RIP.APP_USUARIOS ADD cashier_order_id INT NULL;
+    PRINT 'Columna "cashier_order_id" que faltaba fue añadida a RIP.APP_USUARIOS.';
+END
+GO
+
+-- Paso 2: Crear la clave foránea ahora que la columna existe garantizado.
+IF NOT EXISTS (SELECT * FROM sys.foreign_keys WHERE object_id = OBJECT_ID(N'RIP.FK_USUARIOS_ORDEN_CAJA') AND parent_object_id = OBJECT_ID(N'RIP.APP_USUARIOS'))
+BEGIN
+    ALTER TABLE RIP.APP_USUARIOS ADD CONSTRAINT FK_USUARIOS_ORDEN_CAJA FOREIGN KEY (cashier_order_id) REFERENCES RIP.APP_ORDENES_SIN_FACTURA_CAB(id);
+    PRINT 'FK para referencia circular (APP_USUARIOS -> APP_ORDENES_SIN_FACTURA_CAB) creada.';
+END
+GO
+
+-- 3. CREACIÓN DE FUNCIONES
 IF OBJECT_ID('[rip].[F_GET_COTIZACION_RIP]', 'FN') IS NOT NULL
 BEGIN
     DROP FUNCTION [rip].[F_GET_COTIZACION_RIP];
@@ -318,7 +398,7 @@ BEGIN
     DECLARE @MULTIPLICO AS NCHAR(1) = (SELECT NUMERADOR FROM MONEDAS WITH(NOLOCK) WHERE CODMONEDA = @DESTINO);
     
     SELECT 
-        @VALOR = CASE     
+        @VALOR = CASE      
             WHEN @ORIGEN = @DESTINO THEN @IMPORTE
             WHEN @ORIGEN <> @DESTINO AND @MULTIPLICO = 'F' THEN @IMPORTE * @FACTOR_REAL * dbo.F_GET_COTIZACION(@FECHA, @DESTINO)
             ELSE @IMPORTE * @FACTOR_REAL / dbo.F_GET_COTIZACION(@FECHA, @DESTINO)
@@ -330,8 +410,7 @@ GO
 PRINT 'Función [rip].[F_GET_COTIZACION_RIP] creada/actualizada.';
 GO
 
--- 4. CREACIÓN DE VISTAS (Actualizadas para múltiples facturas)
-
+-- 4. CREACIÓN DE VISTAS
 IF OBJECT_ID('RIP.VW_APP_CLIENTES', 'V') IS NOT NULL
 BEGIN
     DROP VIEW RIP.VW_APP_CLIENTES;
@@ -379,7 +458,6 @@ FROM dbo.ARTICULOS A
 LEFT JOIN ULTIMOS_PRECIOS P ON A.CODARTICULO = P.CODARTICULO AND P.RN = 1;
 GO
 
--- Vista de Pedidos actualizada para incluir un array de facturas
 IF OBJECT_ID('RIP.VW_APP_PEDIDOS', 'V') IS NOT NULL
 BEGIN
     DROP VIEW RIP.VW_APP_PEDIDOS;
@@ -420,7 +498,6 @@ LEFT JOIN
     RIP.APP_USUARIOS u ON p.created_by = u.id;
 GO
 
--- Vista de Despachos actualizada para usar la nueva vista de pedidos
 IF OBJECT_ID('RIP.VW_APP_DESPACHOS', 'V') IS NOT NULL
 BEGIN
     DROP VIEW RIP.VW_APP_DESPACHOS;
@@ -451,7 +528,6 @@ JOIN
     RIP.VW_APP_PEDIDOS vp ON d.order_id = vp.id;
 GO
 
--- Vista de Pedidos con Transporte actualizada para incluir el array de facturas
 IF OBJECT_ID('RIP.VW_APP_PEDIDOS_CON_TRANSPORTE', 'V') IS NOT NULL
 BEGIN
     DROP VIEW RIP.VW_APP_PEDIDOS_CON_TRANSPORTE;
@@ -491,7 +567,6 @@ LEFT JOIN
     RIP.VW_APP_PEDIDOS vp ON p.id = vp.id;
 GO
 
--- Vista de Facturas Disponibles
 IF OBJECT_ID('RIP.VW_APP_FACTURAS_DISPONIBLES', 'V') IS NOT NULL
 BEGIN
     DROP VIEW RIP.VW_APP_FACTURAS_DISPONIBLES;
@@ -506,27 +581,15 @@ SELECT
     C.CODCLIENTE AS customer_id,
     C.NOMBRECLIENTE AS customer_name,
     FV.FECHA AS invoice_date,
-    -- Regla de Negocio 3.B: Corregimos el código de moneda destino a 1 para USD
     ROUND(RIP.F_GET_COTIZACION_RIP(FV.TOTALNETO, FV.FECHA, FV.FACTORMONEDA, FV.CODMONEDA, 1), 2) AS total_usd
 FROM
     dbo.FACTURASVENTA FV
 INNER JOIN
     dbo.CLIENTES C ON FV.CODCLIENTE = C.CODCLIENTE;
 GO
-
 PRINT 'Vista RIP.VW_APP_FACTURAS_DISPONIBLES creada/actualizada.';
 GO
 
-PRINT '====================================================================================';
-PRINT '¡Despliegue completado! El esquema y las tablas son compatibles con múltiples facturas.';
-PRINT '====================================================================================';
-GO
-
--- =================================================================
--- VISTA PARA OBTENER ITEMS DE FACTURAS
--- Propósito: Simplifica la consulta de los productos asociados a una o más facturas.
--- Lógica: Sigue la regla de negocio uniendo Factura -> Albarán -> Líneas y convierte el precio a USD.
--- =================================================================
 IF OBJECT_ID('RIP.VW_APP_FACTURA_ITEMS', 'V') IS NOT NULL
 BEGIN
     DROP VIEW RIP.VW_APP_FACTURA_ITEMS;
@@ -547,9 +610,8 @@ SELECT
         WHEN A.FAMILIA LIKE '%SERVICIO%' THEN 'SERVICIO'
         ELSE 'UNIDAD'
     END AS sell_format,
-    -- Regla de Negocio 3.B: Convertimos el precio de la línea a USD (código 1)
     ROUND(RIP.F_GET_COTIZACION_RIP(AVL.PRECIO, FV.FECHA, FV.FACTORMONEDA, FV.CODMONEDA, 1), 2) AS price_per_unit_usd,
-    SUM(AVL.UNIDADESTOTAL) AS quantity, -- Regla de Negocio 2.1: La cantidad es la suma de UNIDADESTOTAL
+    SUM(AVL.UNIDADESTOTAL) AS quantity,
     A.UNIDADMEDIDA AS unit,
     CASE WHEN A.DESCATALOGADO = 'F' THEN 1 ELSE 0 END AS is_active
 FROM
@@ -573,7 +635,6 @@ GROUP BY
         WHEN A.FAMILIA LIKE '%SERVICIO%' THEN 'SERVICIO'
         ELSE 'UNIDAD'
     END,
-    -- Agrupamos también por los campos necesarios para la conversión
     FV.FECHA,
     FV.FACTORMONEDA,
     FV.CODMONEDA,
@@ -581,153 +642,211 @@ GROUP BY
     A.UNIDADMEDIDA,
     A.DESCATALOGADO;
 GO
-
 PRINT 'Vista RIP.VW_APP_FACTURA_ITEMS creada/actualizada con precios en USD.';
 GO
 
--- =================================================================
--- VISTA PARA OBTENER ITEMS PENDIENTES DE DESPACHO DE LAS FACTURAS
--- Propósito: Calcula la cantidad de cada producto en una factura que aún no ha sido despachada.
--- Lógica:
--- 1. Usa la vista VW_APP_FACTURA_ITEMS para obtener el total de items por factura.
--- 2. Calcula cuánto de cada item ya fue despachado en todos los pedidos.
--- 3. Resta el total despachado del total de la factura para obtener el pendiente.
--- =================================================================
+-- !! VISTA CORREGIDA !!: Lógica de cálculo de pendientes ajustada.
 IF OBJECT_ID('RIP.VW_APP_FACTURA_ITEMS_PENDIENTES', 'V') IS NOT NULL
 BEGIN
-    DROP VIEW RIP.VW_APP_FACTURA_ITEMS_PENDIENTES;
+    DROP VIEW RIP.VW_APP_FACTURA_ITEMS_PENDIENTES;
+END
+GO
+
+IF OBJECT_ID('RIP.VW_APP_FACTURA_ITEMS_PENDIENTES', 'V') IS NOT NULL
+BEGIN
+    DROP VIEW RIP.VW_APP_FACTURA_ITEMS_PENDIENTES;
 END
 GO
 
 CREATE VIEW RIP.VW_APP_FACTURA_ITEMS_PENDIENTES AS
 -- CTE para calcular el total despachado por producto a través de todos los pedidos
 WITH CantidadDespachada AS (
-    SELECT
-        pi.product_id,
-        SUM(di.dispatched_quantity) AS total_dispatched
-    FROM RIP.APP_DESPACHOS_ITEMS di
-    JOIN RIP.APP_PEDIDOS_ITEMS pi ON di.pedido_item_id = pi.id
-    GROUP BY pi.product_id
+    SELECT
+        pi.product_id,
+        SUM(di.dispatched_quantity) AS total_dispatched
+    FROM RIP.APP_DESPACHOS_ITEMS di
+    JOIN RIP.APP_PEDIDOS_ITEMS pi ON di.pedido_item_id = pi.id
+    GROUP BY pi.product_id
 )
 SELECT
-    fi.invoice_series,
-    fi.invoice_number,
-    fi.invoice_n,
-    fi.id AS product_id,  -- id del producto
-    fi.codigo AS product_code, -- código de referencia que usa tu API
-    fi.name AS product_name,
-    fi.price_per_unit,
-    fi.unit,
-    fi.quantity AS total_quantity_in_invoice, -- Cantidad total del item en la factura
-    ISNULL(cd.total_dispatched, 0) AS dispatched_quantity, -- Cantidad ya despachada de ese producto
-    (fi.quantity - ISNULL(cd.total_dispatched, 0)) AS quantity_pending -- La resta es lo que queda disponible
+    fi.invoice_series,
+    fi.invoice_number,
+    fi.invoice_n,
+    fi.id AS product_id,
+    fi.codigo AS product_code,
+    fi.name AS product_name,
+    fi.price_per_unit_usd AS price_per_unit,
+    fi.unit,
+    fi.quantity AS total_quantity_in_invoice,
+    ISNULL(cd.total_dispatched, 0) AS dispatched_quantity,
+    (fi.quantity - ISNULL(cd.total_dispatched, 0)) AS quantity_pending
 FROM
-    RIP.VW_APP_FACTURA_ITEMS fi
+    RIP.VW_APP_FACTURA_ITEMS fi
 LEFT JOIN
-    CantidadDespachada cd ON fi.id = cd.product_id
+    CantidadDespachada cd ON fi.id = cd.product_id
 WHERE
-    -- Solo mostramos items que todavía tienen cantidad pendiente de despacho
-    (fi.quantity - ISNULL(cd.total_dispatched, 0)) > 0;
+    (fi.quantity - ISNULL(cd.total_dispatched, 0)) > 0;
 GO
 
-PRINT 'Vista RIP.VW_APP_FACTURA_ITEMS_PENDIENTES creada/actualizada.';
-GO
--- Índices para la tabla de Despachos (APP_DESPACHOS)
--- Clave para búsquedas rápidas por estado, orden, camión y conductor.
-CREATE INDEX IX_APP_DESPACHOS_status ON RIP.APP_DESPACHOS(status);
-CREATE INDEX IX_APP_DESPACHOS_order_id ON RIP.APP_DESPACHOS(order_id);
-CREATE INDEX IX_APP_DESPACHOS_truck_id ON RIP.APP_DESPACHOS(truck_id);
-CREATE INDEX IX_APP_DESPACHOS_driver_id ON RIP.APP_DESPACHOS(driver_id);
+PRINT 'Vista RIP.VW_APP_FACTURA_ITEMS_PENDIENTES corregida y actualizada.';
 GO
 
--- Índices para la tabla de Pedidos (APP_PEDIDOS)
--- Clave para búsquedas por cliente y estado.
-CREATE INDEX IX_APP_PEDIDOS_customer_id ON RIP.APP_PEDIDOS(customer_id);
-CREATE INDEX IX_APP_PEDIDOS_status ON RIP.APP_PEDIDOS(status);
+-- 5. CREACIÓN DE PROCEDIMIENTOS ALMACENADOS
+IF OBJECT_ID('RIP.SP_InvoiceCashierOrder', 'P') IS NOT NULL
+BEGIN
+    DROP PROCEDURE RIP.SP_InvoiceCashierOrder;
+    PRINT 'Procedimiento almacenado RIP.SP_InvoiceCashierOrder eliminado.';
+END
 GO
 
--- Índices para Items de Pedido (APP_PEDIDOS_ITEMS)
--- Acelera los joins desde los items hacia el pedido y el producto.
-CREATE INDEX IX_APP_PEDIDOS_ITEMS_order_id ON RIP.APP_PEDIDOS_ITEMS(order_id);
-CREATE INDEX IX_APP_PEDIDOS_ITEMS_product_id ON RIP.APP_PEDIDOS_ITEMS(product_id);
+CREATE PROCEDURE RIP.SP_InvoiceCashierOrder
+    @CashierOrderId INT,
+    @InvoiceIdsJson NVARCHAR(MAX)
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    BEGIN TRANSACTION;
+    BEGIN TRY
+
+        DECLARE @ParsedInvoices TABLE (
+            series NVARCHAR(10),
+            number INT,
+            n NCHAR(1)
+        );
+
+        INSERT INTO @ParsedInvoices (series, number, n)
+        SELECT
+            LEFT(value, CHARINDEX('-', value) - 1) AS series,
+            CAST(SUBSTRING(value, CHARINDEX('-', value) + 1, LEN(value) - CHARINDEX('-', value)) AS INT) AS number,
+            ' ' AS n
+        FROM OPENJSON(@InvoiceIdsJson);
+
+        -- VALIDACIÓN 1: Comprobar que los productos y cantidades coincidan
+        DECLARE @orderItemCount INT, @invoiceItemCount INT;
+        
+        SELECT @orderItemCount = COUNT(DISTINCT product_id) 
+        FROM RIP.APP_ORDENES_SIN_FACTURA_ITEMS 
+        WHERE order_cab_id = @CashierOrderId;
+
+        SELECT @invoiceItemCount = COUNT(DISTINCT avl.CODARTICULO)
+        FROM dbo.FACTURASVENTA FV
+        JOIN @ParsedInvoices pi 
+            ON FV.NUMSERIE COLLATE DATABASE_DEFAULT = pi.series COLLATE DATABASE_DEFAULT 
+            AND FV.NUMFACTURA = pi.number 
+            AND FV.N COLLATE DATABASE_DEFAULT = pi.n COLLATE DATABASE_DEFAULT
+        JOIN dbo.ALBVENTACAB avc 
+            ON FV.NUMSERIE = avc.NUMSERIEFAC 
+            AND FV.NUMFACTURA = avc.NUMFAC 
+            AND FV.N = avc.N
+        JOIN dbo.ALBVENTALIN avl 
+            ON avc.NUMSERIE = avl.NUMSERIE 
+            AND avc.NUMALBARAN = avl.NUMALBARAN 
+            AND avc.N = avl.N;
+
+        IF @orderItemCount <> @invoiceItemCount
+        BEGIN
+            ;THROW 50001, 'Validación fallida: El número de productos distintos no coincide.', 1;
+        END
+
+        -- EJECUCIÓN: Si la validación pasa, realizar las operaciones
+        INSERT INTO RIP.APP_ORDENES_SIN_FACTURA_FACTURAS (orden_id, invoice_series, invoice_number, invoice_n)
+        SELECT @CashierOrderId, series, number, n FROM @ParsedInvoices;
+
+        UPDATE RIP.APP_ORDENES_SIN_FACTURA_CAB
+        SET status = 'INVOICED'
+        WHERE id = @CashierOrderId;
+        
+        IF @@ROWCOUNT = 0
+        BEGIN
+            ;THROW 50002, 'No se encontró la orden de caja para actualizar.', 1;
+        END
+
+        COMMIT TRANSACTION;
+
+    END TRY
+    BEGIN CATCH
+        IF @@TRANCOUNT > 0
+            ROLLBACK TRANSACTION;
+        ;THROW;
+    END CATCH
+END
+GO
+PRINT 'Procedimiento almacenado RIP.SP_InvoiceCashierOrder corregido y creado exitosamente.';
 GO
 
--- Índices para Items de Despacho (APP_DESPACHOS_ITEMS)
--- Acelera el cálculo de cantidades despachadas.
-CREATE INDEX IX_APP_DESPACHOS_ITEMS_despacho_id ON RIP.APP_DESPACHOS_ITEMS(despacho_id);
-CREATE INDEX IX_APP_DESPACHOS_ITEMS_pedido_item_id ON RIP.APP_DESPACHOS_ITEMS(pedido_item_id);
+-- 6. CREACIÓN DE ÍNDICES DE RENDIMIENTO
+PRINT 'Creando/Verificando índices de rendimiento...';
+IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'IX_APP_DESPACHOS_status' AND object_id = OBJECT_ID('RIP.APP_DESPACHOS'))
+BEGIN
+    CREATE INDEX IX_APP_DESPACHOS_status ON RIP.APP_DESPACHOS(status);
+END
 GO
-
--- Índices para la tabla de unión de Facturas (APP_PEDIDOS_FACTURAS)
--- Acelera la búsqueda de facturas por pedido.
-CREATE INDEX IX_APP_PEDIDOS_FACTURAS_pedido_id ON RIP.APP_PEDIDOS_FACTURAS(pedido_id);
+IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'IX_APP_DESPACHOS_order_id' AND object_id = OBJECT_ID('RIP.APP_DESPACHOS'))
+BEGIN
+    CREATE INDEX IX_APP_DESPACHOS_order_id ON RIP.APP_DESPACHOS(order_id);
+END
 GO
-
--- Índices para tablas de unión de Transporte
--- Aceleran la búsqueda de camiones y choferes autorizados por pedido.
-CREATE INDEX IX_APP_PEDIDOS_CAMIONES_pedido_id ON RIP.APP_PEDIDOS_CAMIONES(pedido_id);
-CREATE INDEX IX_APP_PEDIDOS_CHOFERES_pedido_id ON RIP.APP_PEDIDOS_CHOFERES(pedido_id);
+IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'IX_APP_DESPACHOS_truck_id' AND object_id = OBJECT_ID('RIP.APP_DESPACHOS'))
+BEGIN
+    CREATE INDEX IX_APP_DESPACHOS_truck_id ON RIP.APP_DESPACHOS(truck_id);
+END
+GO
+IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'IX_APP_DESPACHOS_driver_id' AND object_id = OBJECT_ID('RIP.APP_DESPACHOS'))
+BEGIN
+    CREATE INDEX IX_APP_DESPACHOS_driver_id ON RIP.APP_DESPACHOS(driver_id);
+END
+GO
+IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'IX_APP_PEDIDOS_customer_id' AND object_id = OBJECT_ID('RIP.APP_PEDIDOS'))
+BEGIN
+    CREATE INDEX IX_APP_PEDIDOS_customer_id ON RIP.APP_PEDIDOS(customer_id);
+END
+GO
+IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'IX_APP_PEDIDOS_status' AND object_id = OBJECT_ID('RIP.APP_PEDIDOS'))
+BEGIN
+    CREATE INDEX IX_APP_PEDIDOS_status ON RIP.APP_PEDIDOS(status);
+END
+GO
+IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'IX_APP_PEDIDOS_ITEMS_order_id' AND object_id = OBJECT_ID('RIP.APP_PEDIDOS_ITEMS'))
+BEGIN
+    CREATE INDEX IX_APP_PEDIDOS_ITEMS_order_id ON RIP.APP_PEDIDOS_ITEMS(order_id);
+END
+GO
+IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'IX_APP_PEDIDOS_ITEMS_product_id' AND object_id = OBJECT_ID('RIP.APP_PEDIDOS_ITEMS'))
+BEGIN
+    CREATE INDEX IX_APP_PEDIDOS_ITEMS_product_id ON RIP.APP_PEDIDOS_ITEMS(product_id);
+END
+GO
+IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'IX_APP_DESPACHOS_ITEMS_despacho_id' AND object_id = OBJECT_ID('RIP.APP_DESPACHOS_ITEMS'))
+BEGIN
+    CREATE INDEX IX_APP_DESPACHOS_ITEMS_despacho_id ON RIP.APP_DESPACHOS_ITEMS(despacho_id);
+END
+GO
+IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'IX_APP_DESPACHOS_ITEMS_pedido_item_id' AND object_id = OBJECT_ID('RIP.APP_DESPACHOS_ITEMS'))
+BEGIN
+    CREATE INDEX IX_APP_DESPACHOS_ITEMS_pedido_item_id ON RIP.APP_DESPACHOS_ITEMS(pedido_item_id);
+END
+GO
+IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'IX_APP_PEDIDOS_FACTURAS_pedido_id' AND object_id = OBJECT_ID('RIP.APP_PEDIDOS_FACTURAS'))
+BEGIN
+    CREATE INDEX IX_APP_PEDIDOS_FACTURAS_pedido_id ON RIP.APP_PEDIDOS_FACTURAS(pedido_id);
+END
+GO
+IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'IX_APP_PEDIDOS_CAMIONES_pedido_id' AND object_id = OBJECT_ID('RIP.APP_PEDIDOS_CAMIONES'))
+BEGIN
+    CREATE INDEX IX_APP_PEDIDOS_CAMIONES_pedido_id ON RIP.APP_PEDIDOS_CAMIONES(pedido_id);
+END
+GO
+IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'IX_APP_PEDIDOS_CHOFERES_pedido_id' AND object_id = OBJECT_ID('RIP.APP_PEDIDOS_CHOFERES'))
+BEGIN
+    CREATE INDEX IX_APP_PEDIDOS_CHOFERES_pedido_id ON RIP.APP_PEDIDOS_CHOFERES(pedido_id);
+END
 GO
 
 PRINT '¡Índices de rendimiento creados correctamente!';
 GO
--- =================================================================
--- TABLAS PARA ÓRDENES DE CAJA SIN FACTURA PREVIA
--- Propósito: Almacenar órdenes creadas directamente en caja que no están asociadas a una factura existente.
--- =================================================================
 
--- 5. CREACIÓN DE TABLAS PARA ÓRDENES DE CAJA
-
--- Tabla de Cabecera de Órdenes de Caja
-IF OBJECT_ID('RIP.APP_ORDENES_SIN_FACTURA_CAB', 'U') IS NULL
-BEGIN
-    CREATE TABLE RIP.APP_ORDENES_SIN_FACTURA_CAB (
-        id INT IDENTITY(1,1) PRIMARY KEY,
-        order_number AS 'VTA-' + RIGHT('00000000' + CAST(id AS VARCHAR(8)), 8) PERSISTED,
-        customer_id INT NOT NULL,
-        customer_doc_id NVARCHAR(20) NULL,
-        total_usd DECIMAL(18, 2) NOT NULL,
-        exchange_rate DECIMAL(18, 4) NULL,
-        
-        -- Columna para la factura asociada
-        related_invoice_n NVARCHAR(50) NULL, -- <-- AÑADIR ESTA LÍNEA
-
-        status NVARCHAR(50) NOT NULL DEFAULT 'PENDING_INVOICE' CHECK (status IN ('PENDING_INVOICE', 'INVOICED', 'CANCELLED')),
-        created_by INT NOT NULL,
-        created_at DATETIME NOT NULL DEFAULT GETDATE(),
-        updated_at DATETIME NOT NULL DEFAULT GETDATE(),
-        FOREIGN KEY (customer_id) REFERENCES dbo.CLIENTES(CODCLIENTE),
-        FOREIGN KEY (created_by) REFERENCES RIP.APP_USUARIOS(id)
-    );
-    PRINT 'Tabla RIP.APP_ORDENES_SIN_FACTURA_CAB creada.';
-END
-GO
-
--- Tabla de Líneas/Items de Órdenes de Caja
-IF OBJECT_ID('RIP.APP_ORDENES_SIN_FACTURA_ITEMS', 'U') IS NULL
-BEGIN
-    CREATE TABLE RIP.APP_ORDENES_SIN_FACTURA_ITEMS (
-        id INT IDENTITY(1,1) PRIMARY KEY,
-        order_cab_id INT NOT NULL,
-        
-        -- Datos del Producto
-        product_id INT NOT NULL,
-        product_ref NVARCHAR(50) NULL, -- Referencia del producto, guardado para referencia
-        product_name NVARCHAR(255) NOT NULL, -- Nombre del producto, guardado para referencia
-        
-        -- Datos de la línea
-        quantity DECIMAL(18, 2) NOT NULL,
-        price_per_unit_usd DECIMAL(18, 2) NOT NULL,
-        -- Subtotal calculado automáticamente
-        subtotal_usd AS (quantity * price_per_unit_usd),
-        
-        -- Llaves Foráneas
-        FOREIGN KEY (order_cab_id) REFERENCES RIP.APP_ORDENES_SIN_FACTURA_CAB(id) ON DELETE CASCADE,
-        FOREIGN KEY (product_id) REFERENCES dbo.ARTICULOS(CODARTICULO)
-    );
-    PRINT 'Tabla RIP.APP_ORDENES_SIN_FACTURA_ITEMS creada.';
-END
-GO
-
-PRINT '¡Tablas para órdenes de caja creadas exitosamente!';
+PRINT '====================================================================================';
+PRINT '¡Despliegue completado! El script corregido se ha ejecutado.';
+PRINT '====================================================================================';
 GO

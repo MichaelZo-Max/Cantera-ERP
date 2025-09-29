@@ -1,3 +1,5 @@
+// app/(protected)/cashier/cashier-orders/cashier-orders-client.tsx
+
 "use client";
 
 import { useMemo, useState, useEffect } from "react";
@@ -18,13 +20,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -68,7 +64,6 @@ function OrderStatusBadge({ status }: { status: string }) {
   );
 }
 
-// --- ✨ Componente para formatear moneda ---
 function formatCurrency(amount: number) {
     return new Intl.NumberFormat("en-US", { style: 'currency', currency: 'USD' }).format(amount);
 }
@@ -77,11 +72,10 @@ function formatCurrency(amount: number) {
 export function CashierOrdersClient({ data }: { data: CashierOrder[] }) {
   const router = useRouter();
   const [searchTerm, setSearchTerm] = useState("");
-  
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<CashierOrder | null>(null);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
-  const [selectedInvoiceId, setSelectedInvoiceId] = useState<string>("");
+  const [selectedInvoiceIds, setSelectedInvoiceIds] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
 
@@ -135,18 +129,18 @@ export function CashierOrdersClient({ data }: { data: CashierOrder[] }) {
     setIsModalOpen(false);
     setSelectedOrder(null);
     setInvoices([]);
-    setSelectedInvoiceId("");
+    setSelectedInvoiceIds([]);
   };
   
   const handleInvoiceOrder = async () => {
-    if (!selectedOrder || !selectedInvoiceId) return;
+    if (!selectedOrder || selectedInvoiceIds.length === 0) return;
     
     setIsLoading(true);
     try {
       const response = await fetch(`/api/cashier-orders/${selectedOrder.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ invoiceId: selectedInvoiceId }),
+        body: JSON.stringify({ invoiceIds: selectedInvoiceIds }),
       });
       
       if (!response.ok) {
@@ -162,10 +156,19 @@ export function CashierOrdersClient({ data }: { data: CashierOrder[] }) {
       toast.error(error.message);
       console.error(error);
     } finally {
-       setIsLoading(false);
+      setIsLoading(false);
     }
   };
 
+  const handleInvoiceSelection = (invoiceFullNumber: string) => {
+    setSelectedInvoiceIds((prevSelected) => {
+      if (prevSelected.includes(invoiceFullNumber)) {
+        return prevSelected.filter((id) => id !== invoiceFullNumber);
+      } else {
+        return [...prevSelected, invoiceFullNumber];
+      }
+    });
+  };
 
   return (
     <div className="space-y-4 motion-safe:animate-fade-in">
@@ -240,18 +243,16 @@ export function CashierOrdersClient({ data }: { data: CashierOrder[] }) {
         )}
       </section>
       
-      {/* --- ✨ MODAL ACTUALIZADO --- */}
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
         <DialogContent className="sm:max-w-2xl" onInteractOutside={(e) => e.preventDefault()} onEscapeKeyDown={handleCloseModal}>
           <DialogHeader>
-            <DialogTitle>Asociar Factura a la Orden</DialogTitle>
+            <DialogTitle>Asociar Factura(s) a la Orden</DialogTitle>
             <DialogDescription>
-              Revisa los detalles de la orden <strong>{selectedOrder?.order_number}</strong> y selecciona una factura para asociar.
+              Revisa los detalles de la orden <strong>{selectedOrder?.order_number}</strong> y selecciona una o más facturas para asociar.
             </DialogDescription>
           </DialogHeader>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 py-4">
-            {/* Columna de Detalles de la Orden */}
             <div className="space-y-4">
                 <h4 className="font-semibold text-lg">Detalles de la Orden</h4>
                 <div className="rounded-lg border bg-card text-card-foreground shadow-sm p-4 space-y-3">
@@ -271,18 +272,18 @@ export function CashierOrdersClient({ data }: { data: CashierOrder[] }) {
                     <ScrollArea className="h-[150px] pr-3">
                         <div className="space-y-2">
                            {selectedOrder?.details?.map(item => (
-                               <div key={item.id} className="flex items-center justify-between text-sm">
-                                   <div className="flex items-center">
-                                       <Package className="h-4 w-4 mr-2 text-muted-foreground" />
-                                       <div>
-                                           <p className="font-medium">{item.product_name}</p>
-                                           <p className="text-muted-foreground">
-                                               {item.quantity} x {formatCurrency(item.price_usd)}
-                                           </p>
-                                       </div>
-                                   </div>
-                                   <p className="font-semibold">{formatCurrency(item.total_usd)}</p>
-                               </div>
+                                <div key={item.id} className="flex items-center justify-between text-sm">
+                                    <div className="flex items-center">
+                                        <Package className="h-4 w-4 mr-2 text-muted-foreground" />
+                                        <div>
+                                            <p className="font-medium">{item.product_name}</p>
+                                            <p className="text-muted-foreground">
+                                                {item.quantity} x {formatCurrency(item.price_usd)}
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <p className="font-semibold">{formatCurrency(item.total_usd)}</p>
+                                </div>
                            ))}
                         </div>
                     </ScrollArea>
@@ -294,32 +295,39 @@ export function CashierOrdersClient({ data }: { data: CashierOrder[] }) {
                 </div>
             </div>
 
-            {/* Columna para Seleccionar Factura */}
             <div className="space-y-4">
-                <h4 className="font-semibold text-lg">Asociar Factura</h4>
+                <h4 className="font-semibold text-lg">Asociar Facturas</h4>
                 {isLoading && !invoices.length ? (
-                    <div className="flex items-center justify-center h-24">
+                    <div className="flex items-center justify-center h-full">
                         <LoadingSpinner />
                     </div>
                 ) : (
-                    <div className="space-y-2">
-                        <Label htmlFor="invoice-select">Facturas del Cliente</Label>
-                        <Select
-                            value={selectedInvoiceId}
-                            onValueChange={setSelectedInvoiceId}
-                            disabled={isLoading || invoices.length === 0}
-                        >
-                            <SelectTrigger id="invoice-select">
-                                <SelectValue placeholder={invoices.length > 0 ? "Selecciona una factura..." : "No hay facturas para este cliente"} />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {Array.isArray(invoices) && invoices.map((invoice) => (
-                                    <SelectItem key={invoice.invoice_n} value={invoice.invoice_n}>
-                                        {invoice.invoice_full_number || invoice.invoice_n} - {formatCurrency(invoice.total_usd)}
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
+                    <div className="space-y-2 rounded-lg border p-4">
+                        <Label>Facturas Disponibles del Cliente</Label>
+                        <ScrollArea className="h-[250px] pr-3 mt-2">
+                          {invoices.length > 0 ? (
+                            invoices.map((invoice) => (
+                              // ✅ --- LÍNEAS CORREGIDAS ---
+                              <div key={invoice.invoice_full_number || invoice.invoice_n} className="flex items-center space-x-2 py-2">
+                                <Checkbox
+                                  id={invoice.invoice_full_number || invoice.invoice_n}
+                                  checked={selectedInvoiceIds.includes(invoice.invoice_full_number || invoice.invoice_n)}
+                                  onCheckedChange={() => handleInvoiceSelection(invoice.invoice_full_number || invoice.invoice_n)}
+                                />
+                                <Label htmlFor={invoice.invoice_full_number || invoice.invoice_n} className="flex-grow cursor-pointer">
+                                  <div className="flex justify-between items-center">
+                                    <span>{invoice.invoice_full_number || invoice.invoice_n}</span>
+                                    <span className="font-bold">{formatCurrency(invoice.total_usd)}</span>
+                                  </div>
+                                </Label>
+                              </div>
+                            ))
+                          ) : (
+                            <p className="text-sm text-muted-foreground text-center py-10">
+                              No hay facturas disponibles para este cliente.
+                            </p>
+                          )}
+                        </ScrollArea>
                     </div>
                 )}
             </div>
@@ -331,7 +339,7 @@ export function CashierOrdersClient({ data }: { data: CashierOrder[] }) {
             </Button>
             <Button
               onClick={handleInvoiceOrder}
-              disabled={isLoading || !selectedInvoiceId}
+              disabled={isLoading || selectedInvoiceIds.length === 0}
             >
               {isLoading && <LoadingSpinner className="mr-2 h-4 w-4" />}
               Confirmar y Facturar
