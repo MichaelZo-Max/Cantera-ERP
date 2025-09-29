@@ -32,10 +32,10 @@ import {
   CheckCircle,
   LogOut,
   Camera,
-  FileText, // <-- Icono de factura
+  FileText,
   Eye,
   Box,
-  AlertTriangle, // <-- Importamos un nuevo icono para errores
+  AlertTriangle,
 } from "lucide-react";
 import { toast } from "sonner";
 import type { Delivery, DeliveryItem, Invoice } from "@/lib/types";
@@ -169,12 +169,15 @@ export function SecurityExitsClientUI({
     null
   );
   const [showExitModal, setShowExitModal] = useState(false);
+  
+  // ✅ CAMBIO: Estados para las dos fotos.
   const [exitPhoto, setExitPhoto] = useState<File | null>(null);
+  const [exitLoadPhoto, setExitLoadPhoto] = useState<File | null>(null);
+
   const [exitNotes, setExitNotes] = useState<string>("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showImagePreview, setShowImagePreview] = useState(false);
   const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
-  // ✅ 1. Nuevo estado para manejar errores de carga de imagen
   const [imageError, setImageError] = useState(false);
 
   const loadedDeliveries = useMemo(
@@ -209,15 +212,16 @@ export function SecurityExitsClientUI({
       toast.warning("Este despacho no está listo para salir.");
       return;
     }
-    // ✅ 2. Resetear el estado de error cada vez que se abre el modal
+    
+    // ✅ CAMBIO: Resetear el estado de ambas fotos al abrir el modal.
     setImageError(false);
     setSelectedDelivery(delivery);
     setExitPhoto(null);
+    setExitLoadPhoto(null);
     setExitNotes("");
     setShowExitModal(true);
   }, []);
 
-  // ✅ 3. Nueva función para manejar el error de la imagen
   const handleImageError = useCallback(() => {
     toast.warning("La foto del patio no se pudo cargar.", {
       description: "Puede que no se haya subido correctamente o fue eliminada.",
@@ -235,19 +239,23 @@ export function SecurityExitsClientUI({
 
   const handleAuthorizeExit = useCallback(async () => {
     if (!selectedDelivery) return;
-    if (!exitPhoto) {
-      toast.error("La foto de salida es obligatoria.");
+
+    // ✅ CAMBIO: Validar que ambas fotos existan.
+    if (!exitPhoto || !exitLoadPhoto) {
+      toast.error("Ambas fotos (camión y carga) son obligatorias.");
       return;
     }
 
     setIsSubmitting(true);
-    // ... (resto de la función sin cambios)
     try {
       const formData = new FormData();
       formData.append("status", "EXITED");
       formData.append("notes", exitNotes);
       if (user?.id) formData.append("userId", user.id.toString());
-      formData.append("photoFile", exitPhoto);
+      
+      // ✅ CAMBIO: Añadir ambas fotos al FormData con sus claves correctas.
+      formData.append("exitPhoto", exitPhoto);
+      formData.append("exitLoadPhoto", exitLoadPhoto);
 
       const res = await fetch(`/api/deliveries/${selectedDelivery.id}`, {
         method: "PATCH",
@@ -282,7 +290,7 @@ export function SecurityExitsClientUI({
     } finally {
       setIsSubmitting(false);
     }
-  }, [selectedDelivery, exitPhoto, exitNotes, user?.id, handleCloseModals]);
+  }, [selectedDelivery, exitPhoto, exitLoadPhoto, exitNotes, user?.id, handleCloseModals]);
 
   const openImagePreview = useCallback((imageUrl: string) => {
     setPreviewImageUrl(imageUrl);
@@ -291,8 +299,8 @@ export function SecurityExitsClientUI({
 
   return (
     <div className="space-y-6">
-       {/* ... (JSX sin cambios hasta el modal) ... */}
-       <div className="flex flex-col md:flex-row md:items-center md:justify-between">
+        {/* ... (JSX sin cambios hasta el modal) ... */}
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between">
         <div>
           <h2 className="text-2xl font-bold text-foreground">
             Control de Salida
@@ -395,7 +403,7 @@ export function SecurityExitsClientUI({
               Autorizar Salida - {selectedDelivery?.truck?.placa}
             </DialogTitle>
             <DialogDescription>
-              Verifica los detalles, toma una foto clara de la placa y genera la
+              Verifica los detalles, toma las fotos requeridas y genera la
               guía de despacho.
             </DialogDescription>
           </DialogHeader>
@@ -494,16 +502,24 @@ export function SecurityExitsClientUI({
                     </div>
                   )}
                 </div>
-                <div>
-                  <PhotoInput
-                    onSelect={setExitPhoto}
-                    required={true}
-                    label="Foto de salida (obligatoria)"
-                    capture={true}
-                  />
-                  <p className="text-xs text-muted-foreground mt-2">
-                    Asegúrate que la placa sea claramente visible.
-                  </p>
+                
+                {/* ✅ CAMBIO: Contenedor para los dos nuevos inputs de fotos. */}
+                <div className="space-y-4">
+                    <PhotoInput
+                      onSelect={setExitPhoto}
+                      required={true}
+                      label="Foto del Camión (Placa)"
+                      capture={true}
+                    />
+                     <PhotoInput
+                      onSelect={setExitLoadPhoto}
+                      required={true}
+                      label="Foto de la Carga"
+                      capture={true}
+                    />
+                    <p className="text-xs text-muted-foreground -mt-2">
+                      Ambas fotos son obligatorias para la salida.
+                    </p>
                 </div>
               </div>
               {selectedDelivery.notes && (
@@ -532,7 +548,8 @@ export function SecurityExitsClientUI({
               <div className="flex gap-3 pt-2">
                 <Button
                   onClick={handleAuthorizeExit}
-                  disabled={isSubmitting || !exitPhoto}
+                  // ✅ CAMBIO: Deshabilitar si falta alguna de las dos fotos.
+                  disabled={isSubmitting || !exitPhoto || !exitLoadPhoto}
                   className="flex-1"
                   size="lg"
                 >

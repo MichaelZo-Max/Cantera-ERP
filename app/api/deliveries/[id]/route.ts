@@ -24,7 +24,10 @@ function mapDbStatusToUi(status: string): "PENDING" | "CARGADA" | "EXITED" {
 
 const getDeliveryByIdQuery = `
     SELECT
-        d.id, d.status AS estado, d.notes, d.load_photo_url AS loadPhoto, d.exit_photo_url AS exitPhoto,
+        d.id, d.status AS estado, d.notes, 
+        d.load_photo_url AS loadPhoto, 
+        d.exit_photo_url AS exitPhoto,
+        d.exit_load_photo_url AS exitLoadPhoto, -- ✨ NUEVO CAMPO
         p.id AS order_id, p.order_number, p.customer_id, p.status AS order_status, p.created_at AS order_created_at,
         c.id AS client_id, c.name AS client_name,
         t.id AS truck_id, t.placa,
@@ -138,6 +141,7 @@ export async function GET(
       notes: row.notes ?? undefined,
       loadPhoto: row.loadPhoto ?? undefined,
       exitPhoto: row.exitPhoto ?? undefined,
+      exitLoadPhoto: row.exitLoadPhoto ?? undefined,
       orderDetails: {
         id: orderId,
         order_number: row.order_number,
@@ -191,6 +195,7 @@ export async function PATCH(
     const notes = (formData.get("notes") as string | null) ?? null;
     const userId = formData.get("userId") as string;
     const photoFile = formData.get("photoFile") as File | null;
+    const loadPhotoFile = formData.get("exitLoadPhoto") as File | null;
     const itemsJson = formData.get("itemsJson") as string | null;
 
     if (!status || !userId) {
@@ -326,11 +331,13 @@ export async function PATCH(
         }
       }
     } else if (status === "EXITED") {
-      // (Tu lógica para 'EXITED' no cambia, solo se le añade la llamada a la nueva función)
+      const exitPhotoFile = formData.get("exitPhoto") as File | null;
+      const exitLoadPhotoFile = formData.get("exitLoadPhoto") as File | null;
       const validation = confirmExitSchema.safeParse({
         notes: notes ?? undefined,
-        exitPhoto: photoFile,
-      });
+        exitPhoto: exitPhotoFile,
+        exitLoadPhoto: exitLoadPhotoFile,
+    });
 
       if (!validation.success) {
         return NextResponse.json(
@@ -342,20 +349,36 @@ export async function PATCH(
         );
       }
 
-      const { exitPhoto } = validation.data;
-      let photoUrl: string | null = null;
+      const { exitPhoto, exitLoadPhoto } = validation.data;
+
+      // ✅ CAMBIO: Procesar y guardar AMBAS fotos.
+      let exitPhotoUrl: string | null = null;
       if (exitPhoto) {
         const buffer = Buffer.from(await exitPhoto.arrayBuffer());
-        const filename = `${Date.now()}_exit_${exitPhoto.name.replace(
+        const filename = `${Date.now()}_exit_truck_${exitPhoto.name.replace(
           /\s/g,
           "_"
         )}`;
         const uploadDir = path.join(process.cwd(), "public/uploads");
         await mkdir(uploadDir, { recursive: true });
         await writeFile(path.join(uploadDir, filename), buffer);
-        photoUrl = `/uploads/${filename}`;
+        exitPhotoUrl = `/uploads/${filename}`;
       }
 
+      let exitLoadPhotoUrl: string | null = null;
+      if (exitLoadPhoto) {
+        const buffer = Buffer.from(await exitLoadPhoto.arrayBuffer());
+        const filename = `${Date.now()}_exit_load_${exitLoadPhoto.name.replace(
+          /\s/g,
+          "_"
+        )}`;
+        const uploadDir = path.join(process.cwd(), "public/uploads");
+        await mkdir(uploadDir, { recursive: true });
+        await writeFile(path.join(uploadDir, filename), buffer);
+        exitLoadPhotoUrl = `/uploads/${filename}`;
+      }
+
+      // ✅ CAMBIO: Actualizar la base de datos con las dos URLs.
       const updateDespachoSql = `
             UPDATE RIP.APP_DESPACHOS
             SET
@@ -363,7 +386,8 @@ export async function PATCH(
                 exited_by = @userId,
                 exited_at = GETDATE(),
                 notes = ISNULL(@notes, notes),
-                exit_photo_url = ISNULL(@photoUrl, exit_photo_url),
+                exit_photo_url = ISNULL(@exitPhotoUrl, exit_photo_url),
+                exit_load_photo_url = ISNULL(@exitLoadPhotoUrl, exit_load_photo_url), -- ✨ NUEVO CAMPO
                 updated_at = GETDATE()
             WHERE id = @despachoId;
         `;
@@ -371,7 +395,12 @@ export async function PATCH(
         { name: "despachoId", type: TYPES.Int, value: despachoId },
         { name: "userId", type: TYPES.Int, value: parseInt(userId, 10) },
         { name: "notes", type: TYPES.NVarChar, value: notes },
-        { name: "photoUrl", type: TYPES.NVarChar, value: photoUrl },
+        { name: "exitPhotoUrl", type: TYPES.NVarChar, value: exitPhotoUrl },
+        {
+          name: "exitLoadPhotoUrl",
+          type: TYPES.NVarChar,
+          value: exitLoadPhotoUrl,
+        }, // ✨ NUEVO PARÁMETRO
       ]);
 
       // --- 👇 MEJORA: Llamamos a la función para actualizar el estado de la orden ---

@@ -156,6 +156,7 @@ export interface Delivery {
   exitedAt?: Date;
   notes?: string;
   loadPhoto?: string;
+  exitLoadPhoto?: string;
   exitPhoto?: string;
   dispatchItems?: DeliveryItem[];
 }

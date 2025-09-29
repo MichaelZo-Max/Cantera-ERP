@@ -873,3 +873,5 @@ BEGIN
     PRINT 'Se añadió la llave foránea para related_order_id.';
 END
 GO
+ALTER TABLE RIP.APP_DESPACHOS
+ADD exit_load_photo_url NVARCHAR(255) NULL;

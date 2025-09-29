@@ -101,14 +101,23 @@ export const confirmLoadSchema = z.object({
 
 /**
  * @description Esquema para la CONFIRMACIÓN de salida de un despacho por seguridad.
+ * ✅ CAMBIO: Ahora requiere dos fotos obligatorias.
  */
 export const confirmExitSchema = z.object({
   notes: z.string().optional(),
+  // Foto 1: Se mantiene el nombre para consistencia.
   exitPhoto: z
     .any()
     .refine(
       (file) => file instanceof File,
-      "La foto de salida es obligatoria."
+      "La foto del camión es obligatoria."
+    ),
+  // Foto 2: Nuevo campo para la foto de la carga.
+  exitLoadPhoto: z
+    .any()
+    .refine(
+      (file) => file instanceof File,
+      "La foto de la carga es obligatoria."
     ),
 });
 
