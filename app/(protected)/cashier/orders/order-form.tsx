@@ -286,6 +286,45 @@ export function OrderForm({
     fetchAndSetInvoiceItems();
   }, [selectedInvoices]);
 
+  // --- 👇 NUEVO: useEffect para la búsqueda y paginación de productos ---
+  useEffect(() => {
+    const fetchProducts = async () => {
+      setIsProductsLoading(true);
+      try {
+        const params = new URLSearchParams({
+          page: productPage.toString(),
+          limit: "15", // O el límite que prefieras
+          q: debouncedProductSearch,
+        });
+
+        const res = await fetch(`/api/products?${params.toString()}`);
+        if (!res.ok) {
+          throw new Error("No se pudieron cargar los productos");
+        }
+
+        const result: PaginatedResponse<Product> = await res.json();
+
+        // Si es la primera página (una nueva búsqueda), reemplaza los datos.
+        // Si no, añade los nuevos resultados a los existentes.
+        setProducts((prev) =>
+          productPage === 1 ? result.data : [...prev, ...result.data]
+        );
+        setProductTotalPages(result.totalPages);
+      } catch (error) {
+        toast.error("Error al cargar productos.");
+      } finally {
+        setIsProductsLoading(false);
+      }
+    };
+
+    fetchProducts();
+  }, [debouncedProductSearch, productPage]); // Se ejecuta cuando cambia la búsqueda o la página
+
+  // --- 👇 MODIFICACIÓN: Reiniciar la paginación al buscar ---
+  useEffect(() => {
+    setProductPage(1);
+  }, [debouncedProductSearch]);
+
   const handleAddItem = useCallback(() => {
     if (!selectedProduct || currentQuantity <= 0) {
       toast.error("Por favor, selecciona un producto y una cantidad válida.");
