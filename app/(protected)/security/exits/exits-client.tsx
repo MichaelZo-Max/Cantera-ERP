@@ -498,7 +498,10 @@ export function SecurityExitsClientUI({
                   {selectedDelivery.loadPhoto && !imageError ? (
                     <div className="relative w-full h-48 rounded-lg overflow-hidden group border">
                       <Image
-                        src={selectedDelivery.loadPhoto}
+                        src={`/${selectedDelivery.loadPhoto.replace(
+                          /^\/+/,
+                          ""
+                        )}`}
                         alt="Foto de carga del patio"
                         fill
                         style={{ objectFit: "cover" }}
@@ -510,7 +513,12 @@ export function SecurityExitsClientUI({
                         size="icon"
                         className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity"
                         onClick={() =>
-                          openImagePreview(selectedDelivery.loadPhoto!)
+                          openImagePreview(
+                            `/${selectedDelivery.loadPhoto!.replace(
+                              /^\/+/,
+                              ""
+                            )}`
+                          )
                         }
                       >
                         <Eye className="h-8 w-8 text-white" />
@@ -695,7 +703,10 @@ export function SecurityExitsClientUI({
                   {selectedExitedDelivery.loadPhoto ? (
                     <div className="relative w-full h-40 rounded-lg overflow-hidden group border">
                       <Image
-                        src={selectedExitedDelivery.loadPhoto}
+                        src={`/${selectedExitedDelivery.loadPhoto.replace(
+                          /^\/+/,
+                          ""
+                        )}`}
                         alt="Foto de carga del patio"
                         fill
                         style={{ objectFit: "cover" }}
@@ -706,7 +717,12 @@ export function SecurityExitsClientUI({
                         size="icon"
                         className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100"
                         onClick={() =>
-                          openImagePreview(selectedExitedDelivery.loadPhoto!)
+                          openImagePreview(
+                            `/${selectedExitedDelivery.loadPhoto!.replace(
+                              /^\/+/,
+                              ""
+                            )}`
+                          )
                         }
                       >
                         <Eye className="h-6 w-6 text-white" />
@@ -726,7 +742,10 @@ export function SecurityExitsClientUI({
                   {selectedExitedDelivery.exitPhoto ? (
                     <div className="relative w-full h-40 rounded-lg overflow-hidden group border">
                       <Image
-                        src={selectedExitedDelivery.exitPhoto}
+                        src={`/${selectedExitedDelivery.exitPhoto.replace(
+                          /^\/+/,
+                          ""
+                        )}`}
                         alt="Foto de salida del camión"
                         fill
                         style={{ objectFit: "cover" }}
@@ -737,7 +756,12 @@ export function SecurityExitsClientUI({
                         size="icon"
                         className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100"
                         onClick={() =>
-                          openImagePreview(selectedExitedDelivery.exitPhoto!)
+                          openImagePreview(
+                            `/${selectedExitedDelivery.exitPhoto!.replace(
+                              /^\/+/,
+                              ""
+                            )}`
+                          )
                         }
                       >
                         <Eye className="h-6 w-6 text-white" />
@@ -757,7 +781,10 @@ export function SecurityExitsClientUI({
                   {selectedExitedDelivery.exitLoadPhoto ? (
                     <div className="relative w-full h-40 rounded-lg overflow-hidden group border">
                       <Image
-                        src={selectedExitedDelivery.exitLoadPhoto}
+                        src={`/${selectedExitedDelivery.exitLoadPhoto.replace(
+                          /^\/+/,
+                          ""
+                        )}`}
                         alt="Foto de salida de la carga"
                         fill
                         style={{ objectFit: "cover" }}
@@ -769,7 +796,10 @@ export function SecurityExitsClientUI({
                         className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100"
                         onClick={() =>
                           openImagePreview(
-                            selectedExitedDelivery.exitLoadPhoto!
+                            `/${selectedExitedDelivery.exitLoadPhoto!.replace(
+                              /^\/+/,
+                              ""
+                            )}`
                           )
                         }
                       >
