@@ -191,8 +191,8 @@ export function SecurityExitsClientUI({
 
   // ✅ NUEVO: Estados para el modal de detalles del despacho que ya salió.
   const [showExitedDetailModal, setShowExitedDetailModal] = useState(false);
-  const [selectedExitedDelivery, setSelectedExitedDelivery] = useState<Delivery | null>(null);
-
+  const [selectedExitedDelivery, setSelectedExitedDelivery] =
+    useState<Delivery | null>(null);
 
   const loadedDeliveries = useMemo(
     () => allDeliveries.filter((d) => d.estado === "CARGADA"),
@@ -240,14 +240,12 @@ export function SecurityExitsClientUI({
     setShowExitedDetailModal(true);
   }, []);
 
-
   const handleImageError = useCallback(() => {
     toast.warning("La foto del patio no se pudo cargar.", {
       description: "Puede que no se haya subido correctamente o fue eliminada.",
     });
     setImageError(true);
   }, []);
-
 
   const handleCloseModals = useCallback(() => {
     setShowExitModal(false);
@@ -272,7 +270,7 @@ export function SecurityExitsClientUI({
       formData.append("status", "EXITED");
       formData.append("notes", exitNotes);
       if (user?.id) formData.append("userId", user.id.toString());
-      
+
       formData.append("exitPhoto", exitPhoto);
       formData.append("exitLoadPhoto", exitLoadPhoto);
 
@@ -309,7 +307,14 @@ export function SecurityExitsClientUI({
     } finally {
       setIsSubmitting(false);
     }
-  }, [selectedDelivery, exitPhoto, exitLoadPhoto, exitNotes, user?.id, handleCloseModals]);
+  }, [
+    selectedDelivery,
+    exitPhoto,
+    exitLoadPhoto,
+    exitNotes,
+    user?.id,
+    handleCloseModals,
+  ]);
 
   const openImagePreview = useCallback((imageUrl: string) => {
     setPreviewImageUrl(imageUrl);
@@ -318,7 +323,7 @@ export function SecurityExitsClientUI({
 
   return (
     <div className="space-y-6">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between">
         <div>
           <h2 className="text-2xl font-bold text-foreground">
             Control de Salida
@@ -405,7 +410,11 @@ export function SecurityExitsClientUI({
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
               {exitedDeliveries.map((delivery) => (
-                <ExitedDeliveryCard key={delivery.id} delivery={delivery} onSelect={handleSelectExitedDelivery} />
+                <ExitedDeliveryCard
+                  key={delivery.id}
+                  delivery={delivery}
+                  onSelect={handleSelectExitedDelivery}
+                />
               ))}
             </div>
           </CardContent>
@@ -421,8 +430,8 @@ export function SecurityExitsClientUI({
               Autorizar Salida - {selectedDelivery?.truck?.placa}
             </DialogTitle>
             <DialogDescription>
-              Verifica los detalles, toma las fotos requeridas y genera la
-              guía de despacho.
+              Verifica los detalles, toma las fotos requeridas y genera la guía
+              de despacho.
             </DialogDescription>
           </DialogHeader>
           {selectedDelivery && (
@@ -454,28 +463,24 @@ export function SecurityExitsClientUI({
                   <Box className="h-4 w-4" /> Items de este Despacho:
                 </p>
                 <div className="border rounded-lg space-y-2 p-3 bg-muted/30">
-                  {selectedDelivery.dispatchItems?.map(
-                    (item: DeliveryItem) => {
-                      const orderItem =
-                        selectedDelivery.orderDetails.items.find(
-                          (oi) => oi.id === item.pedido_item_id
-                        );
-                      return (
-                        <div
-                          key={item.id}
-                          className="flex justify-between items-center text-sm"
-                        >
-                          <span className="text-muted-foreground">
-                            {orderItem?.product?.name ||
-                              "Producto no encontrado"}
-                          </span>
-                          <span className="font-medium bg-gray-200 dark:bg-gray-700 px-2 py-1 rounded">
-                            {item.dispatched_quantity} {orderItem?.product?.unit}
-                          </span>
-                        </div>
-                      );
-                    }
-                  )}
+                  {selectedDelivery.dispatchItems?.map((item: DeliveryItem) => {
+                    const orderItem = selectedDelivery.orderDetails.items.find(
+                      (oi) => oi.id === item.pedido_item_id
+                    );
+                    return (
+                      <div
+                        key={item.id}
+                        className="flex justify-between items-center text-sm"
+                      >
+                        <span className="text-muted-foreground">
+                          {orderItem?.product?.name || "Producto no encontrado"}
+                        </span>
+                        <span className="font-medium bg-gray-200 dark:bg-gray-700 px-2 py-1 rounded">
+                          {item.dispatched_quantity} {orderItem?.product?.unit}
+                        </span>
+                      </div>
+                    );
+                  })}
                   {(!selectedDelivery.dispatchItems ||
                     selectedDelivery.dispatchItems.length === 0) && (
                     <p className="text-sm text-center text-muted-foreground py-2">
@@ -515,28 +520,30 @@ export function SecurityExitsClientUI({
                     <div className="border-2 border-dashed border-destructive/25 bg-destructive/5 rounded-lg h-48 flex flex-col items-center justify-center text-destructive">
                       <AlertTriangle className="h-8 w-8 mb-2" />
                       <p className="text-sm font-medium">
-                        {imageError ? "Error al cargar foto" : "Sin foto de patio"}
+                        {imageError
+                          ? "Error al cargar foto"
+                          : "Sin foto de patio"}
                       </p>
                     </div>
                   )}
                 </div>
-                
+
                 <div className="space-y-4">
-                    <PhotoInput
-                      onSelect={setExitPhoto}
-                      required={true}
-                      label="Foto del Camión (Placa)"
-                      capture={true}
-                    />
-                     <PhotoInput
-                      onSelect={setExitLoadPhoto}
-                      required={true}
-                      label="Foto de la Carga"
-                      capture={true}
-                    />
-                    <p className="text-xs text-muted-foreground -mt-2">
-                      Ambas fotos son obligatorias para la salida.
-                    </p>
+                  <PhotoInput
+                    onSelect={setExitPhoto}
+                    required={true}
+                    label="Foto del Camión (Placa)"
+                    capture={true}
+                  />
+                  <PhotoInput
+                    onSelect={setExitLoadPhoto}
+                    required={true}
+                    label="Foto de la Carga"
+                    capture={true}
+                  />
+                  <p className="text-xs text-muted-foreground -mt-2">
+                    Ambas fotos son obligatorias para la salida.
+                  </p>
                 </div>
               </div>
               {selectedDelivery.notes && (
@@ -584,9 +591,12 @@ export function SecurityExitsClientUI({
           )}
         </DialogContent>
       </Dialog>
-      
+
       {/* ✅ NUEVO: MODAL DE DETALLES DEL DESPACHO QUE YA SALIÓ */}
-      <Dialog open={showExitedDetailModal} onOpenChange={setShowExitedDetailModal}>
+      <Dialog
+        open={showExitedDetailModal}
+        onOpenChange={setShowExitedDetailModal}
+      >
         <DialogContent className="sm:max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader className="pb-4">
             <DialogTitle className="flex items-center gap-2">
@@ -594,91 +604,185 @@ export function SecurityExitsClientUI({
               Detalles del Despacho - {selectedExitedDelivery?.truck?.placa}
             </DialogTitle>
             <DialogDescription>
-              Información completa del despacho que ya salió de las instalaciones.
+              Información completa del despacho que ya salió de las
+              instalaciones.
             </DialogDescription>
           </DialogHeader>
           {selectedExitedDelivery && (
             <div className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                        <h4 className="text-sm font-medium mb-2">Cliente</h4>
-                        <p className="text-muted-foreground">{selectedExitedDelivery.orderDetails.client.name}</p>
-                    </div>
-                     <div>
-                        <h4 className="text-sm font-medium mb-2">Fecha de Salida</h4>
-                        <p className="text-muted-foreground">{new Date(selectedExitedDelivery.exitedAt!).toLocaleString()}</p>
-                    </div>
-                </div>
-
-              {selectedExitedDelivery.orderDetails.invoices && selectedExitedDelivery.orderDetails.invoices.length > 0 && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <p className="text-sm font-medium mb-2 flex items-center gap-2">
-                    <FileText className="h-4 w-4" /> Facturas Asociadas:
+                  <h4 className="text-sm font-medium mb-2">Cliente</h4>
+                  <p className="text-muted-foreground">
+                    {selectedExitedDelivery.orderDetails.client.name}
                   </p>
-                  <div className="border rounded-lg p-3 bg-muted/30">
-                    <div className="flex flex-wrap gap-2">
-                      {selectedExitedDelivery.orderDetails.invoices.map((invoice: Invoice) => (
-                        <Badge key={invoice.invoice_full_number} variant="default">
-                          {invoice.invoice_full_number}
-                        </Badge>
-                      ))}
+                </div>
+                <div>
+                  <h4 className="text-sm font-medium mb-2">Fecha de Salida</h4>
+                  <p className="text-muted-foreground">
+                    {selectedExitedDelivery.exitedAt
+                      ? new Date(
+                          selectedExitedDelivery.exitedAt
+                        ).toLocaleString()
+                      : "No disponible"}
+                  </p>
+                </div>
+              </div>
+
+              {selectedExitedDelivery.orderDetails.invoices &&
+                selectedExitedDelivery.orderDetails.invoices.length > 0 && (
+                  <div>
+                    <p className="text-sm font-medium mb-2 flex items-center gap-2">
+                      <FileText className="h-4 w-4" /> Facturas Asociadas:
+                    </p>
+                    <div className="border rounded-lg p-3 bg-muted/30">
+                      <div className="flex flex-wrap gap-2">
+                        {selectedExitedDelivery.orderDetails.invoices.map(
+                          (invoice: Invoice) => (
+                            <Badge
+                              key={invoice.invoice_full_number}
+                              variant="default"
+                            >
+                              {invoice.invoice_full_number}
+                            </Badge>
+                          )
+                        )}
+                      </div>
                     </div>
                   </div>
-                </div>
-              )}
+                )}
 
               <div>
                 <p className="text-sm font-medium mb-2 flex items-center gap-2">
                   <Box className="h-4 w-4" /> Items Despachados:
                 </p>
                 <div className="border rounded-lg space-y-2 p-3 bg-muted/30">
-                  {selectedExitedDelivery.dispatchItems?.map((item: DeliveryItem) => {
-                    const orderItem = selectedExitedDelivery.orderDetails.items.find((oi) => oi.id === item.pedido_item_id);
-                    return (
-                      <div key={item.id} className="flex justify-between items-center text-sm">
-                        <span className="text-muted-foreground">{orderItem?.product?.name || "Producto no encontrado"}</span>
-                        <span className="font-medium bg-gray-200 dark:bg-gray-700 px-2 py-1 rounded">
-                          {item.dispatched_quantity} {orderItem?.product?.unit}
-                        </span>
-                      </div>
-                    );
-                  })}
+                  {selectedExitedDelivery.dispatchItems?.map(
+                    (item: DeliveryItem) => {
+                      const orderItem =
+                        selectedExitedDelivery.orderDetails.items.find(
+                          (oi) => oi.id === item.pedido_item_id
+                        );
+                      return (
+                        <div
+                          key={item.id}
+                          className="flex justify-between items-center text-sm"
+                        >
+                          <span className="text-muted-foreground">
+                            {orderItem?.product?.name ||
+                              "Producto no encontrado"}
+                          </span>
+                          <span className="font-medium bg-gray-200 dark:bg-gray-700 px-2 py-1 rounded">
+                            {item.dispatched_quantity}{" "}
+                            {orderItem?.product?.unit}
+                          </span>
+                        </div>
+                      );
+                    }
+                  )}
                 </div>
               </div>
-              
-                <h3 className="font-semibold text-lg pt-2 border-t mt-4">Fotos del Despacho</h3>
-                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    {/* Foto de Patio */}
-                    <div>
-                        <h4 className="font-medium mb-2 flex items-center gap-2 text-sm"><Camera className="h-4 w-4" /> Patio</h4>
-                        {selectedExitedDelivery.loadPhoto ? (
-                            <div className="relative w-full h-40 rounded-lg overflow-hidden group border">
-                               <Image src={selectedExitedDelivery.loadPhoto} alt="Foto de carga del patio" fill style={{ objectFit: 'cover' }} />
-                               <Button type="button" variant="ghost" size="icon" className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100" onClick={() => openImagePreview(selectedExitedDelivery.loadPhoto!)}><Eye className="h-6 w-6 text-white" /></Button>
-                            </div>
-                        ) : (<div className="border-2 border-dashed rounded-lg h-40 flex items-center justify-center text-muted-foreground text-sm">Sin Foto</div>)}
+
+              <h3 className="font-semibold text-lg pt-2 border-t mt-4">
+                Fotos del Despacho
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {/* Foto de Patio */}
+                <div>
+                  <h4 className="font-medium mb-2 flex items-center gap-2 text-sm">
+                    <Camera className="h-4 w-4" /> Patio
+                  </h4>
+                  {selectedExitedDelivery.loadPhoto ? (
+                    <div className="relative w-full h-40 rounded-lg overflow-hidden group border">
+                      <Image
+                        src={selectedExitedDelivery.loadPhoto}
+                        alt="Foto de carga del patio"
+                        fill
+                        style={{ objectFit: "cover" }}
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100"
+                        onClick={() =>
+                          openImagePreview(selectedExitedDelivery.loadPhoto!)
+                        }
+                      >
+                        <Eye className="h-6 w-6 text-white" />
+                      </Button>
                     </div>
-                    {/* Foto del Camión */}
-                    <div>
-                        <h4 className="font-medium mb-2 flex items-center gap-2 text-sm"><Truck className="h-4 w-4" /> Camión (Placa)</h4>
-                         {selectedExitedDelivery.exitPhoto ? (
-                            <div className="relative w-full h-40 rounded-lg overflow-hidden group border">
-                               <Image src={selectedExitedDelivery.exitPhoto} alt="Foto de salida del camión" fill style={{ objectFit: 'cover' }} />
-                               <Button type="button" variant="ghost" size="icon" className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100" onClick={() => openImagePreview(selectedExitedDelivery.exitPhoto!)}><Eye className="h-6 w-6 text-white" /></Button>
-                            </div>
-                        ) : (<div className="border-2 border-dashed rounded-lg h-40 flex items-center justify-center text-muted-foreground text-sm">Sin Foto</div>)}
+                  ) : (
+                    <div className="border-2 border-dashed rounded-lg h-40 flex items-center justify-center text-muted-foreground text-sm">
+                      Sin Foto
                     </div>
-                    {/* Foto de la Carga */}
-                    <div>
-                        <h4 className="font-medium mb-2 flex items-center gap-2 text-sm"><Package className="h-4 w-4" /> Carga</h4>
-                         {selectedExitedDelivery.exitLoadPhoto ? (
-                            <div className="relative w-full h-40 rounded-lg overflow-hidden group border">
-                               <Image src={selectedExitedDelivery.exitLoadPhoto} alt="Foto de salida de la carga" fill style={{ objectFit: 'cover' }} />
-                               <Button type="button" variant="ghost" size="icon" className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100" onClick={() => openImagePreview(selectedExitedDelivery.exitLoadPhoto!)}><Eye className="h-6 w-6 text-white" /></Button>
-                            </div>
-                        ) : (<div className="border-2 border-dashed rounded-lg h-40 flex items-center justify-center text-muted-foreground text-sm">Sin Foto</div>)}
+                  )}
+                </div>
+                {/* Foto del Camión */}
+                <div>
+                  <h4 className="font-medium mb-2 flex items-center gap-2 text-sm">
+                    <Truck className="h-4 w-4" /> Camión (Placa)
+                  </h4>
+                  {selectedExitedDelivery.exitPhoto ? (
+                    <div className="relative w-full h-40 rounded-lg overflow-hidden group border">
+                      <Image
+                        src={selectedExitedDelivery.exitPhoto}
+                        alt="Foto de salida del camión"
+                        fill
+                        style={{ objectFit: "cover" }}
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100"
+                        onClick={() =>
+                          openImagePreview(selectedExitedDelivery.exitPhoto!)
+                        }
+                      >
+                        <Eye className="h-6 w-6 text-white" />
+                      </Button>
                     </div>
-                 </div>
+                  ) : (
+                    <div className="border-2 border-dashed rounded-lg h-40 flex items-center justify-center text-muted-foreground text-sm">
+                      Sin Foto
+                    </div>
+                  )}
+                </div>
+                {/* Foto de la Carga */}
+                <div>
+                  <h4 className="font-medium mb-2 flex items-center gap-2 text-sm">
+                    <Package className="h-4 w-4" /> Carga
+                  </h4>
+                  {selectedExitedDelivery.exitLoadPhoto ? (
+                    <div className="relative w-full h-40 rounded-lg overflow-hidden group border">
+                      <Image
+                        src={selectedExitedDelivery.exitLoadPhoto}
+                        alt="Foto de salida de la carga"
+                        fill
+                        style={{ objectFit: "cover" }}
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100"
+                        onClick={() =>
+                          openImagePreview(
+                            selectedExitedDelivery.exitLoadPhoto!
+                          )
+                        }
+                      >
+                        <Eye className="h-6 w-6 text-white" />
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="border-2 border-dashed rounded-lg h-40 flex items-center justify-center text-muted-foreground text-sm">
+                      Sin Foto
+                    </div>
+                  )}
+                </div>
+              </div>
 
               {selectedExitedDelivery.notes && (
                 <div className="p-3 bg-yellow-50 border border-yellow-200 dark:bg-yellow-900/20 dark:border-yellow-800 rounded-lg">
@@ -690,7 +794,7 @@ export function SecurityExitsClientUI({
                   </p>
                 </div>
               )}
-                 {selectedExitedDelivery.exit_notes && (
+              {selectedExitedDelivery.exit_notes && (
                 <div className="p-3 bg-blue-50 border border-blue-200 dark:bg-blue-900/20 dark:border-blue-800 rounded-lg">
                   <p className="text-sm font-medium text-blue-800 dark:text-blue-300">
                     Observaciones de Seguridad:
@@ -701,16 +805,15 @@ export function SecurityExitsClientUI({
                 </div>
               )}
 
-                <div className="flex justify-end pt-2">
-                    <Button variant="outline" onClick={handleCloseModals}>
-                        Cerrar
-                    </Button>
-                </div>
+              <div className="flex justify-end pt-2">
+                <Button variant="outline" onClick={handleCloseModals}>
+                  Cerrar
+                </Button>
+              </div>
             </div>
           )}
         </DialogContent>
       </Dialog>
-
 
       <Dialog open={showImagePreview} onOpenChange={setShowImagePreview}>
         <DialogContent className="max-w-3xl p-0">

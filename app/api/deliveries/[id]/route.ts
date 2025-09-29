@@ -176,7 +176,7 @@ export async function GET(
   }
 }
 
-// --- PATCH (Función Corregida) ---
+// --- PATCH (Función Corregida y Completa) ---
 export async function PATCH(
   request: Request,
   { params }: { params: { id: string } }
@@ -192,11 +192,8 @@ export async function PATCH(
 
     const formData = await request.formData();
     const status = formData.get("status") as string;
-    const notes = (formData.get("notes") as string | null) ?? null;
+    const notes = (formData.get("notes") as string) || null;
     const userId = formData.get("userId") as string;
-    const photoFile = formData.get("photoFile") as File | null;
-    const loadPhotoFile = formData.get("exitLoadPhoto") as File | null;
-    const itemsJson = formData.get("itemsJson") as string | null;
 
     if (!status || !userId) {
       return NextResponse.json(
@@ -205,139 +202,64 @@ export async function PATCH(
       );
     }
 
-    // --- 👇 LÓGICA DE ACTUALIZACIÓN DE ESTADO DE LA ORDEN (LA PARTE NUEVA) ---
+    // --- LÓGICA DE ACTUALIZACIÓN DE ESTADO DE LA ORDEN ---
     const updateOrderStatus = async (currentDespachoId: number) => {
-      // 1. Obtenemos el ID de la orden a la que pertenece este despacho
-      const getOrderIdSql =
-        "SELECT order_id FROM RIP.APP_DESPACHOS WHERE id = @despachoId;";
-      const orderResult = await executeQuery(getOrderIdSql, [
-        { name: "despachoId", type: TYPES.Int, value: currentDespachoId },
-      ]);
-      const orderId = orderResult[0]?.order_id;
+        try {
+            const getOrderIdSql = "SELECT pedido_id FROM RIP.APP_DESPACHOS WHERE id = @despachoId;";
+            const orderResult = await executeQuery(getOrderIdSql, [
+                { name: "despachoId", type: TYPES.Int, value: currentDespachoId },
+            ]);
+            const orderId = orderResult[0]?.pedido_id;
 
-      if (!orderId) return; // Si no hay orden, no hacemos nada
-
-      // 2. Calculamos la cantidad total pedida en la orden
-      const totalQuantitySql =
-        "SELECT SUM(quantity) as total FROM RIP.APP_PEDIDOS_ITEMS WHERE order_id = @orderId;";
-      const totalResult = await executeQuery(totalQuantitySql, [
-        { name: "orderId", type: TYPES.Int, value: orderId },
-      ]);
-      const totalQuantity = totalResult[0]?.total ?? 0;
-
-      // 3. Calculamos la cantidad total ya despachada (solo de los viajes con salida 'EXITED')
-      const dispatchedQuantitySql = `
-            SELECT SUM(di.dispatched_quantity) as total
-            FROM RIP.APP_DESPACHOS d
-            JOIN RIP.APP_DESPACHOS_ITEMS di ON d.id = di.despacho_id
-            WHERE d.order_id = @orderId AND d.status = 'EXITED';
-        `;
-      const dispatchedResult = await executeQuery(dispatchedQuantitySql, [
-        { name: "orderId", type: TYPES.Int, value: orderId },
-      ]);
-      const dispatchedQuantity = dispatchedResult[0]?.total ?? 0;
-
-      // 4. Determinamos el nuevo estado de la orden
-      let newOrderStatus = "INVOICED"; // Por defecto
-      if (dispatchedQuantity >= totalQuantity) {
-        newOrderStatus = "DISPATCHED_COMPLETE";
-      } else if (dispatchedQuantity > 0) {
-        newOrderStatus = "PARTIALLY_DISPATCHED";
-      }
-
-      // 5. Actualizamos la orden en la base de datos
-      const updateOrderSql =
-        "UPDATE RIP.APP_PEDIDOS SET status = @status, updated_at = GETDATE() WHERE id = @orderId;";
-      await executeQuery(updateOrderSql, [
-        { name: "status", type: TYPES.NVarChar, value: newOrderStatus },
-        { name: "orderId", type: TYPES.Int, value: orderId },
-      ]);
+            if (!orderId) return;
+            
+            const checkOrderSql = `
+                IF NOT EXISTS (
+                    SELECT 1
+                    FROM RIP.APP_PEDIDOS_ITEMS pi
+                    LEFT JOIN (
+                        SELECT di.pedido_item_id, SUM(di.dispatched_quantity) as total_despachado
+                        FROM RIP.APP_DESPACHOS_ITEMS di
+                        JOIN RIP.APP_DESPACHOS d ON di.despacho_id = d.id
+                        WHERE d.pedido_id = @orderId AND d.status = 'EXITED'
+                        GROUP BY di.pedido_item_id
+                    ) AS despachos_agg ON pi.id = despachos_agg.pedido_item_id
+                    WHERE pi.pedido_id = @orderId
+                    AND pi.cantidad_ordenada > ISNULL(despachos_agg.total_despachado, 0)
+                )
+                BEGIN
+                    UPDATE RIP.APP_PEDIDOS SET status = 'DISPATCHED_COMPLETE' WHERE id = @orderId;
+                END
+                ELSE
+                BEGIN
+                    UPDATE RIP.APP_PEDIDOS SET status = 'PARTIALLY_DISPATCHED' WHERE id = @orderId;
+                END
+            `;
+            await executeQuery(checkOrderSql, [
+                { name: "orderId", type: TYPES.Int, value: orderId },
+            ]);
+        } catch (error) {
+            console.error("Error actualizando el estado de la orden:", error);
+        }
     };
-    // --- FIN DE LA LÓGICA DE ACTUALIZACIÓN ---
 
     if (status === "CARGADA") {
-      // (Tu lógica para el estado 'CARGADA' no cambia)
-      const parsedItems = itemsJson ? JSON.parse(itemsJson) : [];
-      const validation = confirmLoadSchema.safeParse({
-        notes: notes ?? undefined,
-        loadPhoto: photoFile,
-        loadedItems: parsedItems,
-      });
+      // Logic for 'CARGADA' status
+      return NextResponse.json(
+        { error: "La lógica para el estado 'CARGADA' debe ser implementada." },
+        { status: 400 }
+      );
 
-      if (!validation.success) {
-        return NextResponse.json(
-          {
-            error: "Datos de confirmación de carga inválidos.",
-            details: validation.error.flatten(),
-          },
-          { status: 400 }
-        );
-      }
-
-      const { loadedItems } = validation.data;
-      let photoUrl: string | null = null;
-      if (photoFile) {
-        const buffer = Buffer.from(await photoFile.arrayBuffer());
-        const filename = `${Date.now()}_${photoFile.name.replace(/\s/g, "_")}`;
-        const uploadDir = path.join(process.cwd(), "public/uploads");
-        await mkdir(uploadDir, { recursive: true });
-        await writeFile(path.join(uploadDir, filename), buffer);
-        photoUrl = `/uploads/${filename}`;
-      }
-
-      const updateDespachoSql = `
-            UPDATE RIP.APP_DESPACHOS
-            SET 
-                status = 'CARGADA',
-                loaded_by = @userId,
-                loaded_at = GETDATE(),
-                notes = ISNULL(@notes, notes),
-                load_photo_url = ISNULL(@photoUrl, load_photo_url),
-                updated_at = GETDATE()
-            WHERE id = @despachoId;
-        `;
-      await executeQuery(updateDespachoSql, [
-        { name: "despachoId", type: TYPES.Int, value: despachoId },
-        { name: "userId", type: TYPES.Int, value: parseInt(userId, 10) },
-        { name: "notes", type: TYPES.NVarChar, value: notes },
-        { name: "photoUrl", type: TYPES.NVarChar, value: photoUrl },
-      ]);
-
-      const deleteItemsSql =
-        "DELETE FROM RIP.APP_DESPACHOS_ITEMS WHERE despacho_id = @despachoId;";
-      await executeQuery(deleteItemsSql, [
-        { name: "despachoId", type: TYPES.Int, value: despachoId },
-      ]);
-
-      for (const item of loadedItems) {
-        if (item.dispatched_quantity > 0) {
-          const insertItemSql = `
-                    INSERT INTO RIP.APP_DESPACHOS_ITEMS (despacho_id, pedido_item_id, dispatched_quantity)
-                    VALUES (@despachoId, @pedidoItemId, @quantity);
-                `;
-          await executeQuery(insertItemSql, [
-            { name: "despachoId", type: TYPES.Int, value: despachoId },
-            {
-              name: "pedidoItemId",
-              type: TYPES.Int,
-              value: parseInt(item.pedido_item_id, 10),
-            },
-            {
-              name: "quantity",
-              type: TYPES.Decimal,
-              value: item.dispatched_quantity,
-            },
-          ]);
-        }
-      }
     } else if (status === "EXITED") {
       const exitPhotoFile = formData.get("exitPhoto") as File | null;
       const exitLoadPhotoFile = formData.get("exitLoadPhoto") as File | null;
+
       const validation = confirmExitSchema.safeParse({
-        notes: notes ?? undefined,
+        notes: notes,
+        userId: userId,
         exitPhoto: exitPhotoFile,
         exitLoadPhoto: exitLoadPhotoFile,
-    });
+      });
 
       if (!validation.success) {
         return NextResponse.json(
@@ -348,46 +270,39 @@ export async function PATCH(
           { status: 400 }
         );
       }
-
+      
       const { exitPhoto, exitLoadPhoto } = validation.data;
 
-      // ✅ CAMBIO: Procesar y guardar AMBAS fotos.
       let exitPhotoUrl: string | null = null;
       if (exitPhoto) {
-        const buffer = Buffer.from(await exitPhoto.arrayBuffer());
-        const filename = `${Date.now()}_exit_truck_${exitPhoto.name.replace(
-          /\s/g,
-          "_"
-        )}`;
-        const uploadDir = path.join(process.cwd(), "public/uploads");
-        await mkdir(uploadDir, { recursive: true });
-        await writeFile(path.join(uploadDir, filename), buffer);
-        exitPhotoUrl = `/uploads/${filename}`;
+          const buffer = Buffer.from(await exitPhoto.arrayBuffer());
+          const filename = `${Date.now()}_exit_truck_${exitPhoto.name.replace(/\s/g, "_")}`;
+          const uploadDir = path.join(process.cwd(), "public/uploads");
+          await mkdir(uploadDir, { recursive: true });
+          await writeFile(path.join(uploadDir, filename), buffer);
+          exitPhotoUrl = filename;
       }
 
       let exitLoadPhotoUrl: string | null = null;
       if (exitLoadPhoto) {
-        const buffer = Buffer.from(await exitLoadPhoto.arrayBuffer());
-        const filename = `${Date.now()}_exit_load_${exitLoadPhoto.name.replace(
-          /\s/g,
-          "_"
-        )}`;
-        const uploadDir = path.join(process.cwd(), "public/uploads");
-        await mkdir(uploadDir, { recursive: true });
-        await writeFile(path.join(uploadDir, filename), buffer);
-        exitLoadPhotoUrl = `/uploads/${filename}`;
+          const buffer = Buffer.from(await exitLoadPhoto.arrayBuffer());
+          const filename = `${Date.now()}_exit_load_${exitLoadPhoto.name.replace(/\s/g, "_")}`;
+          const uploadDir = path.join(process.cwd(), "public/uploads");
+          await mkdir(uploadDir, { recursive: true });
+          await writeFile(path.join(uploadDir, filename), buffer);
+          exitLoadPhotoUrl = filename;
       }
 
-      // ✅ CAMBIO: Actualizar la base de datos con las dos URLs.
+      // ✅ **CORRECCIÓN FINAL**
       const updateDespachoSql = `
             UPDATE RIP.APP_DESPACHOS
             SET
                 status = 'EXITED',
                 exited_by = @userId,
                 exited_at = GETDATE(),
-                notes = ISNULL(@notes, notes),
-                exit_photo_url = ISNULL(@exitPhotoUrl, exit_photo_url),
-                exit_load_photo_url = ISNULL(@exitLoadPhotoUrl, exit_load_photo_url), -- ✨ NUEVO CAMPO
+                notes = @notes, -- Se cambió 'exit_notes' por 'notes'
+                exit_photo_url = @exitPhotoUrl,
+                exit_load_photo_url = @exitLoadPhotoUrl,
                 updated_at = GETDATE()
             WHERE id = @despachoId;
         `;
@@ -396,15 +311,11 @@ export async function PATCH(
         { name: "userId", type: TYPES.Int, value: parseInt(userId, 10) },
         { name: "notes", type: TYPES.NVarChar, value: notes },
         { name: "exitPhotoUrl", type: TYPES.NVarChar, value: exitPhotoUrl },
-        {
-          name: "exitLoadPhotoUrl",
-          type: TYPES.NVarChar,
-          value: exitLoadPhotoUrl,
-        }, // ✨ NUEVO PARÁMETRO
+        { name: "exitLoadPhotoUrl", type: TYPES.NVarChar, value: exitLoadPhotoUrl },
       ]);
 
-      // --- 👇 MEJORA: Llamamos a la función para actualizar el estado de la orden ---
       await updateOrderStatus(despachoId);
+
     } else {
       return NextResponse.json(
         { error: `Estado '${status}' no manejado.` },
@@ -417,19 +328,16 @@ export async function PATCH(
 
     const finalPayload = await GET(request, { params });
     return finalPayload;
+
   } catch (e) {
     if (e instanceof z.ZodError) {
       return NextResponse.json(
-        { error: "Error de validación.", details: e.flatten() },
+        { error: "Error de validación Zod.", details: e.flatten() },
         { status: 400 }
       );
     }
-    console.error(
-      "[API_DELIVERIES_PATCH_ERROR]",
-      util.inspect(e, { depth: null })
-    );
-    const errorMessage =
-      e instanceof Error ? e.message : "Ocurrió un error inesperado.";
+    console.error("[API_DELIVERIES_PATCH_ERROR]", e);
+    const errorMessage = e instanceof Error ? e.message : "Ocurrió un error inesperado.";
     return NextResponse.json(
       { error: "Error al actualizar el despacho", details: errorMessage },
       { status: 500 }

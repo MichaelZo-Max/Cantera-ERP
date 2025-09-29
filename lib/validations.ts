@@ -104,20 +104,28 @@ export const confirmLoadSchema = z.object({
  * ✅ CAMBIO: Ahora requiere dos fotos obligatorias.
  */
 export const confirmExitSchema = z.object({
-  notes: z.string().optional(),
-  // Foto 1: Se mantiene el nombre para consistencia.
+  notes: z.string().nullable().optional(),
+  userId: z.string().min(1, "El ID de usuario es requerido."),
+
   exitPhoto: z
     .any()
     .refine(
       (file) => file instanceof File,
       "La foto del camión es obligatoria."
+    )
+    .refine(
+      (file) => file?.size > 0,
+      "La foto del camión no puede estar vacía."
     ),
-  // Foto 2: Nuevo campo para la foto de la carga.
   exitLoadPhoto: z
     .any()
     .refine(
       (file) => file instanceof File,
       "La foto de la carga es obligatoria."
+    )
+    .refine(
+      (file) => file?.size > 0,
+      "La foto de la carga no puede estar vacía."
     ),
 });
 
