@@ -691,11 +691,11 @@ GO
 PRINT 'Vista RIP.VW_APP_FACTURA_ITEMS_PENDIENTES corregida y actualizada.';
 GO
 
--- 5. CREACIÓN DE PROCEDIMIENTOS ALMACENADOS
+-- 5. CREACIÓN DE PROCEDIMIMIENTOS ALMACENADOS
 IF OBJECT_ID('RIP.SP_InvoiceCashierOrder', 'P') IS NOT NULL
 BEGIN
     DROP PROCEDURE RIP.SP_InvoiceCashierOrder;
-    PRINT 'Procedimiento almacenado RIP.SP_InvoiceCashierOrder eliminado.';
+    PRINT 'Procedimiento almacenado RIP.SP_InvoiceCashierOrder eliminado para ser reemplazado.';
 END
 GO
 
@@ -715,12 +715,14 @@ BEGIN
             n NCHAR(1)
         );
 
+        -- --- 👇 CORRECCIÓN DE SINTAXIS AQUÍ ---
         INSERT INTO @ParsedInvoices (series, number, n)
         SELECT
-            LEFT(value, CHARINDEX('-', value) - 1) AS series,
-            CAST(SUBSTRING(value, CHARINDEX('-', value) + 1, LEN(value) - CHARINDEX('-', value)) AS INT) AS number,
-            ' ' AS n
-        FROM OPENJSON(@InvoiceIdsJson);
+            PARSENAME(REPLACE(value, '|', '.'), 3),
+            CAST(PARSENAME(REPLACE(value, '|', '.'), 2) AS INT),
+            PARSENAME(REPLACE(value, '|', '.'), 1)
+        FROM OPENJSON(@InvoiceIdsJson)
+        WHERE value LIKE '%|%|%'; -- El WHERE ahora es parte del SELECT y el ; está al final
 
         -- VALIDACIÓN 1: Comprobar que los productos y cantidades coincidan
         DECLARE @orderItemCount INT, @invoiceItemCount INT;

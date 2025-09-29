@@ -69,6 +69,14 @@ function formatCurrency(amount: number) {
 }
 
 /* --------------------------------- Componente Principal -------------------------------- */
+
+// --- 👇 FUNCIÓN HELPER AÑADIDA ---
+function getInvoiceIdentifier(invoice: Invoice): string {
+  // Asegura que 'n' sea un string, incluso si es null/undefined, para evitar errores.
+  const nValue = invoice.invoice_n || ' ';
+  return `${invoice.invoice_series}|${invoice.invoice_number}|${nValue}`;
+}
+
 export function CashierOrdersClient({ data }: { data: CashierOrder[] }) {
   const router = useRouter();
   const [searchTerm, setSearchTerm] = useState("");
@@ -122,6 +130,7 @@ export function CashierOrdersClient({ data }: { data: CashierOrder[] }) {
   const handleOpenModal = (order: CashierOrder) => {
     if (order.status !== 'PENDING_INVOICE') return;
     setSelectedOrder(order);
+    setSelectedInvoiceIds([]);
     setIsModalOpen(true);
   };
   
@@ -160,12 +169,12 @@ export function CashierOrdersClient({ data }: { data: CashierOrder[] }) {
     }
   };
 
-  const handleInvoiceSelection = (invoiceFullNumber: string) => {
+  const handleInvoiceSelection = (invoiceIdentifier: string) => {
     setSelectedInvoiceIds((prevSelected) => {
-      if (prevSelected.includes(invoiceFullNumber)) {
-        return prevSelected.filter((id) => id !== invoiceFullNumber);
+      if (prevSelected.includes(invoiceIdentifier)) {
+        return prevSelected.filter((id) => id !== invoiceIdentifier);
       } else {
-        return [...prevSelected, invoiceFullNumber];
+        return [...prevSelected, invoiceIdentifier];
       }
     });
   };
@@ -306,22 +315,26 @@ export function CashierOrdersClient({ data }: { data: CashierOrder[] }) {
                         <Label>Facturas Disponibles del Cliente</Label>
                         <ScrollArea className="h-[250px] pr-3 mt-2">
                           {invoices.length > 0 ? (
-                            invoices.map((invoice) => (
-                              // ✅ --- LÍNEAS CORREGIDAS ---
-                              <div key={invoice.invoice_full_number || invoice.invoice_n} className="flex items-center space-x-2 py-2">
-                                <Checkbox
-                                  id={invoice.invoice_full_number || invoice.invoice_n}
-                                  checked={selectedInvoiceIds.includes(invoice.invoice_full_number || invoice.invoice_n)}
-                                  onCheckedChange={() => handleInvoiceSelection(invoice.invoice_full_number || invoice.invoice_n)}
-                                />
-                                <Label htmlFor={invoice.invoice_full_number || invoice.invoice_n} className="flex-grow cursor-pointer">
-                                  <div className="flex justify-between items-center">
-                                    <span>{invoice.invoice_full_number || invoice.invoice_n}</span>
-                                    <span className="font-bold">{formatCurrency(invoice.total_usd)}</span>
-                                  </div>
-                                </Label>
-                              </div>
-                            ))
+                            invoices.map((invoice) => {
+                              // --- 👇 LÍNEAS MODIFICADAS ---
+                              const identifier = getInvoiceIdentifier(invoice);
+                              return (
+                                <div key={identifier} className="flex items-center space-x-2 py-2">
+                                  <Checkbox
+                                    id={identifier}
+                                    checked={selectedInvoiceIds.includes(identifier)}
+                                    onCheckedChange={() => handleInvoiceSelection(identifier)}
+                                  />
+                                  <Label htmlFor={identifier} className="flex-grow cursor-pointer">
+                                    <div className="flex justify-between items-center">
+                                      {/* Muestra un formato amigable */}
+                                      <span>{`${invoice.invoice_series}-${invoice.invoice_number}`}</span>
+                                      <span className="font-bold">{formatCurrency(invoice.total_usd)}</span>
+                                    </div>
+                                  </Label>
+                                </div>
+                              );
+                            })
                           ) : (
                             <p className="text-sm text-muted-foreground text-center py-10">
                               No hay facturas disponibles para este cliente.
