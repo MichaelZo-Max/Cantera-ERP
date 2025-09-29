@@ -151,6 +151,7 @@ export interface Delivery {
   estado: DeliveryStatus;
   orderDetails: Order;
   truck: Truck;
+  exit_notes?: string | null;
   driver: Driver;
   loadedAt?: Date;
   exitedAt?: Date;

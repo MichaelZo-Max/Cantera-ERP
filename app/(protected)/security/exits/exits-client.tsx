@@ -36,11 +36,12 @@ import {
   Eye,
   Box,
   AlertTriangle,
+  Info,
 } from "lucide-react";
 import { toast } from "sonner";
 import type { Delivery, DeliveryItem, Invoice } from "@/lib/types";
 
-// --- SUB-COMPONENTES (Sin cambios) ---
+// --- SUB-COMPONENTES ---
 
 const LoadedDeliveryCard = React.memo(
   ({
@@ -126,8 +127,17 @@ const LoadedDeliveryCard = React.memo(
 LoadedDeliveryCard.displayName = "LoadedDeliveryCard";
 
 const ExitedDeliveryCard = React.memo(
-  ({ delivery }: { delivery: Delivery }) => (
-    <Card className="bg-blue-50 border-blue-200 dark:bg-blue-900/20 dark:border-blue-800">
+  ({
+    delivery,
+    onSelect,
+  }: {
+    delivery: Delivery;
+    onSelect: (delivery: Delivery) => void;
+  }) => (
+    <Card
+      className="cursor-pointer hover:shadow-lg transition-shadow bg-blue-50 border-blue-200 dark:bg-blue-900/20 dark:border-blue-800"
+      onClick={() => onSelect(delivery)}
+    >
       <CardContent className="pt-4">
         <div className="flex justify-between items-start mb-3">
           <div>
@@ -148,12 +158,14 @@ const ExitedDeliveryCard = React.memo(
             </div>
           )}
         </div>
+        <Button variant="outline" size="sm" className="w-full mt-3">
+          <Eye className="h-4 w-4 mr-2" /> Ver Detalles
+        </Button>
       </CardContent>
     </Card>
   )
 );
 ExitedDeliveryCard.displayName = "ExitedDeliveryCard";
-
 
 // --- COMPONENTE PRINCIPAL ---
 export function SecurityExitsClientUI({
@@ -169,16 +181,18 @@ export function SecurityExitsClientUI({
     null
   );
   const [showExitModal, setShowExitModal] = useState(false);
-  
-  // ✅ CAMBIO: Estados para las dos fotos.
   const [exitPhoto, setExitPhoto] = useState<File | null>(null);
   const [exitLoadPhoto, setExitLoadPhoto] = useState<File | null>(null);
-
   const [exitNotes, setExitNotes] = useState<string>("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showImagePreview, setShowImagePreview] = useState(false);
   const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
   const [imageError, setImageError] = useState(false);
+
+  // ✅ NUEVO: Estados para el modal de detalles del despacho que ya salió.
+  const [showExitedDetailModal, setShowExitedDetailModal] = useState(false);
+  const [selectedExitedDelivery, setSelectedExitedDelivery] = useState<Delivery | null>(null);
+
 
   const loadedDeliveries = useMemo(
     () => allDeliveries.filter((d) => d.estado === "CARGADA"),
@@ -212,8 +226,6 @@ export function SecurityExitsClientUI({
       toast.warning("Este despacho no está listo para salir.");
       return;
     }
-    
-    // ✅ CAMBIO: Resetear el estado de ambas fotos al abrir el modal.
     setImageError(false);
     setSelectedDelivery(delivery);
     setExitPhoto(null);
@@ -221,6 +233,13 @@ export function SecurityExitsClientUI({
     setExitNotes("");
     setShowExitModal(true);
   }, []);
+
+  // ✅ NUEVO: Handler para seleccionar y mostrar el modal de un despacho que ya salió.
+  const handleSelectExitedDelivery = useCallback((delivery: Delivery) => {
+    setSelectedExitedDelivery(delivery);
+    setShowExitedDetailModal(true);
+  }, []);
+
 
   const handleImageError = useCallback(() => {
     toast.warning("La foto del patio no se pudo cargar.", {
@@ -233,14 +252,15 @@ export function SecurityExitsClientUI({
   const handleCloseModals = useCallback(() => {
     setShowExitModal(false);
     setShowImagePreview(false);
+    setShowExitedDetailModal(false);
     setSelectedDelivery(null);
+    setSelectedExitedDelivery(null);
     setPreviewImageUrl(null);
   }, []);
 
   const handleAuthorizeExit = useCallback(async () => {
     if (!selectedDelivery) return;
 
-    // ✅ CAMBIO: Validar que ambas fotos existan.
     if (!exitPhoto || !exitLoadPhoto) {
       toast.error("Ambas fotos (camión y carga) son obligatorias.");
       return;
@@ -253,7 +273,6 @@ export function SecurityExitsClientUI({
       formData.append("notes", exitNotes);
       if (user?.id) formData.append("userId", user.id.toString());
       
-      // ✅ CAMBIO: Añadir ambas fotos al FormData con sus claves correctas.
       formData.append("exitPhoto", exitPhoto);
       formData.append("exitLoadPhoto", exitLoadPhoto);
 
@@ -299,7 +318,6 @@ export function SecurityExitsClientUI({
 
   return (
     <div className="space-y-6">
-        {/* ... (JSX sin cambios hasta el modal) ... */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between">
         <div>
           <h2 className="text-2xl font-bold text-foreground">
@@ -387,7 +405,7 @@ export function SecurityExitsClientUI({
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
               {exitedDeliveries.map((delivery) => (
-                <ExitedDeliveryCard key={delivery.id} delivery={delivery} />
+                <ExitedDeliveryCard key={delivery.id} delivery={delivery} onSelect={handleSelectExitedDelivery} />
               ))}
             </div>
           </CardContent>
@@ -503,7 +521,6 @@ export function SecurityExitsClientUI({
                   )}
                 </div>
                 
-                {/* ✅ CAMBIO: Contenedor para los dos nuevos inputs de fotos. */}
                 <div className="space-y-4">
                     <PhotoInput
                       onSelect={setExitPhoto}
@@ -548,7 +565,6 @@ export function SecurityExitsClientUI({
               <div className="flex gap-3 pt-2">
                 <Button
                   onClick={handleAuthorizeExit}
-                  // ✅ CAMBIO: Deshabilitar si falta alguna de las dos fotos.
                   disabled={isSubmitting || !exitPhoto || !exitLoadPhoto}
                   className="flex-1"
                   size="lg"
@@ -568,6 +584,133 @@ export function SecurityExitsClientUI({
           )}
         </DialogContent>
       </Dialog>
+      
+      {/* ✅ NUEVO: MODAL DE DETALLES DEL DESPACHO QUE YA SALIÓ */}
+      <Dialog open={showExitedDetailModal} onOpenChange={setShowExitedDetailModal}>
+        <DialogContent className="sm:max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader className="pb-4">
+            <DialogTitle className="flex items-center gap-2">
+              <Info className="h-5 w-5 text-blue-600" />
+              Detalles del Despacho - {selectedExitedDelivery?.truck?.placa}
+            </DialogTitle>
+            <DialogDescription>
+              Información completa del despacho que ya salió de las instalaciones.
+            </DialogDescription>
+          </DialogHeader>
+          {selectedExitedDelivery && (
+            <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <h4 className="text-sm font-medium mb-2">Cliente</h4>
+                        <p className="text-muted-foreground">{selectedExitedDelivery.orderDetails.client.name}</p>
+                    </div>
+                     <div>
+                        <h4 className="text-sm font-medium mb-2">Fecha de Salida</h4>
+                        <p className="text-muted-foreground">{new Date(selectedExitedDelivery.exitedAt!).toLocaleString()}</p>
+                    </div>
+                </div>
+
+              {selectedExitedDelivery.orderDetails.invoices && selectedExitedDelivery.orderDetails.invoices.length > 0 && (
+                <div>
+                  <p className="text-sm font-medium mb-2 flex items-center gap-2">
+                    <FileText className="h-4 w-4" /> Facturas Asociadas:
+                  </p>
+                  <div className="border rounded-lg p-3 bg-muted/30">
+                    <div className="flex flex-wrap gap-2">
+                      {selectedExitedDelivery.orderDetails.invoices.map((invoice: Invoice) => (
+                        <Badge key={invoice.invoice_full_number} variant="default">
+                          {invoice.invoice_full_number}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div>
+                <p className="text-sm font-medium mb-2 flex items-center gap-2">
+                  <Box className="h-4 w-4" /> Items Despachados:
+                </p>
+                <div className="border rounded-lg space-y-2 p-3 bg-muted/30">
+                  {selectedExitedDelivery.dispatchItems?.map((item: DeliveryItem) => {
+                    const orderItem = selectedExitedDelivery.orderDetails.items.find((oi) => oi.id === item.pedido_item_id);
+                    return (
+                      <div key={item.id} className="flex justify-between items-center text-sm">
+                        <span className="text-muted-foreground">{orderItem?.product?.name || "Producto no encontrado"}</span>
+                        <span className="font-medium bg-gray-200 dark:bg-gray-700 px-2 py-1 rounded">
+                          {item.dispatched_quantity} {orderItem?.product?.unit}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+              
+                <h3 className="font-semibold text-lg pt-2 border-t mt-4">Fotos del Despacho</h3>
+                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {/* Foto de Patio */}
+                    <div>
+                        <h4 className="font-medium mb-2 flex items-center gap-2 text-sm"><Camera className="h-4 w-4" /> Patio</h4>
+                        {selectedExitedDelivery.loadPhoto ? (
+                            <div className="relative w-full h-40 rounded-lg overflow-hidden group border">
+                               <Image src={selectedExitedDelivery.loadPhoto} alt="Foto de carga del patio" fill style={{ objectFit: 'cover' }} />
+                               <Button type="button" variant="ghost" size="icon" className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100" onClick={() => openImagePreview(selectedExitedDelivery.loadPhoto!)}><Eye className="h-6 w-6 text-white" /></Button>
+                            </div>
+                        ) : (<div className="border-2 border-dashed rounded-lg h-40 flex items-center justify-center text-muted-foreground text-sm">Sin Foto</div>)}
+                    </div>
+                    {/* Foto del Camión */}
+                    <div>
+                        <h4 className="font-medium mb-2 flex items-center gap-2 text-sm"><Truck className="h-4 w-4" /> Camión (Placa)</h4>
+                         {selectedExitedDelivery.exitPhoto ? (
+                            <div className="relative w-full h-40 rounded-lg overflow-hidden group border">
+                               <Image src={selectedExitedDelivery.exitPhoto} alt="Foto de salida del camión" fill style={{ objectFit: 'cover' }} />
+                               <Button type="button" variant="ghost" size="icon" className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100" onClick={() => openImagePreview(selectedExitedDelivery.exitPhoto!)}><Eye className="h-6 w-6 text-white" /></Button>
+                            </div>
+                        ) : (<div className="border-2 border-dashed rounded-lg h-40 flex items-center justify-center text-muted-foreground text-sm">Sin Foto</div>)}
+                    </div>
+                    {/* Foto de la Carga */}
+                    <div>
+                        <h4 className="font-medium mb-2 flex items-center gap-2 text-sm"><Package className="h-4 w-4" /> Carga</h4>
+                         {selectedExitedDelivery.exitLoadPhoto ? (
+                            <div className="relative w-full h-40 rounded-lg overflow-hidden group border">
+                               <Image src={selectedExitedDelivery.exitLoadPhoto} alt="Foto de salida de la carga" fill style={{ objectFit: 'cover' }} />
+                               <Button type="button" variant="ghost" size="icon" className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100" onClick={() => openImagePreview(selectedExitedDelivery.exitLoadPhoto!)}><Eye className="h-6 w-6 text-white" /></Button>
+                            </div>
+                        ) : (<div className="border-2 border-dashed rounded-lg h-40 flex items-center justify-center text-muted-foreground text-sm">Sin Foto</div>)}
+                    </div>
+                 </div>
+
+              {selectedExitedDelivery.notes && (
+                <div className="p-3 bg-yellow-50 border border-yellow-200 dark:bg-yellow-900/20 dark:border-yellow-800 rounded-lg">
+                  <p className="text-sm font-medium text-yellow-800 dark:text-yellow-300">
+                    Notas del Patio:
+                  </p>
+                  <p className="text-sm text-yellow-700 dark:text-yellow-400 whitespace-pre-wrap">
+                    {selectedExitedDelivery.notes}
+                  </p>
+                </div>
+              )}
+                 {selectedExitedDelivery.exit_notes && (
+                <div className="p-3 bg-blue-50 border border-blue-200 dark:bg-blue-900/20 dark:border-blue-800 rounded-lg">
+                  <p className="text-sm font-medium text-blue-800 dark:text-blue-300">
+                    Observaciones de Seguridad:
+                  </p>
+                  <p className="text-sm text-blue-700 dark:text-blue-400 whitespace-pre-wrap">
+                    {selectedExitedDelivery.exit_notes}
+                  </p>
+                </div>
+              )}
+
+                <div className="flex justify-end pt-2">
+                    <Button variant="outline" onClick={handleCloseModals}>
+                        Cerrar
+                    </Button>
+                </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
 
       <Dialog open={showImagePreview} onOpenChange={setShowImagePreview}>
         <DialogContent className="max-w-3xl p-0">
