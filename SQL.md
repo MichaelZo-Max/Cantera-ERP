@@ -875,3 +875,28 @@ END
 GO
 ALTER TABLE RIP.APP_DESPACHOS
 ADD exit_load_photo_url NVARCHAR(255) NULL;
+
+-- Creación de la tabla de eventos con las referencias correctas
+IF OBJECT_ID('RIP.EventLog', 'U') IS NULL
+BEGIN
+    CREATE TABLE RIP.EventLog (
+        Id INT PRIMARY KEY IDENTITY(1,1),
+        OrderId INT NULL,
+        DeliveryId INT NULL,
+        UserId INT NOT NULL,
+        EventType NVARCHAR(255) NOT NULL,
+        Description NVARCHAR(MAX) NULL,
+        CreatedAt DATETIME DEFAULT GETDATE(),
+
+        -- 👇 CORRECCIONES APLICADAS AQUÍ 👇
+        CONSTRAINT FK_EventLog_Pedidos FOREIGN KEY (OrderId) REFERENCES RIP.APP_PEDIDOS(id),
+        CONSTRAINT FK_EventLog_Despachos FOREIGN KEY (DeliveryId) REFERENCES RIP.APP_DESPACHOS(id),
+        CONSTRAINT FK_EventLog_Usuarios FOREIGN KEY (UserId) REFERENCES RIP.APP_USUARIOS(id)
+    );
+    PRINT 'Tabla RIP.EventLog creada exitosamente con todas sus referencias.';
+END
+ELSE
+BEGIN
+    PRINT 'La tabla RIP.EventLog ya existe.';
+END
+GO
