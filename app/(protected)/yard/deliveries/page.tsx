@@ -61,7 +61,7 @@ async function getData() {
         (SELECT pf.invoice_series, pf.invoice_number, pf.invoice_n, ISNULL(pf.invoice_series + '-' + CAST(pf.invoice_number AS VARCHAR) + pf.invoice_n COLLATE DATABASE_DEFAULT, '') AS invoice_full_number FROM RIP.APP_PEDIDOS_FACTURAS pf WHERE pf.pedido_id = p.id FOR JSON PATH) as invoices_json
     FROM RIP.APP_PEDIDOS p
     JOIN dbo.CLIENTES c ON c.CODCLIENTE = p.customer_id -- ✅ CAMBIO: JOIN a tabla directa
-    WHERE p.status IN ('PAID', 'PARTIALLY_DISPATCHED');
+    WHERE p.status IN ('INVOICED', 'PARTIALLY_DISPATCHED');
   `;
 
   const results = await executeQuery(mainQuery);

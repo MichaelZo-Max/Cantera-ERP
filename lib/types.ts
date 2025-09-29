@@ -4,8 +4,8 @@ export type UnitBase = "M3" | "TON" | "SACO" | "UNIDAD";
 export type UserRole = "ADMIN" | "CASHIER" | "YARD" | "SECURITY" | "REPORTS";
 
 export type OrderStatus =
-  | "AWAITING_PAYMENT"
-  | "PAID"
+  | "PENDING_INVOICE"
+  | "INVOICED"
   | "PARTIALLY_DISPATCHED"
   | "DISPATCHED_COMPLETE"
   | "CANCELLED";
@@ -280,13 +280,13 @@ export type CashierOrder = {
   customer_doc_id?: string | null;
   total_usd: number;
   exchange_rate?: number | null;
-  status: 'PENDING_INVOICE' | 'INVOICED' | 'CANCELLED';
+  status: "PENDING_INVOICE" | "INVOICED" | "CANCELLED";
   created_by: number;
   created_at: string;
   updated_at: string;
   // Opcional: para incluir los items en la misma consulta
   items?: CashierOrderItem[];
-  customer_name?: string;  // Campo que viene del JOIN con CLIENTES
+  customer_name?: string; // Campo que viene del JOIN con CLIENTES
   created_by_name?: string; // Campo que viene del JOIN con APP_USUARIOS
   details: CashierOrderDetail[];
 };
@@ -308,5 +308,5 @@ export type CreateCashierOrderDto = {
   customer_doc_id?: string;
   total_usd: number;
   exchange_rate?: number;
-  items: Omit<CashierOrderItem, 'id' | 'order_cab_id' | 'subtotal_usd'>[];
+  items: Omit<CashierOrderItem, "id" | "order_cab_id" | "subtotal_usd">[];
 };

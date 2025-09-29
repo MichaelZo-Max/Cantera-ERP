@@ -88,14 +88,17 @@ export async function GET(
       GROUP BY di.pedido_item_id;
     `;
     const dispatchedRows = await executeQuery(dispatchedQuantitiesQuery, [
-        { name: "order_id", type: TYPES.Int, value: orderId },
-        { name: "current_despacho_id", type: TYPES.Int, value: despachoId }
+      { name: "order_id", type: TYPES.Int, value: orderId },
+      { name: "current_despacho_id", type: TYPES.Int, value: despachoId },
     ]);
 
     // ✅ PASO 2: Mapear los resultados para fácil acceso
     const dispatchedMap = new Map<number, number>();
     for (const dispatchedItem of dispatchedRows) {
-        dispatchedMap.set(dispatchedItem.pedido_item_id, dispatchedItem.total_dispatched);
+      dispatchedMap.set(
+        dispatchedItem.pedido_item_id,
+        dispatchedItem.total_dispatched
+      );
     }
 
     const itemsQuery = `
@@ -230,7 +233,7 @@ export async function PATCH(
       const dispatchedQuantity = dispatchedResult[0]?.total ?? 0;
 
       // 4. Determinamos el nuevo estado de la orden
-      let newOrderStatus = "PAID"; // Por defecto
+      let newOrderStatus = "INVOICED"; // Por defecto
       if (dispatchedQuantity >= totalQuantity) {
         newOrderStatus = "DISPATCHED_COMPLETE";
       } else if (dispatchedQuantity > 0) {

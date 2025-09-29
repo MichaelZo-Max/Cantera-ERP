@@ -122,7 +122,7 @@ BEGIN
         order_number AS 'ORD-' + RIGHT('00000000' + CAST(id AS VARCHAR(8)), 8) PERSISTED,
         customer_id INT NOT NULL,
         destination_id INT NULL,
-        status NVARCHAR(50) NOT NULL DEFAULT 'AWAITING_PAYMENT',
+        status NVARCHAR(50) NOT NULL DEFAULT 'PENDING_INVOICE',
         notes NVARCHAR(MAX),
         created_by INT NOT NULL,
         created_at DATETIME NOT NULL DEFAULT GETDATE(),
@@ -130,7 +130,7 @@ BEGIN
         FOREIGN KEY (customer_id) REFERENCES dbo.CLIENTES(CODCLIENTE),
         FOREIGN KEY (created_by) REFERENCES RIP.APP_USUARIOS(id),
         FOREIGN KEY (destination_id) REFERENCES RIP.APP_DESTINOS(id),
-        CONSTRAINT CK_APP_PEDIDOS_status CHECK (status IN ('AWAITING_PAYMENT', 'PAID', 'PARTIALLY_DISPATCHED', 'DISPATCHED_COMPLETE', 'CANCELLED'))
+        CONSTRAINT CK_APP_PEDIDOS_status CHECK (status IN ('PENDING_INVOICE', 'INVOICED', 'PARTIALLY_DISPATCHED', 'DISPATCHED_COMPLETE', 'CANCELLED'))
     );
     PRINT 'Tabla RIP.APP_PEDIDOS creada.';
 END
@@ -141,7 +141,7 @@ BEGIN
     BEGIN
         ALTER TABLE RIP.APP_PEDIDOS DROP CONSTRAINT CK_APP_PEDIDOS_status;
     END
-    ALTER TABLE RIP.APP_PEDIDOS ADD CONSTRAINT CK_APP_PEDIDOS_status CHECK (status IN ('AWAITING_PAYMENT', 'PAID', 'PARTIALLY_DISPATCHED', 'DISPATCHED_COMPLETE', 'CANCELLED'));
+    ALTER TABLE RIP.APP_PEDIDOS ADD CONSTRAINT CK_APP_PEDIDOS_status CHECK (status IN ('PENDING_INVOICE', 'INVOICED', 'PARTIALLY_DISPATCHED', 'DISPATCHED_COMPLETE', 'CANCELLED'));
     PRINT ' -> Restricción CK_APP_PEDIDOS_status actualizada.';
 END
 GO
@@ -681,24 +681,19 @@ IF OBJECT_ID('RIP.APP_ORDENES_SIN_FACTURA_CAB', 'U') IS NULL
 BEGIN
     CREATE TABLE RIP.APP_ORDENES_SIN_FACTURA_CAB (
         id INT IDENTITY(1,1) PRIMARY KEY,
-        -- Número de orden autogenerado para fácil referencia
         order_number AS 'VTA-' + RIGHT('00000000' + CAST(id AS VARCHAR(8)), 8) PERSISTED,
-        
-        -- Datos del Cliente
         customer_id INT NOT NULL,
-        customer_doc_id NVARCHAR(20) NULL, -- Cédula/RIF del cliente, guardado para referencia
-        
-        -- Datos Monetarios
+        customer_doc_id NVARCHAR(20) NULL,
         total_usd DECIMAL(18, 2) NOT NULL,
-        exchange_rate DECIMAL(18, 4) NULL, -- Tasa de cambio utilizada al momento de la venta
+        exchange_rate DECIMAL(18, 4) NULL,
         
-        -- Estado y Auditoría
+        -- Columna para la factura asociada
+        related_invoice_n NVARCHAR(50) NULL, -- <-- AÑADIR ESTA LÍNEA
+
         status NVARCHAR(50) NOT NULL DEFAULT 'PENDING_INVOICE' CHECK (status IN ('PENDING_INVOICE', 'INVOICED', 'CANCELLED')),
         created_by INT NOT NULL,
         created_at DATETIME NOT NULL DEFAULT GETDATE(),
         updated_at DATETIME NOT NULL DEFAULT GETDATE(),
-        
-        -- Llaves Foráneas
         FOREIGN KEY (customer_id) REFERENCES dbo.CLIENTES(CODCLIENTE),
         FOREIGN KEY (created_by) REFERENCES RIP.APP_USUARIOS(id)
     );

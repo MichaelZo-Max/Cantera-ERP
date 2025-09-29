@@ -44,7 +44,6 @@ export async function GET() {
   }
 }
 
-
 export async function POST(req: Request) {
   try {
     const { user } = await getUser();
@@ -78,10 +77,17 @@ export async function POST(req: Request) {
 
     let trustedItems: typeof itemsFromClient = [];
 
+    const orderStatus =
+      invoices && invoices.length > 0 ? "INVOICED" : "PENDING_INVOICE";
+
     if (invoices && invoices.length > 0) {
-      // --- LÓGICA EXISTENTE PARA ÓRDENES CON FACTURA (SIN CAMBIOS) ---
+      // --- Lógica para órdenes con factura (sin cambios funcionales) ---
       const invoiceParams = invoices.flatMap((inv, index) => [
-        { name: `series_${index}`, type: TYPES.NVarChar, value: inv.invoice_series },
+        {
+          name: `series_${index}`,
+          type: TYPES.NVarChar,
+          value: inv.invoice_series,
+        },
         { name: `number_${index}`, type: TYPES.Int, value: inv.invoice_number },
         { name: `n_${index}`, type: TYPES.NVarChar, value: inv.invoice_n },
       ]);
@@ -106,7 +112,6 @@ export async function POST(req: Request) {
         WHERE 
             ${conditions};
       `;
-
       const productsFromInvoices: InvoiceProduct[] = await executeQuery(
         itemsQuery,
         invoiceParams
@@ -125,7 +130,10 @@ export async function POST(req: Request) {
       // --- NUEVA LÓGICA 👇: GUARDAR LA ORDEN DE CAJA PARA AUDITORÍA ---
       if (trustedItems.length > 0) {
         // Calculamos el total de la orden manual
-        const total_usd = trustedItems.reduce((acc, item) => acc + item.quantity * item.price_per_unit, 0);
+        const total_usd = trustedItems.reduce(
+          (acc, item) => acc + item.quantity * item.price_per_unit,
+          0
+        );
 
         // 1. Insertar la cabecera en la nueva tabla de auditoría
         const cashierOrderHeaderSql = `
@@ -142,24 +150,36 @@ export async function POST(req: Request) {
 
         // 2. Insertar cada item en la nueva tabla de auditoría
         for (const item of trustedItems) {
-            // Necesitamos obtener el nombre y la referencia del producto
-            const productInfo = await executeQuery('SELECT DESCRIPCION, REFPROVEEDOR FROM dbo.ARTICULOS WHERE CODARTICULO = @id', [{ name: 'id', type: TYPES.Int, value: item.product_id }]);
-
-            const cashierItemSql = `
-                INSERT INTO RIP.APP_ORDENES_SIN_FACTURA_ITEMS (order_cab_id, product_id, product_ref, product_name, quantity, price_per_unit_usd)
-                VALUES (@order_cab_id, @product_id, @product_ref, @product_name, @quantity, @price_per_unit_usd);
-            `;
-            await executeQuery(cashierItemSql, [
-                { name: "order_cab_id", type: TYPES.Int, value: newCashierOrderId },
-                { name: "product_id", type: TYPES.Int, value: item.product_id },
-                { name: "product_ref", type: TYPES.NVarChar, value: productInfo[0]?.REFPROVEEDOR || '' },
-                { name: "product_name", type: TYPES.NVarChar, value: productInfo[0]?.DESCRIPCION || 'N/A' },
-                { name: "quantity", type: TYPES.Decimal, value: item.quantity },
-                { name: "price_per_unit_usd", type: TYPES.Decimal, value: item.price_per_unit },
-            ]);
+          const productInfo = await executeQuery(
+            "SELECT DESCRIPCION, REFPROVEEDOR FROM dbo.ARTICULOS WHERE CODARTICULO = @id",
+            [{ name: "id", type: TYPES.Int, value: item.product_id }]
+          );
+          const cashierItemSql = `
+                    INSERT INTO RIP.APP_ORDENES_SIN_FACTURA_ITEMS (order_cab_id, product_id, product_ref, product_name, quantity, price_per_unit_usd)
+                    VALUES (@order_cab_id, @product_id, @product_ref, @product_name, @quantity, @price_per_unit_usd);
+                `;
+          await executeQuery(cashierItemSql, [
+            { name: "order_cab_id", type: TYPES.Int, value: newCashierOrderId },
+            { name: "product_id", type: TYPES.Int, value: item.product_id },
+            {
+              name: "product_ref",
+              type: TYPES.NVarChar,
+              value: productInfo[0]?.REFPROVEEDOR || "",
+            },
+            {
+              name: "product_name",
+              type: TYPES.NVarChar,
+              value: productInfo[0]?.DESCRIPCION || "N/A",
+            },
+            { name: "quantity", type: TYPES.Decimal, value: item.quantity },
+            {
+              name: "price_per_unit_usd",
+              type: TYPES.Decimal,
+              value: item.price_per_unit,
+            },
+          ]);
         }
       }
-      // --- FIN DE LA NUEVA LÓGICA ---
     }
 
     if (trustedItems.length === 0) {
@@ -168,19 +188,20 @@ export async function POST(req: Request) {
         { status: 400 }
       );
     }
-    
+
     // --- EL RESTO DEL CÓDIGO SIGUE EXACTAMENTE IGUAL ---
     // Crea el pedido en RIP.APP_PEDIDOS, asocia items, camiones y choferes como siempre.
-    
+
     const orderHeaderSql = `
         INSERT INTO RIP.APP_PEDIDOS (customer_id, destination_id, status, created_by)
-        OUTPUT INSERTED.id
-        VALUES (@customer_id, @destination_id, 'PAID', @created_by);
+        OUTPUT INSERTED.id, INSERTED.order_number
+        VALUES (@customer_id, @destination_id, @status, @created_by);
     `;
 
     const headerResult = await executeQuery(orderHeaderSql, [
       { name: "customer_id", type: TYPES.Int, value: customer_id },
       { name: "destination_id", type: TYPES.Int, value: destination_id },
+      { name: "status", type: TYPES.NVarChar, value: orderStatus }, // Se usa la variable
       { name: "created_by", type: TYPES.Int, value: user.id },
     ]);
 
