@@ -54,18 +54,19 @@ export function TrucksClientUI({
   const [searchTerm, setSearchTerm] = useState("");
   const [showDialog, setShowDialog] = useState(false);
   const [editingTruck, setEditingTruck] = useState<TruckType | null>(null);
-  
-  // ✨ 4. Usar los nombres de campo correctos en el estado inicial
+
+  // ✨ 4. Usar los nombres de campo correctos en el status inicial
   const [formData, setFormData] = useState({
     placa: "",
     brand: "",
     model: "",
     capacity: "" as string | number, // El input de número devuelve string
   });
-  
+
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formErrors, setFormErrors] = useState<FormErrors>({}); // ✨ 5. Estado para errores
-  const { isOpen, options, confirm, handleConfirm, handleCancel } = useConfirmation();
+  const { isOpen, options, confirm, handleConfirm, handleCancel } =
+    useConfirmation();
 
   const filteredTrucks = useMemo(
     () =>
@@ -124,7 +125,7 @@ export function TrucksClientUI({
         });
         return;
       }
-      
+
       const body = validation.data; // Usar datos validados
       const method = editingTruck ? "PATCH" : "POST";
       const url = editingTruck
@@ -139,14 +140,16 @@ export function TrucksClientUI({
         });
 
         const responseData = await res.json();
-        
+
         if (!res.ok) {
-           if (res.status === 400 || res.status === 409) {
-             setFormErrors(responseData);
-           }
-           throw new Error(responseData._errors?.[0] || "Error al guardar el camión");
+          if (res.status === 400 || res.status === 409) {
+            setFormErrors(responseData);
+          }
+          throw new Error(
+            responseData._errors?.[0] || "Error al guardar el camión"
+          );
         }
-        
+
         // Refrescar lista de camiones para mantener la UI sincronizada
         const fetchResponse = await fetch("/api/trucks");
         const updatedTrucks = await fetchResponse.json();
@@ -185,17 +188,17 @@ export function TrucksClientUI({
               body: JSON.stringify({ is_active: !is_active }),
             });
             if (!res.ok) throw new Error(await res.text());
-            
+
             const updatedTruck = await res.json();
             setTrucks((prev) =>
               prev.map((t) => (t.id === updatedTruck.id ? updatedTruck : t))
             );
-            
+
             toast.success(
               `Camión ${!is_active ? "activado" : "desactivado"} exitosamente.`
             );
           } catch (err: any) {
-            toast.error("Error al cambiar el estado", {
+            toast.error("Error al cambiar el status", {
               description: err.message,
             });
           }
@@ -204,7 +207,7 @@ export function TrucksClientUI({
     },
     [confirm]
   );
-  
+
   // (El resto del JSX se mantiene igual que en tu código original)
   return (
     <div className="space-y-8 animate-fade-in">
@@ -376,7 +379,10 @@ export function TrucksClientUI({
                   })
                 }
                 placeholder="ABC-123"
-                className={cn(formErrors.placa && "border-red-500", "focus-ring")}
+                className={cn(
+                  formErrors.placa && "border-red-500",
+                  "focus-ring"
+                )}
               />
               {formErrors.placa && (
                 <p className="text-xs text-red-500 flex items-center gap-1 mt-1">
@@ -398,12 +404,15 @@ export function TrucksClientUI({
                     setFormData({ ...formData, brand: e.target.value })
                   }
                   placeholder="Ej: Kenworth"
-                  className={cn(formErrors.brand && "border-red-500", "focus-ring")}
+                  className={cn(
+                    formErrors.brand && "border-red-500",
+                    "focus-ring"
+                  )}
                 />
                 {formErrors.brand && (
-                   <p className="text-xs text-red-500 flex items-center gap-1 mt-1">
-                     <AlertCircle className="h-3 w-3" /> {formErrors.brand[0]}
-                   </p>
+                  <p className="text-xs text-red-500 flex items-center gap-1 mt-1">
+                    <AlertCircle className="h-3 w-3" /> {formErrors.brand[0]}
+                  </p>
                 )}
               </div>
               <div className="space-y-2">
@@ -417,16 +426,19 @@ export function TrucksClientUI({
                     setFormData({ ...formData, model: e.target.value })
                   }
                   placeholder="Ej: T800"
-                  className={cn(formErrors.model && "border-red-500", "focus-ring")}
+                  className={cn(
+                    formErrors.model && "border-red-500",
+                    "focus-ring"
+                  )}
                 />
                 {formErrors.model && (
-                   <p className="text-xs text-red-500 flex items-center gap-1 mt-1">
-                     <AlertCircle className="h-3 w-3" /> {formErrors.model[0]}
-                   </p>
+                  <p className="text-xs text-red-500 flex items-center gap-1 mt-1">
+                    <AlertCircle className="h-3 w-3" /> {formErrors.model[0]}
+                  </p>
                 )}
               </div>
             </div>
-            
+
             {/* --- CAMPO CAPACIDAD --- */}
             <div className="space-y-2">
               <Label htmlFor="capacity" className="font-semibold">
@@ -442,7 +454,10 @@ export function TrucksClientUI({
                   setFormData({ ...formData, capacity: e.target.value })
                 }
                 placeholder="15.0"
-                className={cn(formErrors.capacity && "border-red-500", "focus-ring")}
+                className={cn(
+                  formErrors.capacity && "border-red-500",
+                  "focus-ring"
+                )}
               />
               {formErrors.capacity && (
                 <p className="text-xs text-red-500 flex items-center gap-1 mt-1">
@@ -453,12 +468,12 @@ export function TrucksClientUI({
 
             {/* --- ERROR GENERAL --- */}
             {formErrors._errors && (
-                <div className="text-sm text-red-500 bg-red-500/10 p-3 rounded-md flex items-center gap-2">
-                    <AlertCircle className="h-4 w-4" />
-                    {formErrors._errors[0]}
-                </div>
+              <div className="text-sm text-red-500 bg-red-500/10 p-3 rounded-md flex items-center gap-2">
+                <AlertCircle className="h-4 w-4" />
+                {formErrors._errors[0]}
+              </div>
             )}
-            
+
             <DialogFooter className="pt-4">
               <Button
                 type="button"

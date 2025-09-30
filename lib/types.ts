@@ -148,7 +148,7 @@ export interface Order {
 
 export interface Delivery {
   id: number;
-  estado: DeliveryStatus;
+  status: DeliveryStatus;
   orderDetails: Order;
   truck: Truck;
   exit_notes?: string | null;

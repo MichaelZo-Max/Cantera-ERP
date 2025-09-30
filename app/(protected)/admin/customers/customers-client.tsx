@@ -246,7 +246,7 @@ export function CustomersClientUI({
             );
             router.refresh();
           } catch (err: any) {
-            toast.error("Error al cambiar el estado", {
+            toast.error("Error al cambiar el status", {
               description: err.message,
             });
           }

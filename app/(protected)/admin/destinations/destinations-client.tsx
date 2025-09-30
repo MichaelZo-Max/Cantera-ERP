@@ -57,7 +57,7 @@ export function DestinationsClientUI({
 }) {
   const [destinations, setDestinations] =
     useState<Destination[]>(initialDestinations);
-  // ✨ CORRECCIÓN 1: Asegurar que el estado inicial siempre sea un arreglo.
+  // ✨ CORRECCIÓN 1: Asegurar que el status inicial siempre sea un arreglo.
   const [clients, setClients] = useState<Client[]>(initialClients || []);
   const [searchTerm, setSearchTerm] = useState("");
   const [showDialog, setShowDialog] = useState(false);
@@ -92,9 +92,11 @@ export function DestinationsClientUI({
         if (!res.ok) throw new Error("No se pudieron cargar los clientes");
 
         const responseData: ClientsApiResponse = await res.json();
-        
+
         // ✨ CORRECCIÓN 2: Lógica simplificada y más segura para procesar la respuesta.
-        const newClients = Array.isArray(responseData.data) ? responseData.data : [];
+        const newClients = Array.isArray(responseData.data)
+          ? responseData.data
+          : [];
         const totalPages = responseData.totalPages || 1;
 
         setClients((prev) =>
@@ -103,7 +105,6 @@ export function DestinationsClientUI({
             : [...(Array.isArray(prev) ? prev : []), ...newClients]
         );
         setClientTotalPages(totalPages);
-
       } catch (error) {
         toast.error("Error al cargar clientes.");
         setClients([]); // En caso de error, se asegura de que sea un arreglo vacío.
@@ -113,7 +114,7 @@ export function DestinationsClientUI({
     };
     fetchClients();
   }, [debouncedClientSearch, clientPage]);
-  
+
   const filteredDestinations = useMemo(
     () =>
       destinations.filter(

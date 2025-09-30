@@ -6,7 +6,7 @@ import { unstable_noStore as noStore } from "next/cache";
 import type { Delivery, Order } from "@/lib/types";
 import { executeQuery } from "@/lib/db";
 
-// Función auxiliar para mapear el estado de la base de datos a un estado conocido en la UI
+// Función auxiliar para mapear el status de la base de datos a un status conocido en la UI
 const mapDbStatusToUi = (status: string): "PENDING" | "CARGADA" | "EXITED" => {
   if (!status) return "PENDING";
   const s = status.toUpperCase();
@@ -33,7 +33,7 @@ async function getData() {
     )
     SELECT
         'DELIVERY' as type,
-        d.id as id, d.status as estado, d.notes, d.load_photo_url as loadPhoto, d.exit_photo_url as exitPhoto,
+        d.id as id, d.status as status, d.notes, d.load_photo_url as loadPhoto, d.exit_photo_url as exitPhoto,
         p.id as order_id, p.order_number, p.status as orderStatus, p.created_at as orderCreatedAt, p.customer_id,
         c.CODCLIENTE as client_id, c.NOMBRECLIENTE as client_name, -- ✅ CAMBIO: Tabla directa dbo.CLIENTES
         t.id as truck_id, t.placa,
@@ -78,7 +78,7 @@ async function getData() {
         if (!deliveriesMap.has(row.id)) {
           deliveriesMap.set(row.id, {
             id: row.id,
-            estado: mapDbStatusToUi(row.estado),
+            status: mapDbStatusToUi(row.status),
             notes: row.notes || undefined,
             loadPhoto: row.loadPhoto || undefined,
             exitPhoto: row.exitPhoto || undefined,

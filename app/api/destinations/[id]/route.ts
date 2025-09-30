@@ -101,7 +101,7 @@ export async function PATCH(
     }
 
     if (updates.length === 0) {
-      // Si no hay nada que actualizar, se devuelve el estado actual.
+      // Si no hay nada que actualizar, se devuelve el status actual.
       return GET(request, { params });
     }
 

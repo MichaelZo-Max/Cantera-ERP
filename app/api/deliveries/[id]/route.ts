@@ -7,7 +7,7 @@ import { writeFile, mkdir } from "fs/promises";
 import { revalidateTag } from "next/cache";
 import { Delivery, OrderItem } from "@/lib/types";
 import util from "util";
-import { confirmExitSchema } from "@/lib/validations";
+import { confirmExitSchema, confirmLoadSchema  } from "@/lib/validations";
 import { z } from "zod";
 
 export const dynamic = "force-dynamic";
@@ -19,7 +19,9 @@ export const dynamic = "force-dynamic";
  * @param filename El nombre del archivo de la base de datos.
  * @returns Una ruta completa como /uploads/filename.jpg o undefined.
  */
-const getFullImageUrl = (filename: string | null | undefined): string | undefined => {
+const getFullImageUrl = (
+  filename: string | null | undefined
+): string | undefined => {
   if (!filename) return undefined;
   return `/uploads/${filename}`;
 };
@@ -36,7 +38,7 @@ function mapDbStatusToUi(status: string): "PENDING" | "CARGADA" | "EXITED" {
 // Se añade exit_notes a la consulta
 const getDeliveryByIdQuery = `
     SELECT
-        d.id, d.status AS estado, d.notes, d.exit_notes,
+        d.id, d.status AS status, d.notes, d.exit_notes,
         d.load_photo_url AS loadPhoto, 
         d.exit_photo_url AS exitPhoto,
         d.exit_load_photo_url AS exitLoadPhoto,
@@ -69,18 +71,28 @@ export async function GET(
   try {
     const despachoId = parseInt(params.id, 10);
     if (isNaN(despachoId)) {
-      return NextResponse.json({ error: "ID de despacho inválido" }, { status: 400 });
+      return NextResponse.json(
+        { error: "ID de despacho inválido" },
+        { status: 400 }
+      );
     }
 
-    const rows = await executeQuery(getDeliveryByIdQuery, [{ name: "id", type: TYPES.Int, value: despachoId }]);
+    const rows = await executeQuery(getDeliveryByIdQuery, [
+      { name: "id", type: TYPES.Int, value: despachoId },
+    ]);
 
     if (!rows || rows.length === 0) {
-      return NextResponse.json({ error: "No se encontró el despacho." }, { status: 404 });
+      return NextResponse.json(
+        { error: "No se encontró el despacho." },
+        { status: 404 }
+      );
     }
 
     const row = rows[0];
     const orderId = row.order_id;
-    const invoices = row.order_invoices_json ? JSON.parse(row.order_invoices_json) : [];
+    const invoices = row.order_invoices_json
+      ? JSON.parse(row.order_invoices_json)
+      : [];
 
     const dispatchedQuantitiesQuery = `
       SELECT
@@ -103,6 +115,15 @@ export async function GET(
         dispatchedItem.total_dispatched
       );
     }
+
+    const dispatchItemsQuery = `
+        SELECT id, despacho_id, pedido_item_id, dispatched_quantity
+        FROM RIP.APP_DESPACHOS_ITEMS
+        WHERE despacho_id = @despachoId;
+    `;
+    const dispatchItemRows = await executeQuery(dispatchItemsQuery, [
+        { name: "despachoId", type: TYPES.Int, value: despachoId },
+    ]);
 
     const itemsQuery = `
         SELECT
@@ -136,7 +157,7 @@ export async function GET(
     // Se formatean las URLs y se añaden todas las notas y la fecha.
     const finalPayload: Delivery = {
       id: row.id,
-      estado: mapDbStatusToUi(row.estado),
+      status: mapDbStatusToUi(row.status),
       notes: row.notes ?? undefined,
       exit_notes: row.exit_notes ?? undefined, // Notas de seguridad
       loadPhoto: getFullImageUrl(row.loadPhoto),
@@ -159,14 +180,21 @@ export async function GET(
         name: row.driver_name,
         phone: row.driver_phone ?? undefined,
       },
-      dispatchItems: [],
+      dispatchItems: dispatchItemRows,
     };
 
     return NextResponse.json(finalPayload);
   } catch (e) {
-    console.error("[API_DELIVERIES_ID_GET_ERROR]", util.inspect(e, { depth: null }));
-    const errorMessage = e instanceof Error ? e.message : "Ocurrió un error inesperado.";
-    return NextResponse.json({ error: "Error al obtener el despacho", details: errorMessage }, { status: 500 });
+    console.error(
+      "[API_DELIVERIES_ID_GET_ERROR]",
+      util.inspect(e, { depth: null })
+    );
+    const errorMessage =
+      e instanceof Error ? e.message : "Ocurrió un error inesperado.";
+    return NextResponse.json(
+      { error: "Error al obtener el despacho", details: errorMessage },
+      { status: 500 }
+    );
   }
 }
 
@@ -178,7 +206,10 @@ export async function PATCH(
   try {
     const despachoId = parseInt(params.id, 10);
     if (isNaN(despachoId)) {
-        return NextResponse.json({ error: "ID de despacho inválido" }, { status: 400 });
+      return NextResponse.json(
+        { error: "ID de despacho inválido" },
+        { status: 400 }
+      );
     }
 
     const formData = await request.formData();
@@ -187,20 +218,24 @@ export async function PATCH(
     const userId = formData.get("userId") as string;
 
     if (!status || !userId) {
-        return NextResponse.json({ error: "Faltan parámetros 'status' o 'userId'." }, { status: 400 });
+      return NextResponse.json(
+        { error: "Faltan parámetros 'status' o 'userId'." },
+        { status: 400 }
+      );
     }
-    
-    const updateOrderStatus = async (currentDespachoId: number) => {
-        try {
-            const getOrderIdSql = "SELECT order_id FROM RIP.APP_DESPACHOS WHERE id = @despachoId;";
-            const orderResult = await executeQuery(getOrderIdSql, [
-                { name: "despachoId", type: TYPES.Int, value: currentDespachoId },
-            ]);
-            const orderId = orderResult[0]?.order_id;
 
-            if (!orderId) return;
-            
-            const checkOrderSql = `
+    const updateOrderStatus = async (currentDespachoId: number) => {
+      try {
+        const getOrderIdSql =
+          "SELECT order_id FROM RIP.APP_DESPACHOS WHERE id = @despachoId;";
+        const orderResult = await executeQuery(getOrderIdSql, [
+          { name: "despachoId", type: TYPES.Int, value: currentDespachoId },
+        ]);
+        const orderId = orderResult[0]?.order_id;
+
+        if (!orderId) return;
+
+        const checkOrderSql = `
                 IF NOT EXISTS (
                     SELECT 1
                     FROM RIP.APP_PEDIDOS_ITEMS pi
@@ -222,71 +257,160 @@ export async function PATCH(
                     UPDATE RIP.APP_PEDIDOS SET status = 'PARTIALLY_DISPATCHED' WHERE id = @orderId;
                 END
             `;
-            await executeQuery(checkOrderSql, [
-                { name: "orderId", type: TYPES.Int, value: orderId },
-            ]);
-        } catch (error) {
-            console.error("Error actualizando el estado de la orden:", error);
-        }
+        await executeQuery(checkOrderSql, [
+          { name: "orderId", type: TYPES.Int, value: orderId },
+        ]);
+      } catch (error) {
+        console.error("Error actualizando el status de la orden:", error);
+      }
     };
 
     if (status === "CARGADA") {
-        return NextResponse.json({error: "La lógica para 'CARGADA' debe ser implementada."}, {status: 400})
-
-    } else if (status === "EXITED") {
-        const exitPhotoFile = formData.get("exitPhoto") as File | null;
-        const exitLoadPhotoFile = formData.get("exitLoadPhoto") as File | null;
-
-        const validation = confirmExitSchema.safeParse({
-            notes: notes,
-            userId: userId,
-            exitPhoto: exitPhotoFile,
-            exitLoadPhoto: exitLoadPhotoFile,
+        // ✅ CORRECCIÓN: Obtener los datos correctos del FormData
+        const notes = (formData.get("notes") as string) || null;
+        const itemsJson = formData.get("itemsJson") as string | null;
+        const loadPhotoFile = formData.get("photoFile") as File | null;
+        
+        const parsedItems = itemsJson ? JSON.parse(itemsJson) : [];
+        
+        const validation = confirmLoadSchema.safeParse({
+            notes: notes ?? undefined,
+            loadPhoto: loadPhotoFile,
+            loadedItems: parsedItems,
         });
 
         if (!validation.success) {
-            return NextResponse.json({ error: "Datos de confirmación de salida inválidos.", details: validation.error.flatten() }, { status: 400 });
+            return NextResponse.json(
+                {
+                    error: "Datos de confirmación de carga inválidos.",
+                    details: validation.error.flatten(),
+                },
+                { status: 400 }
+            );
         }
-      
-        const { exitPhoto, exitLoadPhoto } = validation.data;
 
-        const saveFile = async (file: File, prefix: string): Promise<string> => {
-            const buffer = Buffer.from(await file.arrayBuffer());
-            const filename = `${Date.now()}_${prefix}_${file.name.replace(/\s/g, "_")}`;
+        const { loadedItems, loadPhoto } = validation.data;
+        let photoUrl: string | null = null;
+        
+        if (loadPhoto) {
+            const buffer = Buffer.from(await loadPhoto.arrayBuffer());
+            const filename = `${Date.now()}_${loadPhoto.name.replace(/\s/g, "_")}`;
             const uploadDir = path.join(process.cwd(), "public/uploads");
             await mkdir(uploadDir, { recursive: true });
             await writeFile(path.join(uploadDir, filename), buffer);
-            return filename;
+            photoUrl = filename; // Guardar solo el nombre del archivo
         }
 
-        const exitPhotoUrl = exitPhoto ? await saveFile(exitPhoto, 'exit_truck') : null;
-        const exitLoadPhotoUrl = exitLoadPhoto ? await saveFile(exitLoadPhoto, 'exit_load') : null;
-
-        // Guarda las notas en la columna 'exit_notes'
         const updateDespachoSql = `
             UPDATE RIP.APP_DESPACHOS
-            SET
-                status = 'EXITED',
-                exited_by = @userId,
-                exited_at = GETDATE(),
-                exit_notes = @notes,
-                exit_photo_url = @exitPhotoUrl,
-                exit_load_photo_url = @exitLoadPhotoUrl,
+            SET 
+                status = 'CARGADA',
+                loaded_by = @userId,
+                loaded_at = GETDATE(),
+                notes = ISNULL(@notes, notes),
+                load_photo_url = ISNULL(@photoUrl, load_photo_url),
                 updated_at = GETDATE()
             WHERE id = @despachoId;
         `;
         await executeQuery(updateDespachoSql, [
             { name: "despachoId", type: TYPES.Int, value: despachoId },
             { name: "userId", type: TYPES.Int, value: parseInt(userId, 10) },
-            { name: "notes", type: TYPES.NVarChar, value: notes },
-            { name: "exitPhotoUrl", type: TYPES.NVarChar, value: exitPhotoUrl },
-            { name: "exitLoadPhotoUrl", type: TYPES.NVarChar, value: exitLoadPhotoUrl },
+            { name: "notes", type: TYPES.NVarChar, value: notes }, 
+            { name: "photoUrl", type: TYPES.NVarChar, value: photoUrl },
         ]);
 
-        await updateOrderStatus(despachoId);
+        const deleteItemsSql = "DELETE FROM RIP.APP_DESPACHOS_ITEMS WHERE despacho_id = @despachoId;";
+        await executeQuery(deleteItemsSql, [
+            { name: "despachoId", type: TYPES.Int, value: despachoId },
+        ]);
 
+        for (const item of loadedItems) {
+            if (item.dispatched_quantity > 0) {
+                const insertItemSql = `
+                    INSERT INTO RIP.APP_DESPACHOS_ITEMS (despacho_id, pedido_item_id, dispatched_quantity)
+                    VALUES (@despachoId, @pedidoItemId, @quantity);
+                `;
+                await executeQuery(insertItemSql, [
+                    { name: "despachoId", type: TYPES.Int, value: despachoId },
+                    { name: "pedidoItemId", type: TYPES.Int, value: parseInt(item.pedido_item_id, 10) },
+                    { name: "quantity", type: TYPES.Decimal, value: item.dispatched_quantity },
+                ]);
+            }
+        }
+    } else if (status === "EXITED") {
+      const exitPhotoFile = formData.get("exitPhoto") as File | null;
+      const exitLoadPhotoFile = formData.get("exitLoadPhoto") as File | null;
+      const exitNotes = (formData.get("exit_notes") as string) || null;
+
+      const validation = confirmExitSchema.safeParse({
+        exitNotes: exitNotes,
+        userId: userId,
+        exitPhoto: exitPhotoFile,
+        exitLoadPhoto: exitLoadPhotoFile,
+      });
+
+      if (!validation.success) {
+        return NextResponse.json(
+          {
+            error: "Datos de confirmación de salida inválidos.",
+            details: validation.error.flatten(),
+          },
+          { status: 400 }
+        );
+      }
+
+      const { exitPhoto, exitLoadPhoto } = validation.data;
+
+      const saveFile = async (file: File, prefix: string): Promise<string> => {
+        const buffer = Buffer.from(await file.arrayBuffer());
+        const filename = `${Date.now()}_${prefix}_${file.name.replace(
+          /\s/g,
+          "_"
+        )}`;
+        const uploadDir = path.join(process.cwd(), "public/uploads");
+        await mkdir(uploadDir, { recursive: true });
+        await writeFile(path.join(uploadDir, filename), buffer);
+        return filename;
+      };
+
+      const exitPhotoUrl = exitPhoto
+        ? await saveFile(exitPhoto, "exit_truck")
+        : null;
+      const exitLoadPhotoUrl = exitLoadPhoto
+        ? await saveFile(exitLoadPhoto, "exit_load")
+        : null;
+
+      // Guarda las notas en la columna 'exit_notes'
+      const updateDespachoSql = `
+            UPDATE RIP.APP_DESPACHOS
+            SET
+                status = 'EXITED',
+                exited_by = @userId,
+                exited_at = GETDATE(),
+                exit_notes = @exitNotes, 
+                exit_photo_url = @exitPhotoUrl,
+                exit_load_photo_url = @exitLoadPhotoUrl,
+                updated_at = GETDATE()
+            WHERE id = @despachoId;
+        `;
+      await executeQuery(updateDespachoSql, [
+        { name: "despachoId", type: TYPES.Int, value: despachoId },
+        { name: "userId", type: TYPES.Int, value: parseInt(userId, 10) },
+        { name: "exitNotes", type: TYPES.NVarChar, value: exitNotes },
+        { name: "exitPhotoUrl", type: TYPES.NVarChar, value: exitPhotoUrl },
+        {
+          name: "exitLoadPhotoUrl",
+          type: TYPES.NVarChar,
+          value: exitLoadPhotoUrl,
+        },
+      ]);
+
+      await updateOrderStatus(despachoId);
     } else {
-        return NextResponse.json({ error: `Estado '${status}' no manejado.` }, { status: 400 });
+      return NextResponse.json(
+        { error: `Estado '${status}' no manejado.` },
+        { status: 400 }
+      );
     }
 
     revalidateTag("deliveries");
@@ -294,13 +418,19 @@ export async function PATCH(
 
     // Llama a GET para devolver el objeto completo y con el formato correcto
     return await GET(request, { params });
-
   } catch (e) {
     if (e instanceof z.ZodError) {
-        return NextResponse.json({ error: "Error de validación Zod.", details: e.flatten() }, { status: 400 });
+      return NextResponse.json(
+        { error: "Error de validación Zod.", details: e.flatten() },
+        { status: 400 }
+      );
     }
     console.error("[API_DELIVERIES_PATCH_ERROR]", e);
-    const errorMessage = e instanceof Error ? e.message : "Ocurrió un error inesperado.";
-    return NextResponse.json({ error: "Error al actualizar el despacho", details: errorMessage }, { status: 500 });
+    const errorMessage =
+      e instanceof Error ? e.message : "Ocurrió un error inesperado.";
+    return NextResponse.json(
+      { error: "Error al actualizar el despacho", details: errorMessage },
+      { status: 500 }
+    );
   }
 }

@@ -220,7 +220,7 @@ export function OrderForm({
     };
 
     if (selectedcustomer_id) {
-      // Llamamos a la función con el ID del estado
+      // Llamamos a la función con el ID del status
       fetchInvoicesForClient(selectedcustomer_id);
     } else {
       setAvailableInvoices([]);

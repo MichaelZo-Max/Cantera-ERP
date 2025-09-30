@@ -52,11 +52,11 @@ function Dashboard() {
             description: "Consultar ventas directas sin factura",
             icon: ClipboardList,
             href: "/cashier/cashier-orders",
-            color: "bg-primary", 
+            color: "bg-primary",
           },
           {
             title: "Seguimiento de Despachos",
-            description: "Monitorear estado de despachos creados",
+            description: "Monitorear status de despachos creados",
             icon: Truck,
             href: "/cashier/deliveries",
             color: "bg-primary",

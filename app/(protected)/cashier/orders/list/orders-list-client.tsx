@@ -100,7 +100,7 @@ const calculateOrderProgress = (order: Order): OrderProgress => {
     }, 0) || 0;
 
   const completedTrips =
-    order.deliveries?.filter((d) => d.estado === "EXITED").length || 0;
+    order.deliveries?.filter((d) => d.status === "EXITED").length || 0;
   const totalTrips = order.deliveries?.length || 0;
   return {
     order_id: String(order.id),

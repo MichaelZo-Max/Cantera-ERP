@@ -409,7 +409,7 @@ export function DriversClientUI({
 
             if (!res.ok) {
               const errorText = await res.text();
-              throw new Error(errorText || "Error al cambiar el estado");
+              throw new Error(errorText || "Error al cambiar el status");
             }
 
             const fetchResponse = await fetch("/api/drivers");

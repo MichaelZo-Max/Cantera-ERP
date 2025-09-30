@@ -154,7 +154,14 @@ const ExitedDeliveryCard = React.memo(
           {delivery.exitedAt && (
             <div className="flex justify-between">
               <span className="text-muted-foreground">Salida:</span>
-              <span>{new Date(delivery.exitedAt).toLocaleTimeString()}</span>
+              <span>
+                {new Date(delivery.exitedAt).toLocaleString("es-VE", {
+                  hour: "numeric",
+                  minute: "numeric",
+                  hour12: true,
+                  timeZone: "America/Caracas",
+                })}
+              </span>
             </div>
           )}
         </div>
@@ -195,11 +202,11 @@ export function SecurityExitsClientUI({
     useState<Delivery | null>(null);
 
   const loadedDeliveries = useMemo(
-    () => allDeliveries.filter((d) => d.estado === "CARGADA"),
+    () => allDeliveries.filter((d) => d.status === "CARGADA"),
     [allDeliveries]
   );
   const exitedDeliveries = useMemo(
-    () => allDeliveries.filter((d) => d.estado === "EXITED"),
+    () => allDeliveries.filter((d) => d.status === "EXITED"),
     [allDeliveries]
   );
 
@@ -222,7 +229,7 @@ export function SecurityExitsClientUI({
   }, [searchQuery, loadedDeliveries]);
 
   const handleSelectDelivery = useCallback((delivery: Delivery) => {
-    if (delivery.estado !== "CARGADA") {
+    if (delivery.status !== "CARGADA") {
       toast.warning("Este despacho no está listo para salir.");
       return;
     }
@@ -268,7 +275,7 @@ export function SecurityExitsClientUI({
     try {
       const formData = new FormData();
       formData.append("status", "EXITED");
-      formData.append("notes", exitNotes);
+      formData.append("exit_notes", exitNotes);
       if (user?.id) formData.append("userId", user.id.toString());
 
       formData.append("exitPhoto", exitPhoto);
@@ -317,7 +324,8 @@ export function SecurityExitsClientUI({
   ]);
 
   const openImagePreview = useCallback((imageUrl: string) => {
-    setPreviewImageUrl(imageUrl);
+    const correctedUrl = imageUrl.startsWith("/") ? imageUrl : `/${imageUrl}`;
+    setPreviewImageUrl(correctedUrl);
     setShowImagePreview(true);
   }, []);
 
@@ -498,10 +506,8 @@ export function SecurityExitsClientUI({
                   {selectedDelivery.loadPhoto && !imageError ? (
                     <div className="relative w-full h-48 rounded-lg overflow-hidden group border">
                       <Image
-                        src={`/${selectedDelivery.loadPhoto.replace(
-                          /^\/+/,
-                          ""
-                        )}`}
+                        // ✅ CORRECCIÓN: No añadir slash extra
+                        src={selectedDelivery.loadPhoto}
                         alt="Foto de carga del patio"
                         fill
                         style={{ objectFit: "cover" }}
@@ -513,12 +519,7 @@ export function SecurityExitsClientUI({
                         size="icon"
                         className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity"
                         onClick={() =>
-                          openImagePreview(
-                            `/${selectedDelivery.loadPhoto!.replace(
-                              /^\/+/,
-                              ""
-                            )}`
-                          )
+                          openImagePreview(selectedDelivery.loadPhoto!)
                         }
                       >
                         <Eye className="h-8 w-8 text-white" />
@@ -631,7 +632,11 @@ export function SecurityExitsClientUI({
                     {selectedExitedDelivery.exitedAt
                       ? new Date(
                           selectedExitedDelivery.exitedAt
-                        ).toLocaleString()
+                        ).toLocaleString("es-VE", {
+                          dateStyle: "medium",
+                          timeStyle: "short",
+                          timeZone: "America/Caracas",
+                        })
                       : "No disponible"}
                   </p>
                 </div>
@@ -703,13 +708,14 @@ export function SecurityExitsClientUI({
                   {selectedExitedDelivery.loadPhoto ? (
                     <div className="relative w-full h-40 rounded-lg overflow-hidden group border">
                       <Image
-                        src={`/${selectedExitedDelivery.loadPhoto.replace(
-                          /^\/+/,
-                          ""
-                        )}`}
+                        // ✅ CORRECCIÓN: No añadir slash extra
+                        src={selectedExitedDelivery.loadPhoto}
                         alt="Foto de carga del patio"
                         fill
                         style={{ objectFit: "cover" }}
+                        onError={() =>
+                          toast.error("No se pudo cargar la foto del patio")
+                        }
                       />
                       <Button
                         type="button"
@@ -717,12 +723,7 @@ export function SecurityExitsClientUI({
                         size="icon"
                         className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100"
                         onClick={() =>
-                          openImagePreview(
-                            `/${selectedExitedDelivery.loadPhoto!.replace(
-                              /^\/+/,
-                              ""
-                            )}`
-                          )
+                          openImagePreview(selectedExitedDelivery.loadPhoto!)
                         }
                       >
                         <Eye className="h-6 w-6 text-white" />
@@ -742,13 +743,14 @@ export function SecurityExitsClientUI({
                   {selectedExitedDelivery.exitPhoto ? (
                     <div className="relative w-full h-40 rounded-lg overflow-hidden group border">
                       <Image
-                        src={`/${selectedExitedDelivery.exitPhoto.replace(
-                          /^\/+/,
-                          ""
-                        )}`}
+                        // ✅ CORRECCIÓN: No añadir slash extra
+                        src={selectedExitedDelivery.exitPhoto}
                         alt="Foto de salida del camión"
                         fill
                         style={{ objectFit: "cover" }}
+                        onError={() =>
+                          toast.error("No se pudo cargar la foto del camión")
+                        }
                       />
                       <Button
                         type="button"
@@ -756,12 +758,7 @@ export function SecurityExitsClientUI({
                         size="icon"
                         className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100"
                         onClick={() =>
-                          openImagePreview(
-                            `/${selectedExitedDelivery.exitPhoto!.replace(
-                              /^\/+/,
-                              ""
-                            )}`
-                          )
+                          openImagePreview(selectedExitedDelivery.exitPhoto!)
                         }
                       >
                         <Eye className="h-6 w-6 text-white" />
@@ -781,13 +778,14 @@ export function SecurityExitsClientUI({
                   {selectedExitedDelivery.exitLoadPhoto ? (
                     <div className="relative w-full h-40 rounded-lg overflow-hidden group border">
                       <Image
-                        src={`/${selectedExitedDelivery.exitLoadPhoto.replace(
-                          /^\/+/,
-                          ""
-                        )}`}
+                        // ✅ CORRECCIÓN: No añadir slash extra
+                        src={selectedExitedDelivery.exitLoadPhoto}
                         alt="Foto de salida de la carga"
                         fill
                         style={{ objectFit: "cover" }}
+                        onError={() =>
+                          toast.error("No se pudo cargar la foto de la carga")
+                        }
                       />
                       <Button
                         type="button"
@@ -796,10 +794,7 @@ export function SecurityExitsClientUI({
                         className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100"
                         onClick={() =>
                           openImagePreview(
-                            `/${selectedExitedDelivery.exitLoadPhoto!.replace(
-                              /^\/+/,
-                              ""
-                            )}`
+                            selectedExitedDelivery.exitLoadPhoto!
                           )
                         }
                       >

@@ -29,7 +29,7 @@ interface DeliveryCardProps {
 }
 
 // Mapeo de estados alineado con lib/types.ts y el resto de la app
-const getStatusConfig = (status: Delivery["estado"]) => {
+const getStatusConfig = (status: Delivery["status"]) => {
   const s = status?.toUpperCase() ?? "PENDING";
   switch (s) {
     case "PENDING":
@@ -63,7 +63,7 @@ const getStatusConfig = (status: Delivery["estado"]) => {
 };
 
 export function DeliveryCard({ delivery }: DeliveryCardProps) {
-  const statusConfig = getStatusConfig(delivery.estado);
+  const statusConfig = getStatusConfig(delivery.status);
   const StatusIcon = statusConfig.icon;
 
   // Calculamos la cantidad total despachada para ESTE viaje específico.

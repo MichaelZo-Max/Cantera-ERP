@@ -94,7 +94,7 @@ const confirmLoadSchema = z.object({
 // --- Type Definitions (Sin cambios) ---
 type CreateDeliveryFormValues = z.infer<typeof createDeliverySchema>;
 type ConfirmLoadFormValues = z.infer<typeof confirmLoadSchema>;
-type Delivery = BaseDelivery; 
+type Delivery = BaseDelivery;
 interface YardClientProps {
   initialDeliveries: Delivery[];
   initialActiveOrders: Order[];
@@ -162,7 +162,7 @@ const DeliveryCard = React.memo(
               </p>
             </div>
             <Badge
-              variant={delivery.estado === "CARGADA" ? "default" : "secondary"}
+              variant={delivery.status === "CARGADA" ? "default" : "secondary"}
             >
               Pedido #{delivery.orderDetails.order_number}
             </Badge>
@@ -220,7 +220,7 @@ const DeliveryCard = React.memo(
                 />
               </div>
             )
-          ) : delivery.estado === "CARGADA" ? (
+          ) : delivery.status === "CARGADA" ? (
             <div className="h-40 w-full rounded-md border border-dashed bg-muted/20 flex flex-col items-center justify-center text-center text-muted-foreground p-2 mt-2">
               <Package className="h-8 w-8" />
               <p className="text-xs font-medium mt-2">Sin foto de carga</p>
@@ -322,11 +322,11 @@ export function YardDeliveriesClientUI({
   }, [searchQuery, deliveries]);
 
   const pendingDeliveries = useMemo(
-    () => filteredDeliveries.filter((d) => d.estado === "PENDING"),
+    () => filteredDeliveries.filter((d) => d.status === "PENDING"),
     [filteredDeliveries]
   );
   const loadedDeliveries = useMemo(
-    () => filteredDeliveries.filter((d) => d.estado === "CARGADA"),
+    () => filteredDeliveries.filter((d) => d.status === "CARGADA"),
     [filteredDeliveries]
   );
 
@@ -401,9 +401,9 @@ export function YardDeliveriesClientUI({
 
   const handleSelectDelivery = useCallback(
     async (delivery: Delivery) => {
-      if (delivery.estado !== "PENDING") {
+      if (delivery.status !== "PENDING") {
         toast.info("Este despacho ya fue procesado.", {
-          description: `Estado actual: ${delivery.estado}`,
+          description: `Estado actual: ${delivery.status}`,
         });
         return;
       }
@@ -657,7 +657,8 @@ export function YardDeliveriesClientUI({
                         if (!item) return null;
 
                         const totalOrdered = item.quantity;
-                        const totalDispatchedPreviously = item.totalDispatched ?? 0;
+                        const totalDispatchedPreviously =
+                          item.totalDispatched ?? 0;
 
                         const pendingQuantity = Math.max(
                           0,

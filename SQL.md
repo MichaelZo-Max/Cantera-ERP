@@ -519,6 +519,8 @@ SELECT
     d.load_photo_url AS loadPhoto,
     d.exited_at AS exitedAt,
     d.exit_photo_url AS exitPhoto,
+    d.exit_load_photo_url AS exitLoadPhoto,
+    d.exit_notes,
     (SELECT * FROM RIP.VW_APP_PEDIDOS vpo WHERE vpo.id = d.order_id FOR JSON PATH, WITHOUT_ARRAY_WRAPPER) AS orderDetails,
     (SELECT t.id, t.placa, t.brand, t.model, t.capacity FROM RIP.APP_CAMIONES t WHERE t.id = d.truck_id FOR JSON PATH, WITHOUT_ARRAY_WRAPPER) AS truck,
     (SELECT dr.id, dr.name, dr.docId FROM RIP.APP_CHOFERES dr WHERE dr.id = d.driver_id FOR JSON PATH, WITHOUT_ARRAY_WRAPPER) AS driver
@@ -646,12 +648,6 @@ PRINT 'Vista RIP.VW_APP_FACTURA_ITEMS creada/actualizada con precios en USD.';
 GO
 
 -- !! VISTA CORREGIDA !!: Lógica de cálculo de pendientes ajustada.
-IF OBJECT_ID('RIP.VW_APP_FACTURA_ITEMS_PENDIENTES', 'V') IS NOT NULL
-BEGIN
-    DROP VIEW RIP.VW_APP_FACTURA_ITEMS_PENDIENTES;
-END
-GO
-
 IF OBJECT_ID('RIP.VW_APP_FACTURA_ITEMS_PENDIENTES', 'V') IS NOT NULL
 BEGIN
     DROP VIEW RIP.VW_APP_FACTURA_ITEMS_PENDIENTES;
@@ -873,8 +869,21 @@ BEGIN
     PRINT 'Se añadió la llave foránea para related_order_id.';
 END
 GO
-ALTER TABLE RIP.APP_DESPACHOS
-ADD exit_load_photo_url NVARCHAR(255) NULL;
+
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE Name = N'exit_load_photo_url' AND Object_ID = Object_ID(N'RIP.APP_DESPACHOS'))
+BEGIN
+    ALTER TABLE RIP.APP_DESPACHOS ADD exit_load_photo_url NVARCHAR(255) NULL;
+    PRINT 'Columna "exit_load_photo_url" añadida a RIP.APP_DESPACHOS.';
+END
+GO
+
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE Name = N'exit_notes' AND Object_ID = Object_ID(N'RIP.APP_DESPACHOS'))
+BEGIN
+    ALTER TABLE RIP.APP_DESPACHOS ADD exit_notes NVARCHAR(MAX) NULL;
+    PRINT 'Columna "exit_notes" añadida a RIP.APP_DESPACHOS.';
+END
+GO
+
 
 -- Creación de la tabla de eventos con las referencias correctas
 IF OBJECT_ID('RIP.EventLog', 'U') IS NULL
@@ -900,5 +909,3 @@ BEGIN
     PRINT 'La tabla RIP.EventLog ya existe.';
 END
 GO
-ALTER TABLE RIP.APP_DESPACHOS
-ADD exit_notes NVARCHAR(MAX) NULL;

@@ -26,7 +26,7 @@ async function fetchCustomerById(id: number) {
   };
 }
 
-// ---------- PATCH: actualizar datos y/o cambiar estado (toggle) con validación ----------
+// ---------- PATCH: actualizar datos y/o cambiar status (toggle) con validación ----------
 export async function PATCH(
   req: Request,
   { params: routeParams }: { params: { id: string } }

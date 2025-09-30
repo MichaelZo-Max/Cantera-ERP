@@ -191,7 +191,7 @@ export function UsersClientUI({ initialUsers }: { initialUsers: User[] }) {
               `Usuario ${!is_active ? "activado" : "desactivado"} exitosamente.`
             );
           } catch (err: any) {
-            toast.error("Error al cambiar el estado", {
+            toast.error("Error al cambiar el status", {
               description: err.message,
             });
           }
@@ -257,17 +257,17 @@ export function UsersClientUI({ initialUsers }: { initialUsers: User[] }) {
       {/* Users Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {filteredUsers.length === 0 && initialUsers.length > 0 ? (
-           <div className="col-span-full">
-             <Card className="glass">
-               <CardContent className="pt-6">
-                  <EmptyState
-                    icon={<Search className="h-12 w-12" />}
-                    title="No se encontraron usuarios"
-                    description="No hay usuarios que coincidan con tu búsqueda. Intenta con otros términos."
-                  />
-                </CardContent>
-              </Card>
-           </div>
+          <div className="col-span-full">
+            <Card className="glass">
+              <CardContent className="pt-6">
+                <EmptyState
+                  icon={<Search className="h-12 w-12" />}
+                  title="No se encontraron usuarios"
+                  description="No hay usuarios que coincidan con tu búsqueda. Intenta con otros términos."
+                />
+              </CardContent>
+            </Card>
+          </div>
         ) : filteredUsers.length === 0 ? (
           <div className="col-span-full">
             <Card className="glass">

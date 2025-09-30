@@ -25,7 +25,7 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 
-/* ----------------------------- Config de estado (sin cambios) ----------------------------- */
+/* ----------------------------- Config de status (sin cambios) ----------------------------- */
 const STATUS_CONFIG = {
   PENDING: {
     label: "Pendiente",
@@ -49,8 +49,8 @@ const STATUS_CONFIG = {
 
 type StatusKey = keyof typeof STATUS_CONFIG;
 
-function StatusBadge({ estado }: { estado: string }) {
-  const conf = STATUS_CONFIG[estado as StatusKey] ?? STATUS_CONFIG.PENDING;
+function StatusBadge({ status }: { status: string }) {
+  const conf = STATUS_CONFIG[status as StatusKey] ?? STATUS_CONFIG.PENDING;
   const Icon = conf.icon;
   return (
     <Badge className={`text-xs ${conf.color}`}>
@@ -112,7 +112,7 @@ export function CashierDeliveriesClientUI({
 
   /* Contadores (sin cambios) */
   const completedDeliveriesCount = useMemo(
-    () => filteredDeliveries.filter((d) => d.estado === "EXITED").length,
+    () => filteredDeliveries.filter((d) => d.status === "EXITED").length,
     [filteredDeliveries]
   );
   const inProgressDeliveriesCount =
@@ -127,7 +127,7 @@ export function CashierDeliveriesClientUI({
             Seguimiento de Despachos
           </h1>
           <p className="mt-1 text-sm text-muted-foreground sm:text-base">
-            Monitorea el estado de múltiples viajes por orden
+            Monitorea el status de múltiples viajes por orden
           </p>
         </div>
 
@@ -252,7 +252,7 @@ export function CashierDeliveriesClientUI({
                                         Viaje #{delivery.id}
                                       </span>
                                     </div>
-                                    <StatusBadge estado={delivery.estado} />
+                                    <StatusBadge status={delivery.status} />
                                   </div>
 
                                   <p className="pt-1 text-sm font-medium">
