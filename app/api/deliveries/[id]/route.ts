@@ -306,10 +306,10 @@ export async function PATCH(
             SET 
                 status = 'CARGADA',
                 loaded_by = @userId,
-                loaded_at = GETDATE(),
+                loaded_at = GETUTCDATE(),
                 notes = ISNULL(@notes, notes),
                 load_photo_url = ISNULL(@photoUrl, load_photo_url),
-                updated_at = GETDATE()
+                updated_at = GETUTCDATE()
             WHERE id = @despachoId;
         `;
         await executeQuery(updateDespachoSql, [
@@ -386,11 +386,11 @@ export async function PATCH(
             SET
                 status = 'EXITED',
                 exited_by = @userId,
-                exited_at = GETDATE(),
+                exited_at = GETUTCDATE(),
                 exit_notes = @exitNotes, 
                 exit_photo_url = @exitPhotoUrl,
                 exit_load_photo_url = @exitLoadPhotoUrl,
-                updated_at = GETDATE()
+                updated_at = GETUTCDATE()
             WHERE id = @despachoId;
         `;
       await executeQuery(updateDespachoSql, [
