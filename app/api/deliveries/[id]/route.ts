@@ -2,29 +2,23 @@
 
 import { NextResponse } from "next/server";
 import { executeQuery, TYPES } from "@/lib/db";
-import path from "path";
-import { writeFile, mkdir } from "fs/promises";
 import { revalidateTag } from "next/cache";
 import { Delivery, OrderItem } from "@/lib/types";
 import util from "util";
-import { confirmExitSchema, confirmLoadSchema  } from "@/lib/validations";
+import { confirmExitSchema, confirmLoadSchema } from "@/lib/validations";
 import { z } from "zod";
+
+// --- CAMBIO: AÑADIMOS LAS IMPORTACIONES DE BYTESCALE ---
+import { UploadManager } from "@bytescale/sdk";
 
 export const dynamic = "force-dynamic";
 
-// --- Helpers ---
+// --- CAMBIO: CONFIGURAMOS EL GESTOR DE SUBIDAS DE BYTESCALE ---
+const uploadManager = new UploadManager({
+  apiKey: process.env.UPLOAD_IO_SECRET_API_KEY ?? "secret_xxx", // Usa la variable de entorno
+});
 
-/**
- * Garantiza que la URL de la imagen tenga el formato correcto para el cliente.
- * @param filename El nombre del archivo de la base de datos.
- * @returns Una ruta completa como /uploads/filename.jpg o undefined.
- */
-const getFullImageUrl = (
-  filename: string | null | undefined
-): string | undefined => {
-  if (!filename) return undefined;
-  return `/uploads/${filename}`;
-};
+// --- CAMBIO: LA FUNCIÓN getFullImageUrl YA NO ES NECESARIA Y SE ELIMINA ---
 
 function mapDbStatusToUi(status: string): "PENDING" | "CARGADA" | "EXITED" {
   if (!status) return "PENDING";
@@ -35,7 +29,6 @@ function mapDbStatusToUi(status: string): "PENDING" | "CARGADA" | "EXITED" {
   return "PENDING";
 }
 
-// Se añade exit_notes a la consulta
 const getDeliveryByIdQuery = `
     SELECT
         d.id, d.status AS status, d.notes, d.exit_notes,
@@ -154,15 +147,15 @@ export async function GET(
       dispatchItems: [],
     }));
 
-    // Se formatean las URLs y se añaden todas las notas y la fecha.
     const finalPayload: Delivery = {
       id: row.id,
       status: mapDbStatusToUi(row.status),
       notes: row.notes ?? undefined,
-      exit_notes: row.exit_notes ?? undefined, // Notas de seguridad
-      loadPhoto: getFullImageUrl(row.loadPhoto),
-      exitPhoto: getFullImageUrl(row.exitPhoto),
-      exitLoadPhoto: getFullImageUrl(row.exitLoadPhoto),
+      exit_notes: row.exit_notes ?? undefined,
+      // --- CAMBIO: Asignamos directamente la URL completa desde la base de datos ---
+      loadPhoto: row.loadPhoto ?? undefined,
+      exitPhoto: row.exitPhoto ?? undefined,
+      exitLoadPhoto: row.exitLoadPhoto ?? undefined,
       exitedAt: row.exited_at,
       orderDetails: {
         id: orderId,
@@ -214,7 +207,6 @@ export async function PATCH(
 
     const formData = await request.formData();
     const status = formData.get("status") as string;
-    const notes = (formData.get("notes") as string) || null; // Notas de seguridad
     const userId = formData.get("userId") as string;
 
     if (!status || !userId) {
@@ -223,6 +215,27 @@ export async function PATCH(
         { status: 400 }
       );
     }
+    
+    // --- CAMBIO: Nueva función auxiliar para subir archivos a Bytescale ---
+    const uploadFileToBytescale = async (
+      file: File | null,
+      tags: string[] = []
+    ): Promise<string | null> => {
+      if (!file) return null;
+
+      try {
+        const { fileUrl } = await uploadManager.upload({
+          data: Buffer.from(await file.arrayBuffer()),
+          mime: file.type,
+          originalFileName: file.name,
+          tags,
+        });
+        return fileUrl; // Devolvemos la URL completa del archivo subido
+      } catch (error) {
+        console.error("Bytescale upload error:", error);
+        return null; // Devolvemos null si la subida falla
+      }
+    };
 
     const updateOrderStatus = async (currentDespachoId: number) => {
       try {
@@ -236,27 +249,27 @@ export async function PATCH(
         if (!orderId) return;
 
         const checkOrderSql = `
-                IF NOT EXISTS (
-                    SELECT 1
-                    FROM RIP.APP_PEDIDOS_ITEMS pi
-                    LEFT JOIN (
-                        SELECT di.pedido_item_id, SUM(di.dispatched_quantity) as total_despachado
-                        FROM RIP.APP_DESPACHOS_ITEMS di
-                        JOIN RIP.APP_DESPACHOS d ON di.despacho_id = d.id
-                        WHERE d.order_id = @orderId AND d.status = 'EXITED'
-                        GROUP BY di.pedido_item_id
-                    ) AS despachos_agg ON pi.id = despachos_agg.pedido_item_id
-                    WHERE pi.order_id = @orderId
-                    AND pi.quantity > ISNULL(despachos_agg.total_despachado, 0)
-                )
-                BEGIN
-                    UPDATE RIP.APP_PEDIDOS SET status = 'DISPATCHED_COMPLETE' WHERE id = @orderId;
-                END
-                ELSE
-                BEGIN
-                    UPDATE RIP.APP_PEDIDOS SET status = 'PARTIALLY_DISPATCHED' WHERE id = @orderId;
-                END
-            `;
+                  IF NOT EXISTS (
+                      SELECT 1
+                      FROM RIP.APP_PEDIDOS_ITEMS pi
+                      LEFT JOIN (
+                          SELECT di.pedido_item_id, SUM(di.dispatched_quantity) as total_despachado
+                          FROM RIP.APP_DESPACHOS_ITEMS di
+                          JOIN RIP.APP_DESPACHOS d ON di.despacho_id = d.id
+                          WHERE d.order_id = @orderId AND d.status = 'EXITED'
+                          GROUP BY di.pedido_item_id
+                      ) AS despachos_agg ON pi.id = despachos_agg.pedido_item_id
+                      WHERE pi.order_id = @orderId
+                      AND pi.quantity > ISNULL(despachos_agg.total_despachado, 0)
+                  )
+                  BEGIN
+                      UPDATE RIP.APP_PEDIDOS SET status = 'DISPATCHED_COMPLETE' WHERE id = @orderId;
+                  END
+                  ELSE
+                  BEGIN
+                      UPDATE RIP.APP_PEDIDOS SET status = 'PARTIALLY_DISPATCHED' WHERE id = @orderId;
+                  END
+              `;
         await executeQuery(checkOrderSql, [
           { name: "orderId", type: TYPES.Int, value: orderId },
         ]);
@@ -266,7 +279,6 @@ export async function PATCH(
     };
 
     if (status === "CARGADA") {
-        // ✅ CORRECCIÓN: Obtener los datos correctos del FormData
         const notes = (formData.get("notes") as string) || null;
         const itemsJson = formData.get("itemsJson") as string | null;
         const loadPhotoFile = formData.get("photoFile") as File | null;
@@ -293,12 +305,11 @@ export async function PATCH(
         let photoUrl: string | null = null;
         
         if (loadPhoto) {
-            const buffer = Buffer.from(await loadPhoto.arrayBuffer());
-            const filename = `${Date.now()}_${loadPhoto.name.replace(/\s/g, "_")}`;
-            const uploadDir = path.join(process.cwd(), "public/uploads");
-            await mkdir(uploadDir, { recursive: true });
-            await writeFile(path.join(uploadDir, filename), buffer);
-            photoUrl = filename; // Guardar solo el nombre del archivo
+            // --- CAMBIO: Usamos la nueva función para subir a Bytescale ---
+            photoUrl = await uploadFileToBytescale(loadPhoto, [
+              `despacho_${despachoId}`,
+              "foto_carga",
+            ]);
         }
 
         const updateDespachoSql = `
@@ -361,26 +372,17 @@ export async function PATCH(
 
       const { exitPhoto, exitLoadPhoto } = validation.data;
 
-      const saveFile = async (file: File, prefix: string): Promise<string> => {
-        const buffer = Buffer.from(await file.arrayBuffer());
-        const filename = `${Date.now()}_${prefix}_${file.name.replace(
-          /\s/g,
-          "_"
-        )}`;
-        const uploadDir = path.join(process.cwd(), "public/uploads");
-        await mkdir(uploadDir, { recursive: true });
-        await writeFile(path.join(uploadDir, filename), buffer);
-        return filename;
-      };
+      // --- CAMBIO: Usamos la nueva función para subir a Bytescale en lugar de saveFile local ---
+      const exitPhotoUrl = await uploadFileToBytescale(exitPhoto, [
+        `despacho_${despachoId}`,
+        "foto_salida_camion",
+      ]);
 
-      const exitPhotoUrl = exitPhoto
-        ? await saveFile(exitPhoto, "exit_truck")
-        : null;
-      const exitLoadPhotoUrl = exitLoadPhoto
-        ? await saveFile(exitLoadPhoto, "exit_load")
-        : null;
+      const exitLoadPhotoUrl = await uploadFileToBytescale(exitLoadPhoto, [
+        `despacho_${despachoId}`,
+        "foto_salida_carga",
+      ]);
 
-      // Guarda las notas en la columna 'exit_notes'
       const updateDespachoSql = `
             UPDATE RIP.APP_DESPACHOS
             SET
@@ -416,7 +418,6 @@ export async function PATCH(
     revalidateTag("deliveries");
     revalidateTag("orders");
 
-    // Llama a GET para devolver el objeto completo y con el formato correcto
     return await GET(request, { params });
   } catch (e) {
     if (e instanceof z.ZodError) {

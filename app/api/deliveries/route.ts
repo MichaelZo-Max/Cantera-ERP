@@ -13,13 +13,12 @@ export const dynamic = "force-dynamic";
 
 /**
  * ✨ CORRECCIÓN: Función auxiliar para formatear las URLs de las imágenes.
- * Garantiza que el frontend siempre reciba una ruta válida que empiece con "/uploads/".
  */
 const getFullImageUrl = (
   filename: string | null | undefined
 ): string | undefined => {
   if (!filename) return undefined;
-  return `/uploads/${filename}`;
+  return `${filename}`;
 };
 
 function mapDbStatusToUi(status: string): "PENDING" | "CARGADA" | "EXITED" {

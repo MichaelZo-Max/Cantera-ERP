@@ -8,6 +8,9 @@ importers:
 
   .:
     dependencies:
+      '@bytescale/sdk':
+        specifier: ^3.53.0
+        version: 3.53.0
       '@ducanh2912/next-pwa':
         specifier: ^10.2.9
         version: 10.2.9(next@14.2.33(@babel/core@7.28.4)(react-dom@18.3.1(react@18.3.1))(react@18.3.1))(webpack@5.101.3)
@@ -782,6 +785,9 @@ packages:
   '@babel/types@7.28.4':
     resolution: {integrity: sha512-bkFqkLhh3pMBUQQkpVgWDWq/lqzc2678eUyDlTBhRqhCHFguYYGM0Efga7tYk4TogG/3x0EEl66/OQ+WGbWB/Q==}
     engines: {node: '>=6.9.0'}
+
+  '@bytescale/sdk@3.53.0':
+    resolution: {integrity: sha512-qCeNup3pSjaklXuBrO9JeKbozZEs/PjQEvuqCiOAWLBRl6lDjd0V9gRVYqyttPimXYFoV+J/7dmPWtK6RfOABQ==}
 
   '@date-fns/tz@1.2.0':
     resolution: {integrity: sha512-LBrd7MiJZ9McsOgxqWX7AaxrDjcFVjWH/tIKJd7pnR7McaslGYOP1QmmiBXdJH/H/yLCT+rcQ7FaPBUxRGUtrg==}
@@ -4558,6 +4564,8 @@ snapshots:
     dependencies:
       '@babel/helper-string-parser': 7.27.1
       '@babel/helper-validator-identifier': 7.27.1
+
+  '@bytescale/sdk@3.53.0': {}
 
   '@date-fns/tz@1.2.0': {}
 

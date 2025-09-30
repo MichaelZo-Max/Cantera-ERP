@@ -9,20 +9,18 @@ const withPWA = nextPwa({
   disable: process.env.NODE_ENV === "development",
   runtimeCaching: [
     {
-      // Regla para la API: Intenta ir a la red primero.
       urlPattern: ({ url }) => url.pathname.startsWith("/api/"),
-      handler: "NetworkFirst", // <-- Cambio de estrategia
+      handler: "NetworkFirst",
       options: {
         cacheName: "api-cache",
         expiration: {
           maxEntries: 64,
-          maxAgeSeconds: 60 * 60, // 1 hora (puedes ajustarlo)
+          maxAgeSeconds: 60 * 60,
         },
-        networkTimeoutSeconds: 10, // Si la red tarda más de 10s, usa la caché
+        networkTimeoutSeconds: 10,
       },
     },
     {
-      // Regla para las páginas (esta la puedes dejar como está)
       handler: "NetworkFirst",
       urlPattern: ({ request, url }) =>
         request.mode === "navigate" && url.pathname.startsWith("/"),
@@ -30,7 +28,7 @@ const withPWA = nextPwa({
         cacheName: 'pages',
         expiration: {
           maxEntries: 60,
-          maxAgeSeconds: 30 * 24 * 60 * 60, // 30 días
+          maxAgeSeconds: 30 * 24 * 60 * 60,
         },
         networkTimeoutSeconds: 10
       }
@@ -42,7 +40,19 @@ const withPWA = nextPwa({
 const nextConfig = {
   eslint: { ignoreDuringBuilds: false },
   typescript: { ignoreBuildErrors: false },
-  images: { unoptimized: false },
+  // --- CAMBIO AQUÍ ---
+  // Añade remotePatterns a tu configuración de 'images' existente
+  images: {
+    unoptimized: false,
+    remotePatterns: [
+      {
+        protocol: "https",
+        hostname: "upcdn.io",
+        port: "",
+        pathname: "/**",
+      },
+    ],
+  },
 };
 
 export default withPWA(nextConfig);
