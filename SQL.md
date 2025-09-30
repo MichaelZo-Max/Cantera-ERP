@@ -217,6 +217,20 @@ BEGIN
 END
 GO
 
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE Name = N'exit_load_photo_url' AND Object_ID = Object_ID(N'RIP.APP_DESPACHOS'))
+BEGIN
+    ALTER TABLE RIP.APP_DESPACHOS ADD exit_load_photo_url NVARCHAR(255) NULL;
+    PRINT 'Columna "exit_load_photo_url" añadida a RIP.APP_DESPACHOS.';
+END
+GO
+
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE Name = N'exit_notes' AND Object_ID = Object_ID(N'RIP.APP_DESPACHOS'))
+BEGIN
+    ALTER TABLE RIP.APP_DESPACHOS ADD exit_notes NVARCHAR(MAX) NULL;
+    PRINT 'Columna "exit_notes" añadida a RIP.APP_DESPACHOS.';
+END
+GO
+
 -- Tabla de Detalle de Despachos
 IF OBJECT_ID('RIP.APP_DESPACHOS_ITEMS', 'U') IS NULL
 BEGIN
@@ -316,6 +330,22 @@ BEGIN
 END
 GO
 
+-- Añadir columna para vincular la orden de caja con el pedido principal
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE Name = N'related_order_id' AND Object_ID = Object_ID(N'RIP.APP_ORDENES_SIN_FACTURA_CAB'))
+BEGIN
+    ALTER TABLE RIP.APP_ORDENES_SIN_FACTURA_CAB
+    ADD related_order_id INT NULL;
+
+    PRINT 'Columna "related_order_id" añadida a RIP.APP_ORDENES_SIN_FACTURA_CAB.';
+    
+    -- Opcional: Crear una referencia (foreign key) para mantener la integridad
+    ALTER TABLE RIP.APP_ORDENES_SIN_FACTURA_CAB
+    ADD CONSTRAINT FK_ORDEN_CAJA_PEDIDO FOREIGN KEY (related_order_id) REFERENCES RIP.APP_PEDIDOS(id);
+    
+    PRINT 'Se añadió la llave foránea para related_order_id.';
+END
+GO
+
 IF OBJECT_ID('RIP.APP_ORDENES_SIN_FACTURA_ITEMS', 'U') IS NULL
 BEGIN
     CREATE TABLE RIP.APP_ORDENES_SIN_FACTURA_ITEMS (
@@ -377,6 +407,30 @@ BEGIN
 END
 GO
 
+-- Tabla de Log de Eventos
+IF OBJECT_ID('RIP.EventLog', 'U') IS NULL
+BEGIN
+    CREATE TABLE RIP.EventLog (
+        Id INT PRIMARY KEY IDENTITY(1,1),
+        OrderId INT NULL,
+        DeliveryId INT NULL,
+        UserId INT NOT NULL,
+        EventType NVARCHAR(255) NOT NULL,
+        Description NVARCHAR(MAX) NULL,
+        CreatedAt DATETIME DEFAULT GETDATE(),
+        CONSTRAINT FK_EventLog_Pedidos FOREIGN KEY (OrderId) REFERENCES RIP.APP_PEDIDOS(id),
+        CONSTRAINT FK_EventLog_Despachos FOREIGN KEY (DeliveryId) REFERENCES RIP.APP_DESPACHOS(id),
+        CONSTRAINT FK_EventLog_Usuarios FOREIGN KEY (UserId) REFERENCES RIP.APP_USUARIOS(id)
+    );
+    PRINT 'Tabla RIP.EventLog creada exitosamente con todas sus referencias.';
+END
+ELSE
+BEGIN
+    PRINT 'La tabla RIP.EventLog ya existe.';
+END
+GO
+
+
 -- 3. CREACIÓN DE FUNCIONES
 IF OBJECT_ID('[rip].[F_GET_COTIZACION_RIP]', 'FN') IS NOT NULL
 BEGIN
@@ -398,7 +452,7 @@ BEGIN
     DECLARE @MULTIPLICO AS NCHAR(1) = (SELECT NUMERADOR FROM MONEDAS WITH(NOLOCK) WHERE CODMONEDA = @DESTINO);
     
     SELECT 
-        @VALOR = CASE      
+        @VALOR = CASE     
             WHEN @ORIGEN = @DESTINO THEN @IMPORTE
             WHEN @ORIGEN <> @DESTINO AND @MULTIPLICO = 'F' THEN @IMPORTE * @FACTOR_REAL * dbo.F_GET_COTIZACION(@FECHA, @DESTINO)
             ELSE @IMPORTE * @FACTOR_REAL / dbo.F_GET_COTIZACION(@FECHA, @DESTINO)
@@ -528,6 +582,8 @@ FROM
     RIP.APP_DESPACHOS d
 JOIN
     RIP.VW_APP_PEDIDOS vp ON d.order_id = vp.id;
+GO
+PRINT 'Vista RIP.VW_APP_DESPACHOS creada/actualizada.';
 GO
 
 IF OBJECT_ID('RIP.VW_APP_PEDIDOS_CON_TRANSPORTE', 'V') IS NOT NULL
@@ -687,7 +743,8 @@ GO
 PRINT 'Vista RIP.VW_APP_FACTURA_ITEMS_PENDIENTES corregida y actualizada.';
 GO
 
--- Reemplazar el procedimiento almacenado existente
+
+-- 5. CREACIÓN DE PROCEDIMIENTOS ALMACENADOS
 IF OBJECT_ID('RIP.SP_InvoiceCashierOrder', 'P') IS NOT NULL
 BEGIN
     DROP PROCEDURE RIP.SP_InvoiceCashierOrder;
@@ -852,60 +909,4 @@ GO
 PRINT '====================================================================================';
 PRINT '¡Despliegue completado! El script corregido se ha ejecutado.';
 PRINT '====================================================================================';
-GO
-
--- PASO 1: AÑADIR COLUMNA PARA VINCULAR LA ORDEN DE CAJA CON EL PEDIDO PRINCIPAL
-IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE Name = N'related_order_id' AND Object_ID = Object_ID(N'RIP.APP_ORDENES_SIN_FACTURA_CAB'))
-BEGIN
-    ALTER TABLE RIP.APP_ORDENES_SIN_FACTURA_CAB
-    ADD related_order_id INT NULL;
-
-    PRINT 'Columna "related_order_id" añadida a RIP.APP_ORDENES_SIN_FACTURA_CAB.';
-    
-    -- Opcional: Crear una referencia (foreign key) para mantener la integridad
-    ALTER TABLE RIP.APP_ORDENES_SIN_FACTURA_CAB
-    ADD CONSTRAINT FK_ORDEN_CAJA_PEDIDO FOREIGN KEY (related_order_id) REFERENCES RIP.APP_PEDIDOS(id);
-    
-    PRINT 'Se añadió la llave foránea para related_order_id.';
-END
-GO
-
-IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE Name = N'exit_load_photo_url' AND Object_ID = Object_ID(N'RIP.APP_DESPACHOS'))
-BEGIN
-    ALTER TABLE RIP.APP_DESPACHOS ADD exit_load_photo_url NVARCHAR(255) NULL;
-    PRINT 'Columna "exit_load_photo_url" añadida a RIP.APP_DESPACHOS.';
-END
-GO
-
-IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE Name = N'exit_notes' AND Object_ID = Object_ID(N'RIP.APP_DESPACHOS'))
-BEGIN
-    ALTER TABLE RIP.APP_DESPACHOS ADD exit_notes NVARCHAR(MAX) NULL;
-    PRINT 'Columna "exit_notes" añadida a RIP.APP_DESPACHOS.';
-END
-GO
-
-
--- Creación de la tabla de eventos con las referencias correctas
-IF OBJECT_ID('RIP.EventLog', 'U') IS NULL
-BEGIN
-    CREATE TABLE RIP.EventLog (
-        Id INT PRIMARY KEY IDENTITY(1,1),
-        OrderId INT NULL,
-        DeliveryId INT NULL,
-        UserId INT NOT NULL,
-        EventType NVARCHAR(255) NOT NULL,
-        Description NVARCHAR(MAX) NULL,
-        CreatedAt DATETIME DEFAULT GETDATE(),
-
-        -- 👇 CORRECCIONES APLICADAS AQUÍ 👇
-        CONSTRAINT FK_EventLog_Pedidos FOREIGN KEY (OrderId) REFERENCES RIP.APP_PEDIDOS(id),
-        CONSTRAINT FK_EventLog_Despachos FOREIGN KEY (DeliveryId) REFERENCES RIP.APP_DESPACHOS(id),
-        CONSTRAINT FK_EventLog_Usuarios FOREIGN KEY (UserId) REFERENCES RIP.APP_USUARIOS(id)
-    );
-    PRINT 'Tabla RIP.EventLog creada exitosamente con todas sus referencias.';
-END
-ELSE
-BEGIN
-    PRINT 'La tabla RIP.EventLog ya existe.';
-END
 GO
