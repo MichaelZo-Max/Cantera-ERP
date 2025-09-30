@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+
 import { PageHeader } from "@/components/page-header";
 import { executeQuery } from "@/lib/db";
 import { CashierOrdersClient } from "./cashier-orders-client";
