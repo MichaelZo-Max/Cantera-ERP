@@ -7,6 +7,7 @@ const usersToSeed = [
   { email: "seguridad@cantera.com", name: "Carlos López", role: "SECURITY" },
   { email: "admin@cantera.com", name: "Ana Martínez", role: "ADMIN" },
   { email: "reportes@cantera.com", name: "Luis Rodríguez", role: "REPORTS" },
+    { email: "Papi@cantera.com", name: "Medula Osea", role: "ADMIN" },
 ];
 
 const plainTextPassword = '123456';

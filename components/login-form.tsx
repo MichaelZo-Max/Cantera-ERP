@@ -69,6 +69,7 @@ export function LoginForm() {
                 { email: "seguridad@cantera.com", role: "Seguridad" },
                 { email: "admin@cantera.com", role: "Administrador" },
                 { email: "reportes@cantera.com", role: "Reportes" },
+                { email: "michael@cantera.com.com", role: "Administrador" },
               ].map((user, index) => (
                 <div
                   key={index}
