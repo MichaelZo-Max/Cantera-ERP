@@ -194,7 +194,7 @@ export function CashierOrdersClient({ data }: { data: CashierOrder[] }) {
             <Input
               placeholder="Buscar por cliente, número de orden o ID..."
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+           onChange={(e) => setSearchTerm(e.target.value.toUpperCase())}
               className="h-12 pl-12 text-base sm:text-lg"
             />
           </div>

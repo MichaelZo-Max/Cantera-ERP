@@ -168,7 +168,7 @@ export function CashierDeliveriesClientUI({
               id="search-deliveries"
               placeholder="Buscar por placa, cliente, orden, factura o ID de viaje…"
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              onChange={(e) => setSearchTerm(e.target.value.toUpperCase())}
               className="h-12 pl-12 text-base sm:text-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
               inputMode="search"
               autoComplete="off"

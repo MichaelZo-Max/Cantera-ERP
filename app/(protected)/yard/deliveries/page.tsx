@@ -51,6 +51,7 @@ async function getData() {
     LEFT JOIN RIP.APP_PEDIDOS_ITEMS pi ON pi.order_id = p.id
     LEFT JOIN dbo.ARTICULOS prod ON prod.CODARTICULO = pi.product_id -- ✅ CAMBIO: JOIN a tabla directa
     LEFT JOIN DispatchedTotals dt ON dt.pedido_item_id = pi.id
+      where d.status <> 'CANCELLED'
 
     UNION ALL
 
@@ -60,8 +61,13 @@ async function getData() {
         p.id, p.order_number, p.customer_id, c.NOMBRECLIENTE, p.status, p.created_at, -- ✅ CAMBIO: Tabla directa dbo.CLIENTES
         (SELECT pf.invoice_series, pf.invoice_number, pf.invoice_n, ISNULL(pf.invoice_series + '-' + CAST(pf.invoice_number AS VARCHAR) + pf.invoice_n COLLATE DATABASE_DEFAULT, '') AS invoice_full_number FROM RIP.APP_PEDIDOS_FACTURAS pf WHERE pf.pedido_id = p.id FOR JSON PATH) as invoices_json
     FROM RIP.APP_PEDIDOS p
-    JOIN dbo.CLIENTES c ON c.CODCLIENTE = p.customer_id -- ✅ CAMBIO: JOIN a tabla directa
-    WHERE p.status IN ('INVOICED', 'PARTIALLY_DISPATCHED');
+    INNER JOIN dbo.CLIENTES c ON c.CODCLIENTE = p.customer_id -- ✅ CAMBIO: JOIN a tabla directa
+    WHERE 
+     p.status IN ('INVOICED', 'PARTIALLY_DISPATCHED')
+     AND NOT EXISTS (
+       SELECT 1 FROM RIP.APP_DESPACHOS d 
+       WHERE d.order_id = p.id AND d.status IN ('CANCELLED','CARGADA'))
+        order by id desc
   `;
 
   const results = await executeQuery(mainQuery);

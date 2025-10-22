@@ -136,6 +136,8 @@ export function OrderForm({
   const [isInvoiceItemsLoading, setIsInvoiceItemsLoading] = useState(false);
 
   const prevInvoicesRef = useRef<string[]>();
+  // --- 👇 NUEVO: Bandera para controlar la carga inicial en modo edición ---
+  const isInitialLoadInEditMode = useRef(isEditing);
 
   useEffect(() => {
     if (isEditing && initialOrderData) {
@@ -229,6 +231,13 @@ export function OrderForm({
 
   useEffect(() => {
     const fetchAndSetInvoiceItems = async () => {
+      // --- 👇 CORRECCIÓN CLAVE ---
+      // Si estamos en modo de edición, NUNCA debemos recargar los items desde las facturas.
+      // Los items correctos ya vienen en `initialOrderData`.
+      if (isEditing) {
+        return;
+      }
+
       const prevInvoices = prevInvoicesRef.current;
       prevInvoicesRef.current = selectedInvoices;
 
@@ -389,12 +398,30 @@ export function OrderForm({
     toast.success(`Chofer "${newDriver.name}" agregado y seleccionado.`);
   };
 
+  const downloadJSON = (data: object, filename: string) => {
+    const jsonString = JSON.stringify(data, null, 2);
+
+    const blob = new Blob([jsonString], { type: "application/json" });
+
+    const url = URL.createObjectURL(blob);
+
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+
+    document.body.appendChild(a);
+    a.click();
+
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+
   const proceedSubmit = () => {
     const orderData = {
       customer_id: parseInt(selectedcustomer_id!, 10),
-      destination_id: selectedDestinationId
-        ? parseInt(selectedDestinationId, 10)
-        : null,
+      customer_name: selectedClient?.name ?? "N/A",
+      destination_id: selectedDestinationId ? parseInt(selectedDestinationId, 10) : null,
       items: orderItems.map((item) => ({
         product_id: item.product.id,
         quantity: item.quantity,
@@ -402,7 +429,13 @@ export function OrderForm({
         unit: item.product.unit || "UNIDAD",
       })),
       truck_ids: selectedTruckIds.map((id) => parseInt(id, 10)),
+      trucks_name: trucks
+        .filter((t) => selectedTruckIds.includes(t.id.toString()))
+        .map((t) => t.placa),
       driver_ids: selectedDriverIds.map((id) => parseInt(id, 10)),
+      drivers_name: drivers
+        .filter((d) => selectedDriverIds.includes(d.id.toString()))
+        .map((d) => d.name),
       invoices: selectedInvoices.map((invStr) => {
         const [series, number, n] = invStr.split("|");
         return {
@@ -412,6 +445,20 @@ export function OrderForm({
         };
       }),
     };
+
+    // --- 👇 NUEVO: Llamada a la función de descarga ---
+    // Genera un nombre de archivo único con el formato DD-MM-YYYY-ID_CLIENTE.
+    const now = new Date();
+    const day = String(now.getDate()).padStart(2, "0");
+    const month = String(now.getMonth() + 1).padStart(2, "0"); // Los meses son 0-indexados
+    const year = now.getFullYear();
+    // --- CORRECCIÓN: Añadir el nombre del cliente al nombre del archivo ---
+    const customerNameForFilename = selectedClient?.name
+      ? selectedClient.name.replace(/\s+/g, "_")
+      : "unknown_client";
+    const timestamp = `${day}-${month}-${year}-${selectedcustomer_id}-${customerNameForFilename}`;
+    downloadJSON(orderData, `pedido-${timestamp}.json`);
+
     onSubmit(orderData);
   };
 
@@ -490,7 +537,11 @@ export function OrderForm({
                           value: c.id.toString(),
                           label: c.name,
                         }))}
-                        onSearch={setClientSearch}
+                        onSearch={(searchTerm) => {
+                          // --- 👇 CORRECCIÓN: Reiniciar paginación al buscar ---
+                          setClientPage(1);
+                          setClientSearch(searchTerm);
+                        }}
                         onLoadMore={() => {
                           if (
                             clientPage < clientTotalPages &&

@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { AnimatedCard } from "@/components/ui/animated-card";
 import type { Product } from "@/lib/types";
-import { Package, Search } from "lucide-react";
+import { Package,Search } from "lucide-react";
 import { EmptyState } from "@/components/ui/empty-state";
 import { useDebounce } from "@/hooks/use-debounce";
 import {
@@ -38,7 +38,7 @@ export function ProductsClientUI({
   // Efecto corregido para actualizar la URL solo cuando la búsqueda cambia
   useEffect(() => {
     const params = new URLSearchParams(searchParams.toString());
-    
+
     // Solo actualizamos la URL si el término de búsqueda debounced es diferente
     // al que ya está en la URL, para evitar bucles de renderizado.
     if (debouncedSearchTerm !== currentQuery) {
@@ -82,9 +82,9 @@ export function ProductsClientUI({
       <AnimatedCard hoverEffect="lift" className="glass">
         <CardContent className="pt-6">
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-5 w-5" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground h-5 w-5" />
             <Input
-              placeholder="Buscar por nombre o descripción..."
+              placeholder="Buscar por nombre o descripcion..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-12 h-12 text-lg focus-ring"
@@ -122,15 +122,12 @@ export function ProductsClientUI({
                       {product.name}
                     </CardTitle>
                     <p className="text-sm font-semibold text-primary mt-1">
-                      ${(product.price_per_unit || 0).toFixed(2)} /{" "}
-                      Unidad
+                      ${(product.price_per_unit || 0).toFixed(2)} / Unidad
                     </p>
                   </div>
                   <Badge
                     variant={product.is_active ? "default" : "secondary"}
-                    className={
-                      product.is_active ? "bg-gradient-primary" : ""
-                    }
+                    className={product.is_active ? "bg-gradient-primary" : ""}
                   >
                     {product.is_active ? "Activo" : "Inactivo"}
                   </Badge>

@@ -312,7 +312,14 @@ export function CustomersClientUI({
             <Input
               placeholder="Buscar por nombre o RIF..."
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              onChange={(e) =>
+                setSearchTerm(
+                  e.target.value
+                    .normalize("NFD")
+                    .replace(/[\u0300-\u036f]/g, "")
+                    .toLowerCase()
+                )
+              }
               className="pl-12 h-12 text-lg focus-ring"
             />
           </div>
@@ -498,10 +505,13 @@ export function CustomersClientUI({
               <Label htmlFor="name">Nombre del Cliente</Label>
               <Input
                 id="name"
-                placeholder="Ej: John Doe"
+                placeholder="Ej: John Jackson"
                 value={formData.name}
                 onChange={(e) =>
-                  setFormData({ ...formData, name: e.target.value })
+                  setFormData({
+                    ...formData,
+                    name: e.target.value.toUpperCase(),
+                  })
                 }
                 className="mt-1.5" // <-- AÑADE ESTA LÍNEA
               />

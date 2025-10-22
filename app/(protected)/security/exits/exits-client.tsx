@@ -156,9 +156,11 @@ const ExitedDeliveryCard = React.memo(
               <span className="text-muted-foreground">Salida:</span>
               <span>
                 {new Date(delivery.exitedAt).toLocaleString("es-VE", {
+                  day: "2-digit",
+                  month: "2-digit",
+                  year: "numeric",
                   hour: "numeric",
                   minute: "numeric",
-                  hour12: true,
                   timeZone: "America/Caracas",
                 })}
               </span>
@@ -201,6 +203,9 @@ export function SecurityExitsClientUI({
   const [selectedExitedDelivery, setSelectedExitedDelivery] =
     useState<Delivery | null>(null);
 
+  // ✅ NUEVO: Estado para la búsqueda de salidas recientes.
+  const [exitedSearchQuery, setExitedSearchQuery] = useState<string>("");
+
   const loadedDeliveries = useMemo(
     () => allDeliveries.filter((d) => d.status === "CARGADA"),
     [allDeliveries]
@@ -227,6 +232,19 @@ export function SecurityExitsClientUI({
       );
     });
   }, [searchQuery, loadedDeliveries]);
+
+  // ✅ NUEVO: Memo para filtrar las salidas recientes.
+  const filteredExitedDeliveries = useMemo(() => {
+    const query = exitedSearchQuery.toLowerCase().trim();
+    if (!query) return exitedDeliveries;
+    return exitedDeliveries.filter(
+      (delivery) =>
+        (delivery.truck?.placa || "").toLowerCase().includes(query) ||
+        (delivery.orderDetails?.client?.name || "")
+          .toLowerCase()
+          .includes(query)
+    );
+  }, [exitedSearchQuery, exitedDeliveries]);
 
   const handleSelectDelivery = useCallback((delivery: Delivery) => {
     if (delivery.status !== "CARGADA") {
@@ -411,20 +429,40 @@ export function SecurityExitsClientUI({
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <CheckCircle className="h-5 w-5 text-blue-600" />
-              Salidas Recientes
+              Salidas Recientes{" "}
               <Badge variant="secondary">{exitedDeliveries.length}</Badge>
             </CardTitle>
+            <CardDescription>
+              Historial de viajes que ya salieron de las instalaciones.
+            </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-              {exitedDeliveries.map((delivery) => (
-                <ExitedDeliveryCard
-                  key={delivery.id}
-                  delivery={delivery}
-                  onSelect={handleSelectExitedDelivery}
-                />
-              ))}
+            {/* --- 👇 INICIO DE LA MODIFICACIÓN --- */}
+            <div className="relative mb-4">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Filtrar por placa o cliente..."
+                value={exitedSearchQuery}
+                onChange={(e) => setExitedSearchQuery(e.target.value)}
+                className="pl-9"
+              />
             </div>
+            {filteredExitedDeliveries.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                {filteredExitedDeliveries.map((delivery) => (
+                  <ExitedDeliveryCard
+                    key={delivery.id}
+                    delivery={delivery}
+                    onSelect={handleSelectExitedDelivery}
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8 text-muted-foreground">
+                No se encontraron salidas con ese criterio.
+              </div>
+            )}
+            {/* --- FIN DE LA MODIFICACIÓN --- */}
           </CardContent>
         </Card>
       )}
@@ -444,6 +482,19 @@ export function SecurityExitsClientUI({
           </DialogHeader>
           {selectedDelivery && (
             <div className="space-y-4">
+              {/* --- INICIO DE LA MODIFICACIÓN --- */}
+              <div>
+                <p className="text-sm font-medium mb-2 flex items-center gap-2">
+                  <Info className="h-4 w-4" /> Número del Pedido:
+                </p>
+                <div className="border rounded-lg p-3 bg-muted/30">
+                  <Badge variant="default">
+                    {selectedDelivery.orderDetails.order_number}
+                  </Badge>
+                </div>
+              </div>
+              {/* --- FIN DE LA MODIFICACIÓN --- */}
+
               {selectedDelivery.orderDetails.invoices &&
                 selectedDelivery.orderDetails.invoices.length > 0 && (
                   <div>
@@ -497,6 +548,7 @@ export function SecurityExitsClientUI({
                   )}
                 </div>
               </div>
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <h4 className="font-medium mb-2 flex items-center gap-2 text-sm">

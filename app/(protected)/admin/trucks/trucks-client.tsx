@@ -253,7 +253,7 @@ export function TrucksClientUI({
             <Input
               placeholder="Buscar por placas, marca o modelo..."
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={(e) => setSearchTerm(e.target.value.toUpperCase())}
               className="pl-12 h-12 text-lg focus-ring"
             />
           </div>
@@ -275,7 +275,7 @@ export function TrucksClientUI({
                       className="flex items-center space-x-2 mt-4"
                     >
                       <Plus className="h-4 w-4" />
-                      <span>Añadir Primer Camión</span>
+                      <span>Añadir Primer Camion</span>
                     </GradientButton>
                   }
                 />
@@ -360,7 +360,7 @@ export function TrucksClientUI({
             <DialogDescription>
               {editingTruck
                 ? "Actualiza la información del vehículo."
-                : "Completa los datos del nuevo vehículo."}
+                : "Completa los datos del nuevo vehiculo."}
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-6 pt-4">
@@ -487,7 +487,7 @@ export function TrucksClientUI({
                 {isSubmitting ? (
                   <>
                     <LoadingSkeleton className="w-4 h-4 mr-2" />
-                    Guardando...
+                    Gurdando...
                   </>
                 ) : (
                   <>

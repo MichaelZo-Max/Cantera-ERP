@@ -15,14 +15,31 @@ export async function GET(req: NextRequest) {
     const page = parseInt(searchParams.get("page") || "1", 10);
     const limit = parseInt(searchParams.get("limit") || "10", 10);
     const searchTerm = searchParams.get("q") || "";
+    const isActive = searchParams.get("is_active");
+    const customerId = searchParams.get("id"); // <-- NUEVO: Obtener el ID específico
 
     const offset = (page - 1) * limit;
 
     const params: any[] = [];
     let whereClauses: string[] = [];
 
+    // Si se pide un ID específico, este filtro tiene prioridad.
+    if (customerId) {
+      whereClauses.push(`id = ${parseInt(customerId, 10)}`);
+    }
+
+    // Si se especifica el estado de activo/inactivo, lo añadimos al filtro.
+    if (isActive === "true") {
+      whereClauses.push(`is_active = 1`);
+    }
+
     if (searchTerm) {
-      whereClauses.push(`(name LIKE @searchTerm OR rfc LIKE @searchTerm)`);
+      // --- CAMBIO: Se añade COLLATE para que la búsqueda ignore acentos y mayúsculas/minúsculas ---
+      const collation = "Latin1_General_CI_AI"; // CI: Case-Insensitive, AI: Accent-Insensitive
+      whereClauses.push(
+        `(name COLLATE ${collation} LIKE @searchTerm OR rfc COLLATE ${collation} LIKE @searchTerm)`
+      );
+
       params.push({
         name: "searchTerm",
         type: TYPES.NVarChar,
@@ -30,11 +47,15 @@ export async function GET(req: NextRequest) {
       });
     }
 
-    const whereClause = whereClauses.length > 0 ? `WHERE ${whereClauses.join(" AND ")}` : "";
+    const whereClause =
+      whereClauses.length > 0 ? `WHERE ${whereClauses.join(" AND ")}` : "";
 
     // --- Consulta #1: Conteo total (sigue usando la vista) ---
     const countQuery = `SELECT COUNT(*) as total FROM RIP.VW_APP_CLIENTES ${whereClause}`;
-    const countResult = await executeQuery<{ total: number }>(countQuery, params);
+    const countResult = await executeQuery<{ total: number }>(
+      countQuery,
+      params
+    );
     const total = countResult[0]?.total ?? 0;
 
     // --- Consulta #2: Obtener la página de datos ---
@@ -48,7 +69,7 @@ export async function GET(req: NextRequest) {
         email,
         is_active
       FROM RIP.VW_APP_CLIENTES
-      ${whereClause}
+      ${whereClause} 
       -- ✨ CORRECCIÓN CLAVE: Ordenamos por 'id' que es más estable para la paginación.
       ORDER BY id DESC
       OFFSET @offset ROWS
@@ -122,11 +143,36 @@ export async function POST(req: Request) {
 
     const params = [
       { name: "codCliente", type: TYPES.Int, value: codCliente },
-      { name: "nombreCliente", type: TYPES.NVarChar, value: name, options: { length: 200 } },
-      { name: "nif20", type: TYPES.NVarChar, value: rif, options: { length: 20 } },
-      { name: "direccion1", type: TYPES.NVarChar, value: address, options: { length: 400 } },
-      { name: "telefono1", type: TYPES.NVarChar, value: phone, options: { length: 50 } },
-      { name: "e_mail", type: TYPES.NVarChar, value: email, options: { length: 120 } },
+      {
+        name: "nombreCliente",
+        type: TYPES.NVarChar,
+        value: name,
+        options: { length: 200 },
+      },
+      {
+        name: "nif20",
+        type: TYPES.NVarChar,
+        value: rif,
+        options: { length: 20 },
+      },
+      {
+        name: "direccion1",
+        type: TYPES.NVarChar,
+        value: address,
+        options: { length: 400 },
+      },
+      {
+        name: "telefono1",
+        type: TYPES.NVarChar,
+        value: phone,
+        options: { length: 50 },
+      },
+      {
+        name: "e_mail",
+        type: TYPES.NVarChar,
+        value: email,
+        options: { length: 120 },
+      },
     ];
 
     const rows = await executeQuery<any>(sql, params);
@@ -147,9 +193,14 @@ export async function POST(req: Request) {
     return NextResponse.json(savedCustomer, { status: 201 });
   } catch (e: any) {
     if (e?.number === 2627 || e?.number === 2601) {
-      return new NextResponse("Un cliente con el mismo RIF o Email ya existe.", { status: 409 });
+      return new NextResponse(
+        "Un cliente con el mismo RIF o Email ya existe.",
+        { status: 409 }
+      );
     }
     console.error("[API_CUSTOMERS_POST]", e);
-    return new NextResponse("Error interno al crear el cliente.", { status: 500 });
+    return new NextResponse("Error interno al crear el cliente.", {
+      status: 500,
+    });
   }
 }

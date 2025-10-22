@@ -8,15 +8,11 @@ import util from "util";
 import { confirmExitSchema, confirmLoadSchema } from "@/lib/validations";
 import { z } from "zod";
 
-// --- CAMBIO: AÑADIMOS LAS IMPORTACIONES DE BYTESCALE ---
-import { UploadManager } from "@bytescale/sdk";
+// --- CAMBIO: Importaciones para guardar archivos localmente ---
+import fs from "fs/promises";
+import path from "path";
 
 export const dynamic = "force-dynamic";
-
-// --- CAMBIO: CONFIGURAMOS EL GESTOR DE SUBIDAS DE BYTESCALE ---
-const uploadManager = new UploadManager({
-  apiKey: process.env.UPLOAD_IO_SECRET_API_KEY ?? "secret_xxx", // Usa la variable de entorno
-});
 
 // --- CAMBIO: LA FUNCIÓN getFullImageUrl YA NO ES NECESARIA Y SE ELIMINA ---
 
@@ -35,7 +31,7 @@ const getDeliveryByIdQuery = `
         d.load_photo_url AS loadPhoto, 
         d.exit_photo_url AS exitPhoto,
         d.exit_load_photo_url AS exitLoadPhoto,
-        d.exited_at,
+        d.exited_at, d.loaded_at,
         p.id AS order_id, p.order_number, p.customer_id, p.status AS order_status, p.created_at AS order_created_at,
         c.id AS client_id, c.name AS client_name,
         t.id AS truck_id, t.placa,
@@ -56,18 +52,22 @@ const getDeliveryByIdQuery = `
     WHERE d.id = @id;
 `;
 
-// --- GET ---
-export async function GET(
-  request: Request,
-  { params }: { params: { id: string } }
-) {
+/**
+ * Obtiene un despacho completo por su ID.
+ * @param despachoId El ID del despacho a obtener.
+ * @returns El objeto Delivery completo o null si no se encuentra.
+ */
+export async function getFullDeliveryById(
+  despachoId: number
+): Promise<Delivery | null> {
   try {
-    const despachoId = parseInt(params.id, 10);
     if (isNaN(despachoId)) {
-      return NextResponse.json(
-        { error: "ID de despacho inválido" },
-        { status: 400 }
+      // En lugar de devolver una respuesta, devolvemos null o lanzamos un error
+      // para que la función que llama sepa que algo salió mal.
+      console.error(
+        "Error: ID de despacho inválido proporcionado a getFullDeliveryById."
       );
+      return null;
     }
 
     const rows = await executeQuery(getDeliveryByIdQuery, [
@@ -75,10 +75,7 @@ export async function GET(
     ]);
 
     if (!rows || rows.length === 0) {
-      return NextResponse.json(
-        { error: "No se encontró el despacho." },
-        { status: 404 }
-      );
+      return null;
     }
 
     const row = rows[0];
@@ -91,14 +88,17 @@ export async function GET(
       SELECT
         di.pedido_item_id,
         SUM(di.dispatched_quantity) as total_dispatched
-      FROM RIP.APP_DESPACHOS_ITEMS di
-      JOIN RIP.APP_DESPACHOS d ON d.id = di.despacho_id
-      WHERE d.order_id = @order_id AND d.id != @current_despacho_id AND d.status IN ('CARGADA', 'SALIDA', 'EXITED')
+      FROM 
+        RIP.APP_DESPACHOS_ITEMS di
+      JOIN 
+        RIP.APP_DESPACHOS d ON d.id = di.despacho_id
+      -- --- 👇 CORRECCIÓN: Incluir TODOS los despachos cargados o salidos para el cálculo ---
+      WHERE 
+        d.order_id = @order_id AND d.status IN ('CARGADA', 'EXITED')
       GROUP BY di.pedido_item_id;
     `;
     const dispatchedRows = await executeQuery(dispatchedQuantitiesQuery, [
       { name: "order_id", type: TYPES.Int, value: orderId },
-      { name: "current_despacho_id", type: TYPES.Int, value: despachoId },
     ]);
 
     const dispatchedMap = new Map<number, number>();
@@ -115,7 +115,7 @@ export async function GET(
         WHERE despacho_id = @despachoId;
     `;
     const dispatchItemRows = await executeQuery(dispatchItemsQuery, [
-        { name: "despachoId", type: TYPES.Int, value: despachoId },
+      { name: "despachoId", type: TYPES.Int, value: despachoId },
     ]);
 
     const itemsQuery = `
@@ -157,6 +157,7 @@ export async function GET(
       exitPhoto: row.exitPhoto ?? undefined,
       exitLoadPhoto: row.exitLoadPhoto ?? undefined,
       exitedAt: row.exited_at,
+      loadedAt: row.loaded_at,
       orderDetails: {
         id: orderId,
         order_number: row.order_number,
@@ -176,7 +177,38 @@ export async function GET(
       dispatchItems: dispatchItemRows,
     };
 
-    return NextResponse.json(finalPayload);
+    return finalPayload;
+  } catch (e) {
+    console.error(
+      `[getFullDeliveryById] Error fetching delivery ${despachoId}:`,
+      e
+    );
+    return null;
+  }
+}
+
+// --- GET ---
+export async function GET(
+  request: Request,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const despachoId = parseInt(params.id, 10);
+    if (isNaN(despachoId)) {
+      return NextResponse.json(
+        { error: "ID de despacho inválido" },
+        { status: 400 }
+      );
+    }
+
+    const delivery = await getFullDeliveryById(despachoId);
+    if (!delivery) {
+      return NextResponse.json(
+        { error: "No se encontró el despacho." },
+        { status: 404 }
+      );
+    }
+    return NextResponse.json(delivery);
   } catch (e) {
     console.error(
       "[API_DELIVERIES_ID_GET_ERROR]",
@@ -215,25 +247,34 @@ export async function PATCH(
         { status: 400 }
       );
     }
-    
-    // --- CAMBIO: Nueva función auxiliar para subir archivos a Bytescale ---
-    const uploadFileToBytescale = async (
+
+    // --- CAMBIO: Nueva función para guardar archivos localmente ---
+    const saveFileLocally = async (
       file: File | null,
-      tags: string[] = []
+      subfolder: string,
+      filenamePrefix: string
     ): Promise<string | null> => {
       if (!file) return null;
 
       try {
-        const { fileUrl } = await uploadManager.upload({
-          data: Buffer.from(await file.arrayBuffer()),
-          mime: file.type,
-          originalFileName: file.name,
-          tags,
-        });
-        return fileUrl; // Devolvemos la URL completa del archivo subido
+        const uploadDir = path.join(
+          process.cwd(),
+          "public",
+          "uploads",
+          "deliveries",
+          subfolder
+        );
+        await fs.mkdir(uploadDir, { recursive: true });
+
+        const fileExtension = path.extname(file.name);
+        const uniqueFilename = `${filenamePrefix}-${Date.now()}${fileExtension}`;
+        const filePath = path.join(uploadDir, uniqueFilename);
+        await fs.writeFile(filePath, Buffer.from(await file.arrayBuffer()));
+
+        return `/uploads/deliveries/${subfolder}/${uniqueFilename}`;
       } catch (error) {
-        console.error("Bytescale upload error:", error);
-        return null; // Devolvemos null si la subida falla
+        console.error("Error al guardar el archivo localmente:", error);
+        return null;
       }
     };
 
@@ -279,75 +320,98 @@ export async function PATCH(
     };
 
     if (status === "CARGADA") {
-        const notes = (formData.get("notes") as string) || null;
-        const itemsJson = formData.get("itemsJson") as string | null;
-        const loadPhotoFile = formData.get("photoFile") as File | null;
-        
-        const parsedItems = itemsJson ? JSON.parse(itemsJson) : [];
-        
-        const validation = confirmLoadSchema.safeParse({
-            notes: notes ?? undefined,
-            loadPhoto: loadPhotoFile,
-            loadedItems: parsedItems,
+      const notes = (formData.get("notes") as string) || null;
+      const itemsJson = formData.get("itemsJson") as string | null;
+      const loadPhotoFile = formData.get("photoFile") as File | null;
+
+      // --- 👇 CORRECCIÓN CLAVE ---
+      // El objeto que se valida con Zod DEBE incluir el archivo de la foto.
+      const parsedItems = itemsJson ? JSON.parse(itemsJson) : [];
+      const validation = confirmLoadSchema.safeParse({
+        notes: notes ?? undefined,
+        loadPhoto: loadPhotoFile, // Incluimos el archivo aquí
+        loadedItems: parsedItems,
+      });
+
+      if (!validation.success) {
+        return NextResponse.json(
+          {
+            error: "Datos de confirmación de carga inválidos.",
+            details: validation.error.flatten(),
+          },
+          { status: 400 }
+        );
+      }
+
+      const { loadedItems, loadPhoto } = validation.data;
+      let photoUrl: string | null = null;
+
+      if (loadPhoto) {
+        // --- CAMBIO: Usamos la nueva función para guardar localmente ---
+        photoUrl = await saveFileLocally(
+          loadPhoto,
+          "load_photos(Patio)",
+          `despacho_${despachoId}`
+        );
+      }
+
+      // --- 👇 CORRECCIÓN: Construir la consulta de actualización dinámicamente ---
+      const updateFields = [
+        "status = 'CARGADA'",
+        "loaded_by = @userId",
+        "loaded_at = GETUTCDATE()",
+        "notes = @notes",
+        "updated_at = GETUTCDATE()",
+      ];
+      const updateParams = [
+        { name: "despachoId", type: TYPES.Int, value: despachoId },
+        { name: "userId", type: TYPES.Int, value: parseInt(userId, 10) },
+        { name: "notes", type: TYPES.NVarChar, value: notes },
+      ];
+
+      if (photoUrl) {
+        updateFields.push("load_photo_url = @photoUrl");
+        updateParams.push({
+          name: "photoUrl",
+          type: TYPES.NVarChar,
+          value: photoUrl,
         });
+      }
 
-        if (!validation.success) {
-            return NextResponse.json(
-                {
-                    error: "Datos de confirmación de carga inválidos.",
-                    details: validation.error.flatten(),
-                },
-                { status: 400 }
-            );
-        }
-
-        const { loadedItems, loadPhoto } = validation.data;
-        let photoUrl: string | null = null;
-        
-        if (loadPhoto) {
-            // --- CAMBIO: Usamos la nueva función para subir a Bytescale ---
-            photoUrl = await uploadFileToBytescale(loadPhoto, [
-              `despacho_${despachoId}`,
-              "foto_carga",
-            ]);
-        }
-
-        const updateDespachoSql = `
+      const updateDespachoSql = `
             UPDATE RIP.APP_DESPACHOS
-            SET 
-                status = 'CARGADA',
-                loaded_by = @userId,
-                loaded_at = GETUTCDATE(),
-                notes = ISNULL(@notes, notes),
-                load_photo_url = ISNULL(@photoUrl, load_photo_url),
-                updated_at = GETUTCDATE()
+            SET ${updateFields.join(", ")}
             WHERE id = @despachoId;
         `;
-        await executeQuery(updateDespachoSql, [
-            { name: "despachoId", type: TYPES.Int, value: despachoId },
-            { name: "userId", type: TYPES.Int, value: parseInt(userId, 10) },
-            { name: "notes", type: TYPES.NVarChar, value: notes }, 
-            { name: "photoUrl", type: TYPES.NVarChar, value: photoUrl },
-        ]);
+      await executeQuery(updateDespachoSql, updateParams);
 
-        const deleteItemsSql = "DELETE FROM RIP.APP_DESPACHOS_ITEMS WHERE despacho_id = @despachoId;";
-        await executeQuery(deleteItemsSql, [
-            { name: "despachoId", type: TYPES.Int, value: despachoId },
-        ]);
+      const deleteItemsSql =
+        "DELETE FROM RIP.APP_DESPACHOS_ITEMS WHERE despacho_id = @despachoId;";
+      await executeQuery(deleteItemsSql, [
+        { name: "despachoId", type: TYPES.Int, value: despachoId },
+      ]);
 
-        for (const item of loadedItems) {
-            if (item.dispatched_quantity > 0) {
-                const insertItemSql = `
+      for (const item of loadedItems) {
+        if (item.dispatched_quantity > 0) {
+          const insertItemSql = `
                     INSERT INTO RIP.APP_DESPACHOS_ITEMS (despacho_id, pedido_item_id, dispatched_quantity)
                     VALUES (@despachoId, @pedidoItemId, @quantity);
                 `;
-                await executeQuery(insertItemSql, [
-                    { name: "despachoId", type: TYPES.Int, value: despachoId },
-                    { name: "pedidoItemId", type: TYPES.Int, value: parseInt(item.pedido_item_id, 10) },
-                    { name: "quantity", type: TYPES.Decimal, value: item.dispatched_quantity },
-                ]);
-            }
+          await executeQuery(insertItemSql, [
+            { name: "despachoId", type: TYPES.Int, value: despachoId },
+            {
+              name: "pedidoItemId",
+              type: TYPES.Int,
+              value: parseInt(item.pedido_item_id, 10),
+            },
+            {
+              name: "quantity",
+              type: TYPES.Decimal,
+              value: item.dispatched_quantity,
+            },
+          ]);
         }
+      }
     } else if (status === "EXITED") {
       const exitPhotoFile = formData.get("exitPhoto") as File | null;
       const exitLoadPhotoFile = formData.get("exitLoadPhoto") as File | null;
@@ -372,16 +436,18 @@ export async function PATCH(
 
       const { exitPhoto, exitLoadPhoto } = validation.data;
 
-      // --- CAMBIO: Usamos la nueva función para subir a Bytescale en lugar de saveFile local ---
-      const exitPhotoUrl = await uploadFileToBytescale(exitPhoto, [
-        `despacho_${despachoId}`,
-        "foto_salida_camion",
-      ]);
+      // --- CAMBIO: Usamos la nueva función para guardar localmente ---
+      const exitPhotoUrl = await saveFileLocally(
+        exitPhoto,
+        "exit_photos(Camion-Placa)",
+        `despacho_${despachoId}`
+      );
 
-      const exitLoadPhotoUrl = await uploadFileToBytescale(exitLoadPhoto, [
-        `despacho_${despachoId}`,
-        "foto_salida_carga",
-      ]);
+      const exitLoadPhotoUrl = await saveFileLocally(
+        exitLoadPhoto,
+        "exit_load_photos(Carga)",
+        `despacho_${despachoId}`
+      );
 
       const updateDespachoSql = `
             UPDATE RIP.APP_DESPACHOS

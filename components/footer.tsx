@@ -16,16 +16,16 @@ export const Footer = ({ className }: { className?: string }) => {
           <p>
             &copy; {new Date().getFullYear()} Cantera ERP. Todos los derechos
             reservados.
-          </p>
+          </p>                                                                                                                                                                                                                                                                                                                                                                               
           <p>
-            Hecho con ❤️ por{" "}
+            Hecho con 💖 por{" "}
             <a
               href="https://redesip.org/"
               target="_blank"
               rel="noopener noreferrer"
               className="font-semibold text-primary hover:underline"
             >
-              RedesIP
+              Redes IP
             </a>
           </p>
         </div>

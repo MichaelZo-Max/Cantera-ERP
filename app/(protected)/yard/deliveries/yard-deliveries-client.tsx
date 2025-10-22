@@ -14,6 +14,7 @@ import type {
   Truck as TruckType,
   Driver,
   Invoice,
+  OrderItem,
 } from "@/lib/types";
 
 // --- UI Components ---
@@ -99,6 +100,12 @@ interface YardClientProps {
   initialDeliveries: Delivery[];
   initialActiveOrders: Order[];
 }
+
+// --- 👇 CORRECCIÓN: Tipo local para el item del despacho ---
+type DeliveryItem = {
+  quantity: number;
+  totalDispatched?: number;
+};
 // --- RHFSearchableSelect (Sin cambios) ---
 const RHFSearchableSelect = ({
   control,
@@ -245,6 +252,9 @@ export function YardDeliveriesClientUI({
   const [selectedDelivery, setSelectedDelivery] = useState<Delivery | null>(
     null
   );
+  const [activeOrders, setActiveOrders] =
+    useState<Order[]>(initialActiveOrders);
+
   const [showModal, setShowModal] = useState(false);
 
   const [authorizedTrucks, setAuthorizedTrucks] = useState<TruckType[]>([]);
@@ -354,6 +364,11 @@ export function YardDeliveriesClientUI({
       );
 
       setDeliveries((prev) => [newDelivery, ...prev]);
+      // 👇 LA LÓGICA CLAVE: Actualiza el estado de los pedidos activos en el cliente.
+      setActiveOrders((prev) =>
+        prev.filter((order) => order.id.toString() !== values.order_id)
+      );
+
       createTripForm.reset();
       setAuthorizedDrivers([]);
       setAuthorizedTrucks([]);
@@ -391,6 +406,32 @@ export function YardDeliveriesClientUI({
       setDeliveries((prev) =>
         prev.map((d) => (d.id === updatedDelivery.id ? updatedDelivery : d))
       );
+
+      // --- 👇 CORRECCIÓN: Lógica para actualizar la lista de pedidos activos ---
+      // Después de confirmar una carga, recalculamos si el pedido debe seguir activo o no.
+      const orderDetails = updatedDelivery.orderDetails;
+
+      // Verificamos si el pedido está completamente despachado.
+      // El backend ya nos devuelve el estado actualizado del pedido ('DISPATCHED_COMPLETE' si está terminado).
+      const isOrderComplete = orderDetails.status === "DISPATCHED_COMPLETE";
+
+      if (isOrderComplete) {
+        // Si el pedido está completo, lo eliminamos de la lista de activos para que no se puedan crear más viajes.
+        setActiveOrders((prev) => prev.filter((o) => o.id !== orderDetails.id));
+      } else {
+        // Si el pedido NO está completo (es decir, es 'PARTIALLY_DISPATCHED'),
+        // lo añadimos de nuevo a la lista de activos si no está ya presente, para permitir más viajes.
+        // Esto maneja los casos de despachos parciales.
+        setActiveOrders((prev) => {
+          if (!prev.some((o) => o.id === orderDetails.id)) {
+            return [...prev, orderDetails];
+          }
+          // --- CORRECCIÓN: Actualizar el pedido si ya existe en la lista ---
+          // Esto asegura que si el pedido ya estaba, se actualice con la nueva información
+          // (ej. el estado 'PARTIALLY_DISPATCHED').
+          return prev.map((o) => (o.id === orderDetails.id ? orderDetails : o));
+        });
+      }
 
       setShowModal(false);
       setSelectedDelivery(null);
@@ -473,7 +514,7 @@ export function YardDeliveriesClientUI({
                   name="order_id"
                   label="1. Pedido Activo"
                   placeholder="Seleccionar Pedido..."
-                  options={initialActiveOrders.map((o) => ({
+                  options={activeOrders.map((o) => ({
                     value: o.id.toString(),
                     label: `#${o.order_number} - ${o.client.name}`,
                   }))}

@@ -27,7 +27,7 @@ async function getClients(): Promise<PaginatedResponse<Client>> {
   try {
     const baseUrl = process.env.NEXT_PUBLIC_API_URL;
     // Hacemos la petición a la primera página por defecto
-    const res = await fetch(`${baseUrl}/api/customers?page=1&limit=20`, {
+    const res = await fetch(`${baseUrl}/api/customers?page=1&limit=45`, {
       next: { tags: ["customers"] },
     });
     if (!res.ok) throw new Error("Failed to fetch clients");

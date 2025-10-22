@@ -68,15 +68,24 @@ export function UsersClientUI({ initialUsers }: { initialUsers: User[] }) {
   const { isOpen, options, confirm, handleConfirm, handleCancel } =
     useConfirmation();
 
-  const filteredUsers = useMemo(
-    () =>
-      users.filter(
-        (user) =>
-          user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          user.email.toLowerCase().includes(searchTerm.toLowerCase())
-      ),
-    [users, searchTerm]
-  );
+  const filteredUsers = useMemo(() => {
+   // Función para normalizar texto: quita acentos y convierte a minúsculas.
+    const normalizeText = (str: string) =>
+      str
+        .normalize("NFD") // Separa los caracteres base de los diacríticos (ej: 'ó' -> 'o' + '´')
+        .replace(/[\u0300-\u036f]/g, "") // Elimina los diacríticos
+        .toLowerCase();
+
+    const normalizedSearchTerm = normalizeText(searchTerm);
+
+    if (!normalizedSearchTerm) return users;
+
+    return users.filter(
+      (user) =>
+        normalizeText(user.name).includes(normalizedSearchTerm) ||
+        normalizeText(user.email).includes(normalizedSearchTerm)
+    );
+  }, [users, searchTerm]);
 
   const getInitials = (name: string) => {
     return name
@@ -245,7 +254,7 @@ export function UsersClientUI({ initialUsers }: { initialUsers: User[] }) {
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-5 w-5" />
             <Input
-              placeholder="Buscar por name o correo electrónico..."
+              placeholder="Buscar por nombre o correo electrónico..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-12 h-12 text-lg focus-ring"

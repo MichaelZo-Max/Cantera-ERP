@@ -122,13 +122,21 @@ export function OrdersListClientUI({
 
   const filteredOrders = useMemo(() => {
     if (!searchTerm) return initialOrders;
-    const q = searchTerm.toLowerCase();
+
+    const normalizeText = (str: string) =>
+      str
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toLowerCase();
+
+    const normalizedSearchTerm = normalizeText(searchTerm);
+
     return initialOrders.filter(
       (order) =>
-        (order.order_number?.toLowerCase() ?? "").includes(q) ||
-        (order.client?.name?.toLowerCase() ?? "").includes(q) ||
+        normalizeText(order.order_number ?? "").includes(normalizedSearchTerm) ||
+        normalizeText(order.client?.name ?? "").includes(normalizedSearchTerm) ||
         order.invoices?.some((invoice) =>
-          invoice.invoice_full_number?.toLowerCase().includes(q)
+          normalizeText(invoice.invoice_full_number ?? "").includes(normalizedSearchTerm)
         )
     );
   }, [initialOrders, searchTerm]);

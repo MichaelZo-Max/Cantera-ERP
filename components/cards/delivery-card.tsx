@@ -116,6 +116,7 @@ export function DeliveryCard({ delivery }: DeliveryCardProps) {
           </span>
         </div>
 
+
         {/* Muestra la foto si existe */}
         {delivery.loadPhoto && (
           <div className="relative h-32 w-full overflow-hidden rounded-md border group mt-2">

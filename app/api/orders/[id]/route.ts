@@ -73,9 +73,38 @@ export async function GET(
       { name: "id", type: TYPES.Int, value: id },
     ]);
 
-    const finalResponse = {
-      ...order,
+    // Construimos la respuesta final asegurándonos de que las propiedades anidadas
+    // 'client' y 'destination' coincidan con la interfaz 'Order'.
+    const finalResponse: typeof order & {
+      client: any;
+      destination?: any;
+      items: any[];
+      trucks: any[];
+      drivers: any[];
+    } = {
+      id: order.id,
+      order_number: order.order_number,
+      status: order.status,
+      created_at: order.created_at,
+      notes: order.notes,
+      customer_id: order.customer_id,
+      client: {
+        // Construimos el objeto client
+        id: order.customer_id,
+        name: order.client_name,
+        rif: order.rfc, // Mapeamos rfc a rif según la interfaz Client
+      },
+      destination_id: order.destination_id,
+      destination: order.destination_id
+        ? {
+            // Construimos el objeto destination si existe
+            id: order.destination_id,
+            name: order.destino_name,
+          }
+        : undefined,
+      invoices: order.invoices, // Ya está parseado
       items: itemsResult.map((item: any) => ({
+        // Mapeamos los items
         id: item.id,
         quantity: Number(item.quantity),
         price_per_unit: Number(item.price_per_unit),
@@ -86,9 +115,9 @@ export async function GET(
           unit: item.product_unit,
         },
       })),
-      trucks: trucksResult,
-      drivers: driversResult,
-    };
+      trucks: trucksResult, // Incluimos los camiones
+      drivers: driversResult, // Incluimos los choferes
+    }; // Aseguramos que el tipo sea compatible
 
     return NextResponse.json(finalResponse);
   } catch (error) {
@@ -119,7 +148,7 @@ export async function PUT(
       WHERE order_id = @id;
     `;
     const result = await executeQuery(checkDispatchesQuery, [
-      { name: "id", type: TYPES.Int, value: id }
+      { name: "id", type: TYPES.Int, value: id },
     ]);
 
     if (result && result[0]?.dispatchCount > 0) {
@@ -149,14 +178,21 @@ export async function PUT(
 
     if (invoices && invoices.length > 0) {
       const invoiceParams = invoices.flatMap((inv, index) => [
-        { name: `series_${index}`, type: TYPES.NVarChar, value: inv.invoice_series },
+        {
+          name: `series_${index}`,
+          type: TYPES.NVarChar,
+          value: inv.invoice_series,
+        },
         { name: `number_${index}`, type: TYPES.Int, value: inv.invoice_number },
         { name: `n_${index}`, type: TYPES.NVarChar, value: inv.invoice_n },
       ]);
 
-      const conditions = invoices.map((_, index) =>
-        `(invoice_series = @series_${index} AND invoice_number = @number_${index} AND invoice_n = @n_${index})`
-      ).join(" OR ");
+      const conditions = invoices
+        .map(
+          (_, index) =>
+            `(invoice_series = @series_${index} AND invoice_number = @number_${index} AND invoice_n = @n_${index})`
+        )
+        .join(" OR ");
 
       const itemsQuery = `
         SELECT
@@ -171,36 +207,53 @@ export async function PUT(
         WHERE 
             ${conditions};
       `;
-      
-      const productsFromInvoices = await executeQuery(itemsQuery, invoiceParams);
+
+      const productsFromInvoices = await executeQuery(
+        itemsQuery,
+        invoiceParams
+      );
 
       trustedItems = productsFromInvoices.map((p: any) => ({
         product_id: p.id,
         quantity: p.available_quantity,
         price_per_unit: p.price_per_unit ?? 0,
-        unit: p.unit || 'UNIDAD'
+        unit: p.unit || "UNIDAD",
       }));
     } else {
       trustedItems = itemsFromClient;
     }
 
     if (trustedItems.length === 0) {
-      return NextResponse.json({ error: "El pedido debe tener al menos un producto." }, { status: 400 });
+      return NextResponse.json(
+        { error: "El pedido debe tener al menos un producto." },
+        { status: 400 }
+      );
     }
     // --- FIN DE LA LÓGICA DE SEGURIDAD ---
+
+    // --- 👇 CORRECCIÓN: Determinar el nuevo estado del pedido ---
+    // Si se proporcionan facturas, el estado debe ser 'INVOICED'.
+    // De lo contrario, se mantiene como 'PENDING_INVOICE'.
+    const newStatus = invoices && invoices.length > 0 ? "INVOICED" : "PENDING_INVOICE";
 
     // ===== INICIO DE LA TRANSACCIÓN EN LA BASE DE DATOS =====
     const updateOrderQuery = `
       UPDATE RIP.APP_PEDIDOS
       SET customer_id = @customer_id, 
           destination_id = @destination_id,
+          status = @status, -- Actualizamos el estado
           updated_at = GETDATE()
       WHERE id = @id;
     `;
     await executeQuery(updateOrderQuery, [
       { name: "id", type: TYPES.Int, value: id },
       { name: "customer_id", type: TYPES.Int, value: orderData.customer_id },
-      { name: "destination_id", type: TYPES.Int, value: orderData.destination_id },
+      {
+        name: "destination_id",
+        type: TYPES.Int,
+        value: orderData.destination_id,
+      },
+      { name: "status", type: TYPES.NVarChar, value: newStatus }, // Pasamos el nuevo estado como parámetro
     ]);
 
     // 1. Actualizar Items
@@ -217,7 +270,11 @@ export async function PUT(
         { name: "order_id", type: TYPES.Int, value: id },
         { name: "product_id", type: TYPES.Int, value: item.product_id },
         { name: "quantity", type: TYPES.Decimal, value: item.quantity },
-        { name: "price_per_unit", type: TYPES.Decimal, value: item.price_per_unit },
+        {
+          name: "price_per_unit",
+          type: TYPES.Decimal,
+          value: item.price_per_unit,
+        },
         { name: "unit", type: TYPES.NVarChar, value: item.unit },
       ]);
     }
@@ -235,8 +292,16 @@ export async function PUT(
         `;
         await executeQuery(insertInvoiceQuery, [
           { name: "pedido_id", type: TYPES.Int, value: id },
-          { name: "invoice_series", type: TYPES.NVarChar, value: invoice.invoice_series },
-          { name: "invoice_number", type: TYPES.Int, value: invoice.invoice_number },
+          {
+            name: "invoice_series",
+            type: TYPES.NVarChar,
+            value: invoice.invoice_series,
+          },
+          {
+            name: "invoice_number",
+            type: TYPES.Int,
+            value: invoice.invoice_number,
+          },
           { name: "invoice_n", type: TYPES.NVarChar, value: invoice.invoice_n },
         ]);
       }
@@ -269,9 +334,11 @@ export async function PUT(
     }
 
     revalidateTag("orders");
-    
+
     const getOrderNumberSql = `SELECT order_number FROM RIP.APP_PEDIDOS WHERE id = @id;`;
-    const orderResult = await executeQuery(getOrderNumberSql, [{ name: "id", type: TYPES.Int, value: id }]);
+    const orderResult = await executeQuery(getOrderNumberSql, [
+      { name: "id", type: TYPES.Int, value: id },
+    ]);
     const order_number = orderResult[0]?.order_number;
 
     return NextResponse.json({

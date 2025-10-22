@@ -84,7 +84,7 @@ export function CreateCustomerModal({ isOpen, onClose, onSuccess }: CreateCustom
         <form onSubmit={handleSubmit} className="space-y-4 pt-4">
           <div>
             <Label htmlFor="name">Nombre del Cliente *</Label>
-            <Input id="name" placeholder="Ej: John Doe" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} className="mt-1.5" />
+            <Input id="name" placeholder="Ej: John Jackson" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} className="mt-1.5" />
             {formErrors.name && <p className="text-red-500 text-sm mt-1">{formErrors.name}</p>}
           </div>
           <div>

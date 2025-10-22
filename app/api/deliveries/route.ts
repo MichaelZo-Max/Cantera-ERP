@@ -6,6 +6,7 @@ import { revalidateTag } from "next/cache";
 import { z } from "zod";
 import { Delivery, OrderItem, Invoice, DeliveryItem } from "@/lib/types";
 import { createDeliverySchema } from "@/lib/validations";
+import { getFullDeliveryById } from "./[id]/route"; // Importamos la función refactorizada
 
 export const dynamic = "force-dynamic";
 
@@ -123,7 +124,7 @@ export async function GET(_request: Request) {
       const invoices = row.order_invoices_json
         ? JSON.parse(row.order_invoices_json)
         : [];
-        
+
       return {
         id: row.id,
         status: mapDbStatusToUi(row.status),
@@ -184,48 +185,20 @@ export async function POST(request: Request) {
       throw new Error("No se pudo crear el despacho en la base de datos.");
     }
 
-    // ✨ CORRECCIÓN: No es necesario volver a consultar todo. Construimos una respuesta parcial
-    // y dejamos que el frontend use la data que ya tiene o revalide si es necesario.
-    // Aquí hacemos una consulta mínima para obtener los nombres y la data esencial.
-    const selectQuery = `
-        SELECT
-            d.id, d.status,
-            p.order_number, p.customer_id, p.status as order_status, p.created_at as order_created_at,
-            c.CODCLIENTE as client_id, c.NOMBRECLIENTE as client_name,
-            t.placa,
-            dr.name as driver_name, dr.phone as driver_phone
-        FROM RIP.APP_DESPACHOS d
-        JOIN RIP.APP_PEDIDOS p ON d.order_id = p.id
-        JOIN dbo.CLIENTES c ON p.customer_id = c.CODCLIENTE
-        JOIN RIP.APP_CAMIONES t ON d.truck_id = t.id
-        JOIN RIP.APP_CHOFERES dr ON d.driver_id = dr.id
-        WHERE d.id = @delivery_id;
-    `;
-     const newDeliveryData = (await executeQuery(selectQuery, [
-        { name: "delivery_id", type: TYPES.Int, value: newDeliveryId },
-    ]))[0];
+    // --- 👇 LA SOLUCIÓN ---
+    // Después de crear el despacho, obtenemos el objeto completo usando la función reutilizada.
+    const fullNewDelivery = await getFullDeliveryById(newDeliveryId);
 
+    if (!fullNewDelivery) {
+      // Si no se puede obtener el despacho completo, es un error grave.
+      throw new Error(
+        `Se creó el despacho #${newDeliveryId}, pero no se pudo recuperar su información completa.`
+      );
+    }
 
-    const payload: Delivery = {
-        id: newDeliveryData.id,
-        status: mapDbStatusToUi(newDeliveryData.status),
-        orderDetails: {
-            id: order_id,
-            order_number: newDeliveryData.order_number,
-            customer_id: newDeliveryData.customer_id,
-            status: newDeliveryData.order_status,
-            created_at: newDeliveryData.order_created_at,
-            client: { id: newDeliveryData.client_id, name: newDeliveryData.client_name },
-            items: [], // El detalle completo se puede cargar en el cliente si es necesario
-            invoices: [],
-        },
-        truck: { id: truck_id, placa: newDeliveryData.placa },
-        driver: { id: driver_id, name: newDeliveryData.driver_name, phone: newDeliveryData.driver_phone },
-        dispatchItems: [],
-    };
-    
     revalidateTag("deliveries");
-    return NextResponse.json(payload, { status: 201 });
+    // Devolvemos el objeto completo al frontend.
+    return NextResponse.json(fullNewDelivery, { status: 201 });
   } catch (e) {
     if (e instanceof z.ZodError) {
       return new NextResponse(JSON.stringify(e.errors), { status: 400 });

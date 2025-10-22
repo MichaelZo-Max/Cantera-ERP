@@ -274,16 +274,14 @@ export function DriversClientUI({
   const { isOpen, options, confirm, handleConfirm, handleCancel } =
     useConfirmation();
 
-  const filteredDrivers = useMemo(
-    () =>
-      drivers.filter(
-        (driver) =>
-          driver.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          (driver.docId &&
-            driver.docId.toLowerCase().includes(searchTerm.toLowerCase()))
-      ),
-    [drivers, searchTerm]
-  );
+  const filteredDrivers = useMemo(() => {
+    const lowercasedTerm = searchTerm.toLowerCase();
+    return drivers.filter(
+      (driver) =>
+        driver.name.toLowerCase().includes(lowercasedTerm) ||
+        (driver.docId && driver.docId.toLowerCase().includes(lowercasedTerm))
+    );
+  }, [drivers, searchTerm]);
 
   const handleNewDriver = useCallback(() => {
     setEditingDriver(null);
@@ -575,7 +573,10 @@ export function DriversClientUI({
                 id="name"
                 value={formData.name}
                 onChange={(e) =>
-                  setFormData({ ...formData, name: e.target.value })
+                  setFormData({
+                    ...formData,
+                    name: e.target.value.toUpperCase(),
+                  })
                 }
                 className={cn(formErrors.name && "border-red-500")}
               />

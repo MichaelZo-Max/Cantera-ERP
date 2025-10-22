@@ -20,8 +20,8 @@ async function getOrders(): Promise<{ orders: Order[] }> {
 
     if (!res.ok) throw new Error("Error al cargar las órdenes");
 
-    const orders = await res.json();
-    return { orders };
+    const responseData = await res.json();
+    return { orders: responseData.data || [] }; // Extraemos la propiedad 'data'
   } catch (error) {
     console.error("Error cargando órdenes en el servidor:", error);
     return { orders: [] };

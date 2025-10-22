@@ -19,7 +19,13 @@ async function getOrderCatalogs(): Promise<{
     const baseUrl = process.env.NEXT_PUBLIC_API_URL;
     // Quitamos la llamada a la API de facturas
     const [cRes, pRes, dRes, tRes, drRes] = await Promise.all([
-      fetch(`${baseUrl}/api/customers?page=1&limit=20`, { next: { tags: ["customers"] } }),
+      
+      //Mostrar un solo cliente por id
+      fetch(`${baseUrl}/api/customers?id=2519`, { next: { tags: ["customers"] } }),
+
+    //Mostrar 25 Clientes activos en el modulo de crear nuevo pedido
+     //fetch(`${baseUrl}/api/customers?page=1&limit=45&is_active=true`, { next: { tags: ["customers"] } }),
+
       fetch(`${baseUrl}/api/products?page=1&limit=20`, { next: { tags: ["products"] } }),
       fetch(`${baseUrl}/api/destinations`, { next: { tags: ["destinations"] } }),
       fetch(`${baseUrl}/api/trucks`, { next: { tags: ["trucks"] } }),
